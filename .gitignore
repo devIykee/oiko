@@ -1,0 +1,16 @@
+node_modules
+.next
+dist
+target
+.env
+.env.local
+.env*.local
+*.log
+.vercel
+coverage
+playwright-report
+test-results
+.turbo
+contracts/res/*.wasm
+!contracts/res/.gitkeep
+.near-credentials

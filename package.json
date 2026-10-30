@@ -1,0 +1,25 @@
+{
+  "name": "oiko",
+  "private": true,
+  "packageManager": "pnpm@10.18.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @oiko/web dev",
+    "build": "pnpm -r --filter './packages/*' build && pnpm --filter @oiko/web build",
+    "test": "pnpm test:contracts && pnpm test:unit",
+    "test:contracts": "cd contracts && cargo test --workspace",
+    "test:unit": "vitest run",
+    "e2e": "playwright test",
+    "lint": "pnpm -r lint",
+    "check:no-llm": "node scripts/check-no-llm.mjs",
+    "check:copy": "node scripts/check-copy.mjs",
+    "example:agent": "pnpm --filter @oiko/example-agent start"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}
