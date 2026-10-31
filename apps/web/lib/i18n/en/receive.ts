@@ -1,0 +1,15 @@
+export const receive = {
+  "receive.title": "Get paid",
+  "receive.sub": "Your name. Anyone can pay it from almost anywhere.",
+  "receive.qrLabel": "QR code for your pay link",
+  "receive.qrCaption": "Scan to open your pay page.",
+  "receive.yourLink": "Your pay link",
+  "receive.shareText": "Pay me with Oiko: {link}",
+  "receive.shareShort": "Pay me with Oiko",
+  "receive.howTitle": "What happens when someone pays",
+  "receive.howBody": "They pick where their USDC or USDT is now and how much to send. It arrives in your account and your plan splits it into your pots straight away.",
+  "receive.permanent": "Permanent address",
+  "receive.permanentWarn": "Only send USDC or USDT on NEAR to this name. Anything else sent here may be lost. For everything else, share your pay link.",
+  "receive.accountName": "Account name",
+  "receive.permanentOther": "Permanent addresses for other places (like TRON or Base) aren't available yet. Use your pay link instead.",
+} as const;

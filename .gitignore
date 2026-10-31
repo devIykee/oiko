@@ -16,3 +16,4 @@ contracts/res/*.wasm
 .near-credentials
 .claude/
 .oiko/
+.env*

@@ -1,0 +1,16 @@
+export const misc = {
+  "activityPage.sub": "Everything that happened in your account, and who did it.",
+  "activityPage.filter": "Show",
+  "activityPage.all": "All",
+  "activityPage.in": "In",
+  "activityPage.out": "Out",
+  "more.receiveSub": "Share your pay link",
+  "more.withdrawSub": "To an exchange or someone on Oiko",
+  "more.moveSub": "Move money between your pots",
+  "more.billsSub": "Rent, power, internet and more",
+  "more.insightsSub": "Where your money went each month",
+  "more.activitySub": "Everything, in plain words",
+  "more.roscaSub": "Rotating savings with friends and family",
+  "more.security": "How Oiko keeps your money safe",
+  "more.securitySub": "Who can and can't touch it",
+} as const;

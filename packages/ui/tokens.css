@@ -1,0 +1,168 @@
+/*
+ * Oiko design tokens (spec: docs/BUILD_PROMPT.md section 10).
+ * Light is default; dark via prefers-color-scheme unless [data-theme="light"],
+ * or forced via [data-theme="dark"] on <html>.
+ *
+ * AA adjustments (recorded, measured against the surfaces they sit on):
+ *   --ink-3  #9297A1 -> #676C78  (2.9:1 -> 4.6:1 on --bg, 4.5:1 on --surface-2)
+ *   text on soft tiles uses *-ink variants: success #0F7A41 (4.8:1), warning #8F5300 (5.6:1),
+ *   danger #BF2633 (5.1:1), accent #3049E8 on accent-soft (5.5:1)
+ *   dark --ink-3 #6F7480 -> #858A96 (3.8:1 -> 5.1:1 on --surface)
+ *   dark --accent-ink #FFFFFF -> #0B0C0E (white on #6E86FF is 3.2:1; near-black is 6.1:1)
+ */
+:root {
+  color-scheme: light;
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #eef0f3;
+  --line: #e3e5e9;
+  --ink: #16181d;
+  --ink-2: #5e636e;
+  --ink-3: #676c78;
+  --accent: #3d5afe;
+  --accent-ink: #ffffff;
+  --accent-soft: #e8ecff;
+  --accent-soft-ink: #3049e8;
+  --success: #128a4a;
+  --success-soft: #e3f5ea;
+  --success-ink: #0f7a41;
+  --warning: #a35f00;
+  --warning-soft: #fff2db;
+  --warning-ink: #8f5300;
+  --danger: #d62f3c;
+  --danger-soft: #fde8ea;
+  --danger-ink: #bf2633;
+  --focus: #3d5afe;
+  --pill-black: #16181d;
+  --pill-black-ink: #ffffff;
+  --pressed: rgba(22, 24, 29, 0.05);
+  --scrim: rgba(11, 12, 14, 0.4);
+
+  /* tiles: soft background / deep glyph */
+  --tile-blue-soft: #e8ecff;   --tile-blue: #3d5afe;
+  --tile-violet-soft: #eee9ff; --tile-violet: #5b3fe0;
+  --tile-mint-soft: #e2f6ee;   --tile-mint: #0e8a5f;
+  --tile-sun-soft: #fff0e0;    --tile-sun: #c2560e;
+  --tile-rose-soft: #fde9ee;   --tile-rose: #c42b57;
+  --tile-stone-soft: #eef0f3;  --tile-stone: #16181d;
+
+  /* type */
+  --font-ui: var(--font-inter, "Inter"), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font-inter-tight, "Inter Tight"), var(--font-ui);
+  --fs-hero: clamp(48px, 8vw, 104px);
+  --fs-section: clamp(36px, 5vw, 64px);
+  --fs-h1: 32px;
+  --fs-h2: 24px;
+  --fs-h3: 20px;
+  --fs-body: 16px;
+  --fs-small: 14px;
+  --fs-micro: 12px;
+  --fs-balance: 48px;
+
+  /* shape */
+  --r-card: 20px;
+  --r-sheet: 24px;
+  --r-input: 12px;
+  --r-pill: 999px;
+  --gutter: 16px;
+  --hairline: 1px;
+  --shadow-float: 0 12px 40px rgba(22, 24, 29, 0.12);
+
+  /* motion */
+  --dur-instant: 100ms;
+  --dur-fast: 160ms;
+  --dur-base: 240ms;
+  --dur-slow: 320ms;
+  --dur-reveal: 560ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+@media (min-width: 768px) {
+  :root { --gutter: 32px; --fs-balance: 64px; }
+}
+
+@media (min-resolution: 2dppx) {
+  :root { --hairline: 0.5px; }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0b0c0e;
+    --surface: #17191d;
+    --surface-2: #212429;
+    --line: #2a2d33;
+    --ink: #f5f6f8;
+    --ink-2: #a4a9b3;
+    --ink-3: #858a96;
+    --accent: #6e86ff;
+    --accent-ink: #0b0c0e;
+    --accent-soft: #1e2550;
+    --accent-soft-ink: #a9b6ff;
+    --success: #3dd68c;
+    --success-soft: #0f2e20;
+    --success-ink: #5fe0a2;
+    --warning: #f5b94a;
+    --warning-soft: #33250c;
+    --warning-ink: #f5b94a;
+    --danger: #ff6b75;
+    --danger-soft: #3a1418;
+    --danger-ink: #ff8a92;
+    --focus: #6e86ff;
+    --pill-black: #f5f6f8;
+    --pill-black-ink: #0b0c0e;
+    --pressed: rgba(255, 255, 255, 0.06);
+    --scrim: rgba(0, 0, 0, 0.6);
+    --tile-blue-soft: #1e2550;   --tile-blue: #8c9eff;
+    --tile-violet-soft: #2a2150; --tile-violet: #ae9bff;
+    --tile-mint-soft: #0f2e24;   --tile-mint: #4fd1a0;
+    --tile-sun-soft: #33230f;    --tile-sun: #ffae6b;
+    --tile-rose-soft: #36161f;   --tile-rose: #ff86a6;
+    --tile-stone-soft: #212429;  --tile-stone: #f5f6f8;
+    --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.5);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b0c0e;
+  --surface: #17191d;
+  --surface-2: #212429;
+  --line: #2a2d33;
+  --ink: #f5f6f8;
+  --ink-2: #a4a9b3;
+  --ink-3: #858a96;
+  --accent: #6e86ff;
+  --accent-ink: #0b0c0e;
+  --accent-soft: #1e2550;
+  --accent-soft-ink: #a9b6ff;
+  --success: #3dd68c;
+  --success-soft: #0f2e20;
+  --success-ink: #5fe0a2;
+  --warning: #f5b94a;
+  --warning-soft: #33250c;
+  --warning-ink: #f5b94a;
+  --danger: #ff6b75;
+  --danger-soft: #3a1418;
+  --danger-ink: #ff8a92;
+  --focus: #6e86ff;
+  --pill-black: #f5f6f8;
+  --pill-black-ink: #0b0c0e;
+  --pressed: rgba(255, 255, 255, 0.06);
+  --scrim: rgba(0, 0, 0, 0.6);
+  --tile-blue-soft: #1e2550;   --tile-blue: #8c9eff;
+  --tile-violet-soft: #2a2150; --tile-violet: #ae9bff;
+  --tile-mint-soft: #0f2e24;   --tile-mint: #4fd1a0;
+  --tile-sun-soft: #33230f;    --tile-sun: #ffae6b;
+  --tile-rose-soft: #36161f;   --tile-rose: #ff86a6;
+  --tile-stone-soft: #212429;  --tile-stone: #f5f6f8;
+  --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Reduced motion and low-data mode remove movement. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur-base: 0ms; --dur-slow: 0ms; --dur-reveal: 0ms; }
+}
+:root[data-low-data="1"] { --dur-fast: 0ms; --dur-base: 0ms; --dur-slow: 0ms; --dur-reveal: 0ms; }

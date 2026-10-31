@@ -1,0 +1,15 @@
+export const insights = {
+  "insights.sub": "Worked out from your account's own records. Same numbers every time.",
+  "insights.month": "Month",
+  "insights.period": "Period: {month} (UTC)",
+  "insights.in": "Money in",
+  "insights.out": "Money out",
+  "insights.saved": "Saved",
+  "insights.rate": "Savings rate",
+  "insights.unit": "All amounts in USDC + USDT.",
+  "insights.trend": "Last 6 months",
+  "insights.barLabel": "{month}: in {in}, out {out}",
+  "insights.topPayees": "Top payees",
+  "insights.noPayees": "No payments out this month",
+  "insights.agentNote": "Connected agents with read access see these same numbers.",
+} as const;

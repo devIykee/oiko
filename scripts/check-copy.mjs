@@ -9,7 +9,7 @@ import { join, relative } from "node:path";
 const ROOT = new URL("..", import.meta.url).pathname;
 const WEB = join(ROOT, "apps/web");
 const EXPLAINER = "USDC and USDT are stablecoins designed to track the US dollar. They are not dollars and are not bank deposits. They can lose their peg and issuers can freeze them.";
-const EXPLAINER_FAQ = /Stablecoins track the US dollar but are not dollars or bank deposits/;
+const EXPLAINER_FAQ = /Stablecoins track the US dollar but are not dollars or bank deposits|^Are these dollars\?$|^Stablecoins are not dollars\.$/;
 
 const SCOPE_A = [/\bdollars?\b/i, /\bUSD\b/, /\$\s?\d/];
 const SCOPE_B = [/\bgas\b/i, /seed phrase/i, /\bbridge\b/i, /\bnetwork\b/i, /\bRPC\b/, /chain ID/i, /wallet address/i,

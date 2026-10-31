@@ -1,0 +1,156 @@
+"use client";
+import { AgentAccessLog, AgentCard, Badge, CopyField, EmptyState, GroupedList, ListRow, ProposalCard, ScopeList, SectionTitle, useToast } from "@oiko/ui";
+import type { AgentView, Overview, Proposal } from "@oiko/sdk";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { ConfirmSheet } from "@/components/app/ConfirmSheet";
+import { ConnectFlow } from "@/components/app/ConnectFlow";
+import { PageHeader } from "@/components/app/PageHeader";
+import { LoadError, PageSkeleton } from "@/components/app/States";
+import { capUsage, consentItems, templateDraft, type Draft, type TemplateId } from "@/components/app/agentPolicy";
+import { actionSentence } from "@/components/app/describe";
+import { explain, useMoney } from "@/lib/actions";
+import { useAgentLog, useOverview } from "@/lib/data";
+import { fmt, fmtDate, fmtDateTime, nsToMs, shortKey } from "@/lib/format";
+import { useT } from "@/lib/i18n";
+
+
+export function AgentsScreen() {
+  const t = useT();
+  const ov = useOverview();
+  const sp = useSearchParams();
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [origin, setOrigin] = useState("");
+  useEffect(() => { setOrigin(window.location.origin); }, []);
+
+  // Deep link from Bills: "Let my agent pay this".
+  useEffect(() => {
+    if (!ov.data || draft) return;
+    const tpl = sp.get("template");
+    if (tpl === "bill-payer") {
+      const billId = Number(sp.get("bill"));
+      const bills = ov.data.bills.filter((b) => !sp.get("bill") || b.id === billId);
+      setDraft(templateDraft("bills", bills, t));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ov.data, sp]);
+
+  if (ov.error && !ov.data) return <div className="oi-col oi-page"><LoadError error={ov.error} onRetry={ov.refresh} /></div>;
+  if (!ov.data) return <div className="oi-col"><PageSkeleton rows={4} /></div>;
+  const o = ov.data;
+  const agents = o.agents.filter((a) => !a.revoked);
+
+  const templates: Array<{ id: TemplateId; icon: "insights" | "bills" | "savings" | "settings"; color: "blue" | "sun" | "mint" | "stone" }> = [
+    { id: "coach", icon: "insights", color: "blue" },
+    { id: "bills", icon: "bills", color: "sun" },
+    { id: "autopilot", icon: "savings", color: "mint" },
+    { id: "custom", icon: "settings", color: "stone" },
+  ];
+
+  return (
+    <div className="oi-col oi-page" data-testid="agents">
+      <PageHeader title={t("nav.agents")} />
+      <div>
+        <h2 className="oi-h1" style={{ fontSize: 26 }}>{t("agents.headline")}</h2>
+        <p className="oi-muted oi-pretty" style={{ margin: "8px 0 0" }}>{t("agents.intro")}</p>
+      </div>
+
+      <section aria-labelledby="connected" className="oi-stack-sm">
+        <SectionTitle id="connected">{t("agents.connected")}</SectionTitle>
+        {agents.length === 0 ? (
+          <div className="oi-card"><EmptyState icon="agents" color="violet" title={t("agents.emptyTitle")} body={t("agents.emptyBody")} /></div>
+        ) : agents.map((a) => <ConnectedAgent key={a.public_key} a={a} o={o} />)}
+      </section>
+
+      <section aria-labelledby="connect-new">
+        <SectionTitle id="connect-new">{t("agents.connectNew")}</SectionTitle>
+        <GroupedList label={t("agents.connectNew")}>
+          {templates.map((tp) => (
+            <ListRow key={tp.id} icon={tp.icon} color={tp.color} chevron onClick={() => setDraft(templateDraft(tp.id, o.bills, t))} data-testid={`agent-template-${tp.id}`}
+              title={t(`agents.tpl.${tp.id}`)} subtitle={t(`agents.tpl.${tp.id}Sub`)} />
+          ))}
+        </GroupedList>
+      </section>
+
+      <section aria-labelledby="dev" className="oi-card oi-stack-sm">
+        <h2 id="dev" className="oi-h2" style={{ fontSize: 16 }}>{t("agents.devTitle")}</h2>
+        <p className="oi-small oi-muted" style={{ margin: 0 }}>{t("agents.devBody")}</p>
+        <CopyField label={t("agents.mcpInstall")} value="npx -y @oiko/mcp" copyLabel={t("common.copy")} copiedLabel={t("common.copied")} />
+        <CopyField label={t("agents.mcpHttp")} value={`${origin}/api/mcp`} copyLabel={t("common.copy")} copiedLabel={t("common.copied")} />
+        <CopyField label={t("agents.connectLink")} value={`${origin}/connect?name=My%20agent&pk=ed25519:…&scopes=read,propose`} copyLabel={t("common.copy")} copiedLabel={t("common.copied")} />
+        <p className="oi-small" style={{ margin: 0 }}><a className="oi-dark-accent-link" href="/llms.txt">llms.txt</a> · <a className="oi-dark-accent-link" href="/.well-known/oiko-agent.json">oiko-agent.json</a></p>
+      </section>
+
+      {draft && <ConnectFlow open={!!draft} onOpenChange={(v) => !v && setDraft(null)} initial={draft} overview={o} />}
+    </div>
+  );
+}
+
+function ConnectedAgent({ a, o }: { a: AgentView; o: Overview }) {
+  const t = useT();
+  const toast = useToast();
+  const { exec } = useMoney();
+  const [busy, setBusy] = useState(false);
+  const [showLog, setShowLog] = useState(false);
+  const [pending, setPending] = useState<{ p: Proposal; kind: "approve" | "reject" } | null>(null);
+  const log = useAgentLog(showLog ? a.public_key : null);
+  const u = capUsage(a);
+  const act = a.scopes.includes("act");
+  const expired = nsToMs(a.expires_at) < Date.now();
+  const proposals = o.proposals.filter((p) => p.public_key === a.public_key);
+  const items = useMemo(() => consentItems(a, t).filter((i) => i.allowed), [a, t]);
+
+  const disconnect = async () => {
+    setBusy(true);
+    try {
+      await exec("revokeAgent", a.public_key);
+      toast.show({ message: t("agents.disconnected", { name: a.agent_name }), tone: "success" });
+    } catch (e) {
+      const f = explain(e);
+      toast.show({ message: `${f.title} ${f.next}`, tone: "danger", durationMs: 6000 });
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <AgentCard
+      testId={`agent-card-${shortKey(a.public_key)}`}
+      name={a.agent_name}
+      subtitle={t("agents.cardSub", { scopes: a.scopes.map((s) => t(`agents.scope.${s}`)).join(" · "), date: fmtDate(nsToMs(a.expires_at)) })}
+      status={expired ? <Badge tone="danger">{t("agents.expired")}</Badge> : <Badge tone="success">{t("agents.active")}</Badge>}
+      caps={act ? [
+        { label: t("agents.today"), used: Number(u.usedDay), cap: Number(u.daily), text: t("agents.capText", { used: fmt(u.usedDay), cap: fmt(u.daily) }) },
+        { label: t("agents.thisWeek"), used: Number(u.usedWeek), cap: Number(u.weekly), text: t("agents.capText", { used: fmt(u.usedWeek), cap: fmt(u.weekly) }) },
+      ] : []}
+      onDisconnect={disconnect}
+      disconnecting={busy}
+      disconnectLabel={t("agents.disconnect")}
+    >
+      <ScopeList label={t("agents.permissions")} items={items} />
+      {proposals.map((p) => (
+        <ProposalCard key={p.id} testId={`proposal-${p.id}`} agentName={a.agent_name} sentence={actionSentence(p.action, o.pots, o.bills, t)} reason={p.reason}
+          approveLabel={t("home.approve")} rejectLabel={t("home.reject")} onApprove={() => setPending({ p, kind: "approve" })} onReject={() => setPending({ p, kind: "reject" })} />
+      ))}
+      <button type="button" className="oi-btn oi-btn--secondary oi-btn--sm" onClick={() => setShowLog((v) => !v)} aria-expanded={showLog} style={{ alignSelf: "flex-start" }}>
+        {showLog ? t("agents.hideLog") : t("agents.showLog")}
+      </button>
+      {showLog && (
+        log.error ? <p className="oi-small oi-muted" style={{ margin: 0 }}>{explain(log.error).title}</p> : (
+          <AgentAccessLog label={t("agents.log")} empty={log.data ? t("agents.logEmpty") : t("common.loading")}
+            rows={(log.data ?? []).map((r) => ({
+              at: r.at, atLabel: fmtDateTime(Date.parse(r.at)),
+              text: r.summary ?? `${r.tool ?? r.path}${r.status && r.status >= 400 ? ` · ${t("agents.refused")}` : ""}`,
+              detail: r.code ?? undefined,
+            }))} />
+        )
+      )}
+      {pending && (
+        <ConfirmSheet open onOpenChange={(v) => { if (!v) setPending(null); }}
+          title={pending.kind === "approve" ? t("home.approveTitle") : t("home.rejectTitle")}
+          sentence={pending.kind === "approve" ? t("home.approveSentence", { action: actionSentence(pending.p.action, o.pots, o.bills, t), agent: a.agent_name }) : t("home.rejectSentence", { agent: a.agent_name })}
+          confirmLabel={pending.kind === "approve" ? t("home.approve") : t("home.reject")} variant={pending.kind === "approve" ? "black" : "danger"}
+          successText={pending.kind === "approve" ? t("home.approved") : t("home.rejected")}
+          onConfirm={() => (pending.kind === "approve" ? exec("approveProposal", pending.p.id) : exec("rejectProposal", pending.p.id))} />
+      )}
+    </AgentCard>
+  );
+}
