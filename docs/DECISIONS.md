@@ -284,3 +284,106 @@ All decimals are 6 unless marked.
 ## Product change: global, English only (2026-10-31)
 
 Source: the human, in chat. Removed Pidgin and the language toggle, removed the naira reference line and `/api/rates/ngn`, removed all country-specific wording. "Ajo" is renamed "ROSCA savings" in user-facing copy; the contract (`ajo.<root>`) and method names keep `ajo` so the frozen interface does not change.
+
+## Backend / SDK decisions (2026-10-31, backend agent)
+
+- **SDK** (`packages/sdk`) uses `near-api-js@7.4.0` for borsh tx/delegate building (`actions.*` incl. `useGlobalContract`, `addFunctionCallAccessKey` with allowance, `deleteKey`, `signedDelegate`). `SignedDelegate` and `Action` are **type-only** exports at runtime in 7.4.0; plain borsh-shaped objects are used instead (verified byte-identical re-encoding in tests). `UseGlobalContract(CodeHash)` bytes are unit-tested as `[10, 0, <32 bytes>]` (nearcore enum order).
+- **NEP-413** is implemented with @noble/curves + @noble/hashes + borsh (sync API required by the frozen SDK) and tested byte-for-byte against near-api-js `KeyPairSigner.signNep413Message`. Signature and nonce are base64.
+- **Gateway message path** = request pathname **plus query string** (`/api/agent/activity?limit=5`), so query parameters are signed. Nonces are stored as `<publicKey>:<nonce>` for 2× the 5-minute window.
+- **Agent writes**: `/api/agent/prepare` builds a tx with gas 200 Tgas, deposit 0, nonce = key nonce + 1, latest final block hash. `/api/agent/submit` accepts only one `agent_execute`/`agent_propose` FunctionCall signed by the authenticated agent key on its vault (signature verified server-side before broadcast). Submit returns `{ txHash, ok, value?, error?: { code, message, detail } }`. The contract is the only authority on caps/allowlist; the gateway does not pre-check them.
+- **MCP over HTTP** cannot sign. `propose`/`act` there return `{ needs_signature, unsigned_tx, hash }` unless `signed_tx` is passed. The stdio server (`@oiko/mcp`) signs locally. MCP tool for ajo is **`get_rosca_groups`**; REST read path `/api/agent/rosca` (frozen `/api/agent/ajo` kept as an alias).
+- **Rates**: `/api/rates/earn` `supplyApr` is a **percent string with 2 decimals** ("13.62" = 13.62%), truncated from Rhea's fraction. `paused = !config.can_deposit`; the UI should also treat `utilizationBps > 9200` as paused. `/api/rates/ngn` removed (product change).
+- **1Click proxy**: deposit quotes use `swapType EXACT_INPUT`, `slippageTolerance 100`, `depositType/refundType ORIGIN_CHAIN`, `recipientType DESTINATION_CHAIN`, `recipient = vault.<name>.<root>`, deadline +1 h, `referral "oiko"`; amounts are in the **origin asset's** base units (BNB Chain = 18 decimals; `/api/intents/tokens` returns `decimals`). Response adds `timeEstimate` and `minAmountOut`; `fee` = formatted in − formatted out in 6-decimal units. "minimum swap amount is $100" maps to `E_MIN_AMOUNT` "Minimum 100 USDT right now." The proxy refuses to quote for a name whose vault doesn't exist. JWT is sent as `Authorization: Bearer`.
+- **Mock 1Click**: in-process (no self-HTTP) when `ONECLICK_BASE_URL` is empty/`mock` and network ≠ mainnet; also exposed at `/api/mock-1click/v0/*`. Fee 0.05% (+0.005 withdraw fee off-NEAR). States advance on poll: PENDING_DEPOSIT → KNOWN_DEPOSIT_TX (<1 s after sent) → PROCESSING → mint at ≥3 s → SUCCESS. NEAR-origin (withdraw) quotes use the relayer account as deposit address plus an 8-digit `depositMemo`; status takes `?memo=` (additive). The vault's `withdraw(memo)` should pass that memo. State is in Postgres table `mock_oneclick_swaps` when `DATABASE_URL` is set, else memory (on Vercel without a DB, a poll may hit another instance — set DATABASE_URL for the hosted demo).
+- **Relay allow-list** (`/api/relay`): sender `<name>.<root>` (one label), receiver `vault.<sender>`, actions in order CreateAccount → Transfer (≤ `RELAY_MAX_TRANSFER_NEAR`) → UseGlobalContract(CodeHash in env/registry trusted set; AccountId form refused) | DeployContract(sha256 in trusted set) → FunctionCall `new` (deposit 0, gas ≤ 300 T, `owner == sender`, `usdc/usdt` = configured). Signature and `maxBlockHeight` checked before spending relayer gas.
+- **Rate limits** are in-memory per instance (per IP + per account, token buckets) and a global daily relayer budget (`RELAYER_DAILY_BUDGET_NEAR`, deposits + 0.003 NEAR/tx estimate). On serverless they are best-effort.
+- **Storage**: drizzle + postgres.js when `DATABASE_URL` is set; tables are created on first use (`CREATE TABLE IF NOT EXISTS`, schema in `apps/web/server/db/schema.ts`). Otherwise in-memory with a console warning; `/api/agent/log` reports `storage: "memory"` with a note.
+- **Local relayer key**: if `RELAYER_ACCOUNT_ID/RELAYER_PRIVATE_KEY` are empty, the server reads `.oiko/relayer.json` (`{account_id, private_key}`) — the local deploy script should write it (gitignored). For the mock 1Click the relayer must be the mock-ft `minter`, and must be storage-registered on `usdc.<root>`/`usdt.<root>` (it receives NEAR-origin mock withdrawals).
+- **Cron**: `GET|POST /api/cron` with `Authorization: Bearer $CRON_SECRET` (open in local mode when unset). Runs `run_schedules` on vaults with a due schedule, `settle_round` on due ROSCA rounds (`get_circles` ids start at 1, max 50/page), and bill reminders via Web Push (3 days before and on the day) when VAPID keys are set. Owner push subscription: `POST /api/push/subscribe` (NEP-413 by the owner's key; additive endpoint).
+- **Goal ETA** counts as inflows: `moved` rows whose note is `to pot <id>` (the vault records moves on the source pot) plus rows with `pot_id = <id>` and kind `split_applied`/`schedule_ran`/`deposit_received`.
+
+## Requests to contracts (from the backend agent)
+
+1. **Registry `list_names(from_index: u64, limit: u32) -> [{ name, account_id, vault_id, created_at }]`** (or any paged enumeration). `/api/cron` needs it to find vaults with due schedules; until it exists cron logs "registry.list_names unavailable" and only settles ROSCA rounds.
+2. **Per-pot inflow activity rows**: today split allocations and `schedule_ran` are only events, so per-pot inflows aren't visible in `get_activity`. Recording `split_applied` (pot_id = target, amount) and `schedule_ran` (pot_id = to_pot) rows would make goal ETAs and per-pot history accurate. Alternatively record `moved` with `pot_id = to_pot` and `counterparty = "pot:<from>"`.
+3. Keep `registry.config().account_funding` (the relayer reads it to attach the deposit to `register_name`).
+4. mock-ft `mint(account_id, amount)` should not panic for an account without storage (or the relayer will storage-deposit first); the mock 1Click mints to vaults, which register at init, so this matters only for other recipients.
+
+## Contract deviations
+
+Contracts agent, 2026-10-31. Toolchain: Rust 1.93.0 (`contracts/rust-toolchain.toml`), `near-sdk =5.29.1`, `near-workspaces 0.23.0`. We use 0.23 rather than 0.24 because 0.24 needs rustc 1.95. near-workspaces 0.23 runs sandbox 2.13.4, and global contracts work there. Build with `scripts/build-contracts.sh`. Error codes are listed in `contracts/ERRORS.md`.
+
+### Additions and signature differences
+- **Vault `ajo_create(name, token, amount_per_round, period_ns, max_members, bond_amount?, shuffle, invite_code_hash) -> Promise`** and **`ajo_start(circle_id)`** were added. The ajo makes the *caller* the organiser and first member, so the vault has to make these calls itself. Both are in the app key's method list.
+- The app key's method list = every owner method except `withdraw_large`/`rescue_sign`, **plus `sync` and `run_schedules`**. The list lives in `oiko_common::APP_KEY_METHODS` and is exposed in `registry.config().app_key_methods`.
+- `circle_id` is a JSON number (`u64`) everywhere: the vault `ajo_*` methods, ajo `join/start/settle_round`, and the ajo `ft_on_transfer` msg.
+- Ajo init is `new(usdc, usdt)`. Extra views: `min_period_ns()` and `version()`. `MAX_MEMBERS = 12`.
+- Return types:
+  - Methods that move tokens return the promise: `withdraw`, `withdraw_large`, `pay_bill`, `earn_on`, `earn_off`, `ajo_*` and `rescue_sign`.
+  - `earn_on` resolves to `bool`: `false` means refused.
+  - `agent_execute` and `approve_proposal` return `PromiseOrValue<bool>`.
+  - `agent_propose` returns `u64` as a JSON number.
+- Registry `suggest` returns `Vec<String>` (up to 3). Added `list_names(from_index, limit) -> [{name, account_id, vault_id, created_at}]` (backend request) and `version()`.
+- Mock lending init is `new(admin, tokens, extra_decimals?)` with a default of 12. `set_state(token_id, supplied, borrowed, apy_bps)` takes **inner units** (token decimals + extra_decimals), like Rhea's `get_asset`.
+- `add_schedule` refuses Spend as `to_pot`. The minimum period is 60 s.
+
+### Behaviour choices
+- **`ft_on_transfer` does not credit directly.** It schedules the same `ft_balance_of → on_balance` read that `sync()` uses, within the same transaction, so a deposit can never be counted twice. If a stale `sync` read had already counted it, a direct credit would double it. It needs ≥25 TGas left; otherwise the deposit waits for the next `sync()`. Events keep `source: "ft_on_transfer"` and `sender_id`.
+- **Concurrent sync guard**: there is a per-token `epoch`, bumped whenever an outflow is finalised. A balance read started under an older epoch credits nothing. Credit = `max(0, real − accounted)`, so a second sync is a no-op.
+- **Lending returns**: Rhea sends withdrawals back with a plain `ft_transfer` (verified in burrowland source), so the `"lending_return"` msg is not needed.
+  - `earn_off` records a *pending return* for the pot.
+  - The next balance read fills pending returns FIFO before applying splits. The `earn_off` callback triggers that read itself.
+- **`earn_on` refusal does not panic.** It emits `earn_refused {utilization_bps}`, logs `E_UTILIZATION: ...` and returns `false`; nothing changes. Utilization = `borrowed.balance / supplied.balance` from `get_asset`. `max_utilization_bps` must be ≤ 9500 at init.
+- **`earn_off(pot, token, amount)`**:
+  - It reads `get_asset` (for `extra_decimals`) and `get_account(vault)` (for the real supplied balance).
+  - A pot may withdraw up to its pro-rata share of the real balance, so interest is shared by principal.
+  - It calls `execute({actions:[{Withdraw:{token_id, max_amount: amount·10^extra_decimals}}]})` with 1 yocto. A failure restores state.
+  - Locked pots may use Earn. The funds stay attributed to the pot and come back into the same pot.
+- **Splits**: percent rules take `floor(amount·bps/10000)` of the *whole* payment, in rule order. Fixed rules then take their value, capped by what is left. The remainder goes to Spend. This matches the /plan preview example.
+- **Agent caps** count every executed action kind: pay, pay_bill, move and save. USDC and USDT are summed. `pay_bill` also requires the bill payee on the allowlist.
+  - Revoking an agent also closes its pending proposals.
+  - A failed payout rolls back the recorded spend.
+- Agent keys get `config.agent_allowance`, which the app chooses; 0.25 NEAR is suggested. That gas is paid from the vault's NEAR balance.
+- `vault.new` requires `predecessor == owner` and `current_account == vault.<owner>`. It storage-deposits USDC and USDT with 0.00125 NEAR each (registration_only) and the lending market with 0.1 NEAR (Burrow's minimum).
+- Events:
+  - Ajo contributions and bonds from a vault emit `withdrawn` with `by: "ajo:contribution" | "ajo:bond"`.
+  - `bill_paid.period` is the `yyyymm` paid; it is `null` on `bill_added`/`bill_removed`.
+- Activity rows, per the backend request:
+  - Each split allocation adds a `split_applied` row with `pot_id` = the receiving pot.
+  - `moved` rows have `pot_id` = the *receiving* pot and `counterparty: "pot:<from>"`.
+  - `schedule_ran` rows have `pot_id` = `to_pot`.
+- Month stats:
+  - `in` counts deposits after lending returns are taken out.
+  - `out` counts successful outflows, including ajo payments.
+  - `saved` = split allocations to non-Spend pots + Spend→pot moves − pot→Spend moves (saturating).
+- Ajo:
+  - With `shuffle`, bonded members are shuffled into the first positions and unbonded members after them, so the "first ceil(n/2) must be bonded" rule holds.
+  - A late or short contribution, or a duplicate, is refunded with a logged code rather than panicking.
+  - Payouts use `ft_transfer_call` (msg `"ajo_payout"`) with 80 TGas. If the receiver refunds, the callback resends with a plain `ft_transfer`.
+  - **Bond returns use a plain `ft_transfer`**, which keeps `settle_round` under 300 TGas with 12 members. The member vault credits the bond on its next `sync()`.
+- `rescue_sign` calls `<mpc_signer>.sign({request:{path:"oiko-rescue-v1/<chain>", payload_v2:{Ecdsa:"<hex32>"}, domain_id:0}})`. It forwards the attached deposit (≥1 yocto) and passes ≥50 TGas plus all remaining gas (weight 1). It requires ≥70 TGas prepaid.
+- Mock FT `mint` auto-registers the receiver (backend request 4).
+
+### Global contract vs DeployContract (both tested)
+- `tests/tests/critical_path.rs` takes the production path:
+  - The publisher sends `DeployGlobalContract(code, CodeHash)`.
+  - The user's key sends `CreateAccount → Transfer → UseGlobalContract(CodeHash) → FunctionCall new`.
+  - These are signed raw with near-primitives 0.37, because near-workspaces has no global-contract helpers.
+- `tests/tests/ajo_cycle.rs` uses the `DeployContract` fallback.
+
+### Funding numbers (vault wasm 464,720 bytes; storage 1e19 yocto/byte)
+- **Publishing the vault globally**: about 464.7 KB × 1e20 yocto/byte ≈ **46.5 NEAR burned once** per network. The vault wasm is large (near-sdk forces serde_json `preserve_order`; there are about 70 `json!` event sites). Typed event structs could shrink it later; `opt-level="s"` gave 545 KB, so we keep `"z"`.
+- **Vault funding** (name account → vault, with a global contract): **1.0 NEAR**.
+  - Measured vault storage after the full critical-path test is 5,413 bytes (≈0.054 NEAR).
+  - The global contract reference is <0.001 NEAR.
+  - Storage deposits: USDC 0.00125, USDT 0.00125 and lending 0.1, so 0.1025 NEAR.
+  - Worst-case state is about 95 KB ≈ 0.95 NEAR: 200 activity rows ≈ 40 KB, 100 kept proposals ≈ 35 KB, 10 agents, 20 pots, 30 bills and 20 schedules. That is far above typical use.
+  - Agent gas is paid from the vault's own balance; the vault had 0.897 NEAR left after the test.
+- **DeployContract fallback**: add the code storage, ≈ **4.65 NEAR**, to the vault (tests use 6 NEAR).
+- **`account_funding` (registry → `<name>.<root>`)**: **1.5 NEAR**.
+  - 1.0 goes to vault funding.
+  - The name account's own storage is ≈ 0.007 NEAR (682 bytes with 2 keys).
+  - 0.25 is the gas budget for the app key's allowance.
+  - About 0.24 is buffer for the vault-creation transaction's gas and later storage.
+- The name account had 0.48 NEAR left after the test.
+- The sandbox gas price is 1e9 yocto/gas (10× testnet/mainnet). The fixed 0.25 NEAR app-key allowance therefore runs out after a few dozen heavy calls in sandbox, so integration tests use the full-access key for most owner calls.

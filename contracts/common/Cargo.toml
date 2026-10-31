@@ -1,0 +1,13 @@
+[package]
+name = "oiko-common"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+near-sdk.workspace = true
+
+[dev-dependencies]
+proptest = "1"
+near-sdk = { workspace = true, features = ["unit-testing"] }

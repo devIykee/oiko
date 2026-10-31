@@ -1,0 +1,23 @@
+[workspace]
+resolver = "3"
+members = ["common", "registry", "vault", "ajo", "mocks/ft", "mocks/lending", "tests"]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.93"
+license = "MIT"
+
+[workspace.dependencies]
+near-sdk = "=5.29.1"
+near-contract-standards = "=5.29.1"
+oiko-common = { path = "common" }
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+strip = true
+panic = "abort"
+overflow-checks = true

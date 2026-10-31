@@ -1,0 +1,21 @@
+[package]
+name = "oiko-ajo"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# 60 s minimum period for sandbox/testnet demos. Build mainnet with --no-default-features (1 day).
+default = ["short-periods"]
+short-periods = []
+
+[dependencies]
+near-sdk.workspace = true
+oiko-common.workspace = true
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }
