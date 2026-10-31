@@ -26,6 +26,7 @@ export const act = {
   addFunctionCallKey: (publicKey: string, receiverId: string, methodNames: string[], allowanceYocto?: string | bigint): Action =>
     nearActions.addFunctionCallAccessKey(PublicKey.fromString(publicKey), receiverId, methodNames, allowanceYocto === undefined ? undefined : BigInt(allowanceYocto)),
   deleteKey: (publicKey: string): Action => nearActions.deleteKey(PublicKey.fromString(publicKey)),
+  deleteAccount: (beneficiaryId: string): Action => nearActions.deleteAccount(beneficiaryId),
   deployContract: (code: Uint8Array): Action => nearActions.deployContract(code),
   /** UseGlobalContract by immutable code hash (base58 string or 32 bytes). */
   useGlobalContract: (codeHash: string | Uint8Array): Action =>

@@ -72,6 +72,7 @@ check(!lockedTry.ok && /E_LOCKED/.test(JSON.stringify(lockedTry)), "locked pot r
 
 log("5. withdraw 1 USDT from Spend");
 const w = await vault.withdraw(0, "usdt", toUnits("1"), "oiko-relayer.testnet");
+if (!w.ok) console.log(w.errorCode, w.errorMessage);
 check(w.ok, "withdraw from Spend");
 
 log("6. agent with 5 USDT cap");
@@ -94,3 +95,11 @@ check((await rpc.viewAccessKeyList(vaultId)).length === 0, "agent key deleted on
 const after = await agent.request("GET", "/api/agent/overview").then(() => true).catch(() => false);
 check(!after, "reads refused after revoke");
 log(`ALL OK  account=${accountId}`);
+
+// Cleanup: return the sign-in account's NEAR to the relayer so repeated smoke runs don't drain the demo budget.
+// (The savings account itself has no keys by design, so its small balance stays with it.)
+if (process.env.SMOKE_KEEP !== "1") {
+  const beneficiary = cfgApi.relayer ?? "oiko-relayer.testnet";
+  const d = await ownerSigner.signAndSend(accountId, [act.deleteAccount(beneficiary)]).catch((e: Error) => ({ ok: false, errorMessage: e.message }));
+  log(d.ok ? `cleanup: ${accountId} deleted, NEAR returned to ${beneficiary}` : `cleanup skipped: ${(d as { errorMessage?: string }).errorMessage}`);
+}
