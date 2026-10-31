@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "oiko": {
+      "command": "npx",
+      "args": ["-y", "@oiko/mcp"],
+      "env": {
+        "OIKO_CONNECTION": "oiko1:paste-the-connection-string-from-Oiko-Agents-Connect"
+      }
+    }
+  }
+}

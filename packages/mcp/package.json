@@ -1,0 +1,48 @@
+{
+  "name": "@oiko/mcp",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Oiko MCP server: lets your own AI agent read and act on an Oiko account inside the limits you set.",
+  "license": "MIT",
+  "bin": {
+    "oiko-mcp": "./bin/oiko-mcp.mjs"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tools": "./src/tools.ts"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit -p .",
+    "start": "tsx src/cli.ts",
+    "prepack": "node build.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@oiko/sdk": "workspace:*",
+    "@scure/base": "2.2.0",
+    "borsh": "2.0.0",
+    "near-api-js": "7.4.0",
+    "zod": "^4.6.7"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}

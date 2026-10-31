@@ -1,0 +1,86 @@
+// HTTP glue for /api/agent/* (framework-free: takes a web Request, returns a Response).
+import { parseGatewayAuthHeader, normalizePublicKey } from "@oiko/sdk";
+import { ApiError } from "./errors";
+import { authenticateAgent, authenticateOwner, logAccess, prepare, readTool, submit, type GatewayRequest } from "./gateway";
+import { clientIp, errorResponse, json, parseBody, readText } from "./http";
+import { checkLimits } from "./ratelimit";
+import { PrepareBody, SubmitBody } from "./schemas";
+import { store } from "./store";
+
+function gatewayRequest(req: Request, body: string): GatewayRequest {
+  const url = new URL(req.url);
+  return { method: req.method, path: url.pathname + url.search, body, authorization: req.headers.get("authorization") };
+}
+function who(req: Request): { vaultId: string; publicKey: string } | null {
+  const a = parseGatewayAuthHeader(req.headers.get("authorization"));
+  if (!a) return null;
+  try {
+    return { vaultId: a.accountId, publicKey: normalizePublicKey(a.publicKey) };
+  } catch {
+    return null;
+  }
+}
+
+/** GET /api/agent/<tool> */
+export async function agentRead(req: Request, tool: string): Promise<Response> {
+  const url = new URL(req.url);
+  const id = who(req);
+  let status = 200, code: string | null = null;
+  try {
+    if (!checkLimits("gateway", clientIp(req), id?.publicKey ?? null)) throw new ApiError("E_RATE_LIMIT", 429);
+    const ctx = await authenticateAgent(gatewayRequest(req, ""), "read");
+    const params = Object.fromEntries(url.searchParams.entries());
+    return json(await readTool(ctx, tool, params));
+  } catch (e) {
+    status = e instanceof ApiError ? e.status : 500;
+    code = e instanceof ApiError ? e.code : "E_INTERNAL";
+    return errorResponse(e);
+  } finally {
+    if (id) await logAccess({ ...id, method: "GET", path: url.pathname + url.search, status, code, tool });
+  }
+}
+
+/** POST /api/agent/prepare and /api/agent/submit */
+export async function agentWrite(req: Request, op: "prepare" | "submit"): Promise<Response> {
+  const url = new URL(req.url);
+  const id = who(req);
+  let status = 200, code: string | null = null, txHash: string | null = null;
+  try {
+    if (!checkLimits("gateway", clientIp(req), id?.publicKey ?? null)) throw new ApiError("E_RATE_LIMIT", 429);
+    const text = await readText(req);
+    if (op === "prepare") {
+      const b = parseBody(PrepareBody, text);
+      const ctx = await authenticateAgent(gatewayRequest(req, text), b.kind);
+      return json(await prepare(ctx, b.kind, b.action, b.reason));
+    }
+    const b = parseBody(SubmitBody, text);
+    const ctx = await authenticateAgent(gatewayRequest(req, text), null);
+    const r = await submit(ctx, b.signedTx);
+    txHash = r.txHash;
+    if (!r.ok) code = r.error?.code ?? null;
+    return json(r);
+  } catch (e) {
+    status = e instanceof ApiError ? e.status : 500;
+    code = e instanceof ApiError ? e.code : "E_INTERNAL";
+    return errorResponse(e);
+  } finally {
+    if (id) await logAccess({ ...id, method: "POST", path: url.pathname, status, code, tool: op, txHash });
+  }
+}
+
+/** GET /api/agent/log?vaultId=&publicKey= — owner only (NEP-413 by a key on the owner's name account). */
+export async function agentLog(req: Request): Promise<Response> {
+  try {
+    if (!checkLimits("gateway", clientIp(req), null)) throw new ApiError("E_RATE_LIMIT", 429);
+    const owner = await authenticateOwner(gatewayRequest(req, ""));
+    const url = new URL(req.url);
+    const vaultId = url.searchParams.get("vaultId") ?? `vault.${owner.accountId}`;
+    if (vaultId !== `vault.${owner.accountId}`) throw new ApiError("E_UNAUTHORIZED", 403, "You can only read your own account's access log.");
+    const pk = url.searchParams.get("publicKey");
+    const s = store();
+    const rows = await s.listAccess(vaultId, pk ? normalizePublicKey(pk) : null, 200);
+    return json({ vaultId, storage: s.kind, ...(s.kind === "memory" ? { note: "In-memory log: it resets when the server restarts." } : {}), rows });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}

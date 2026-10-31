@@ -1,0 +1,22 @@
+{
+  "name": "@oiko/example-telegram-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Telegram bot skeleton (no LLM): relays chat commands to the Oiko MCP tools.",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@oiko/mcp": "workspace:*",
+    "@oiko/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}

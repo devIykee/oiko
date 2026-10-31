@@ -1,0 +1,286 @@
+// Agent gateway: NEP-413 auth (docs/interfaces/http.md), read tools, prepare/submit for agent_execute/agent_propose.
+import {
+  AjoClient, b64decode, b64encode, billStatus, buildUnsignedTx, act, computeInsights, decodeSignedTx, formatAmount, friendlyError,
+  GATEWAY_RECIPIENT, GATEWAY_WINDOW_MS, goalEta, isVaultId, monthOfMs, normalizePublicKey, parseGatewayAuthHeader, parseGatewayMessage,
+  parseOutcome, prevMonth, sha256Hex, splitPreview, TGAS, verifyNep413, verifySignedTx, b58encode,
+  type AgentAction, type AgentView, type Balances, type NearRpc, type Overview, type Pot, type Scope, type Token,
+} from "@oiko/sdk";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { encodeTransaction } from "near-api-js";
+import { serverConfig } from "./config";
+import { ApiError } from "./errors";
+import { rpc } from "./near";
+import { earnRates } from "./rates";
+import { store, type Store } from "./store";
+
+export interface AuthedAgent { kind: "agent"; vaultId: string; publicKey: string; policy: AgentView }
+export interface AuthedOwner { kind: "owner"; accountId: string; publicKey: string }
+
+export interface GatewayDeps {
+  now: () => number;
+  store: Store;
+  viewAccessKey: (accountId: string, publicKey: string) => Promise<{ nonce: number; permission: unknown } | null>;
+  getAgent: (vaultId: string, publicKey: string) => Promise<AgentView | null>;
+  isVaultId: (id: string) => boolean;
+}
+
+export function defaultDeps(): GatewayDeps {
+  const r = rpc();
+  const cfg = serverConfig();
+  return {
+    now: () => Date.now(),
+    store: store(),
+    viewAccessKey: (a, pk) => r.viewAccessKey(a, pk),
+    getAgent: (v, pk) => r.view<AgentView | null>(v, "get_agent", { public_key: pk }),
+    isVaultId: (id) => isVaultId(id, cfg.oiko),
+  };
+}
+
+export interface GatewayRequest { method: string; path: string; body: string; authorization: string | null }
+
+/** Shared signature/time/nonce checks. Returns the parsed header. */
+async function verifyRequest(req: GatewayRequest, deps: GatewayDeps) {
+  const auth = parseGatewayAuthHeader(req.authorization);
+  if (!auth) throw new ApiError("E_AUTH", 401, "Missing or malformed Authorization: NEP413 header.");
+  const m = parseGatewayMessage(auth.message);
+  if (!m) throw new ApiError("E_AUTH", 401, "The signed message must be \"<METHOD> <path>\\n<sha256 hex of body>\\n<unix ms>\".");
+  if (m.method !== req.method.toUpperCase() || m.path !== req.path) throw new ApiError("E_AUTH", 401, `The signed message is for "${m.method} ${m.path}", not "${req.method.toUpperCase()} ${req.path}".`);
+  if (m.bodyHash !== sha256Hex(req.body)) throw new ApiError("E_AUTH", 401, "The body hash in the signed message doesn't match the body.");
+  const now = deps.now();
+  if (Math.abs(now - m.timestamp) > GATEWAY_WINDOW_MS) throw new ApiError("E_STALE", 401);
+  let publicKey: string;
+  try {
+    publicKey = normalizePublicKey(auth.publicKey);
+  } catch {
+    throw new ApiError("E_AUTH", 401, "publicKey must be an ed25519 key.");
+  }
+  if (!verifyNep413({ publicKey, signature: auth.signature, message: auth.message, recipient: GATEWAY_RECIPIENT, nonce: auth.nonce })) {
+    throw new ApiError("E_AUTH", 401, "The NEP-413 signature doesn't verify (recipient must be \"oiko-gateway\").");
+  }
+  if (!(await deps.store.useNonce(`${publicKey}:${auth.nonce}`, publicKey, m.timestamp + 2 * GATEWAY_WINDOW_MS))) throw new ApiError("E_REPLAY", 401);
+  return { auth, publicKey };
+}
+
+function fcReceiver(permission: unknown): string | null {
+  const p = permission as { FunctionCall?: { receiver_id?: string } } | string;
+  return typeof p === "object" && p?.FunctionCall?.receiver_id ? p.FunctionCall.receiver_id : null;
+}
+
+export function requiredScope(path: string, kind?: "propose" | "act"): Scope {
+  if (path.startsWith("/api/agent/prepare") || path.startsWith("/api/agent/submit")) return kind ?? "propose";
+  return "read";
+}
+
+/** Agent auth: the key must still be on the vault (view_access_key) and the vault's policy must allow the scope. */
+export async function authenticateAgent(req: GatewayRequest, scope: Scope | null, deps: GatewayDeps = defaultDeps()): Promise<AuthedAgent> {
+  const { auth, publicKey } = await verifyRequest(req, deps);
+  const vaultId = auth.accountId;
+  if (!deps.isVaultId(vaultId)) throw new ApiError("E_AUTH", 401, "accountId must be the Oiko account (vault.<name>.<root>) the agent is connected to.");
+  const key = await deps.viewAccessKey(vaultId, publicKey);
+  if (!key) throw new ApiError("E_KEY_GONE", 401);
+  const recv = fcReceiver(key.permission);
+  if (recv !== null && recv !== vaultId) throw new ApiError("E_KEY_GONE", 401);
+  const policy = await deps.getAgent(vaultId, publicKey);
+  if (!policy) throw new ApiError("E_AGENT_UNKNOWN", 403);
+  if (policy.revoked) throw new ApiError("E_AGENT_REVOKED", 403);
+  if (BigInt(policy.expires_at) <= BigInt(deps.now()) * 1_000_000n) throw new ApiError("E_AGENT_EXPIRED", 403);
+  if (scope && !policy.scopes.includes(scope)) throw new ApiError("E_SCOPE", 403, `This agent doesn't have the "${scope}" permission. The owner can change it in Agents.`);
+  return { kind: "agent", vaultId, publicKey, policy };
+}
+
+/** Owner auth (access log, push): NEP-413 by a key on the owner's name account (the app key or the sign-in key). */
+export async function authenticateOwner(req: GatewayRequest, deps: GatewayDeps = defaultDeps()): Promise<AuthedOwner> {
+  const { auth, publicKey } = await verifyRequest(req, deps);
+  if (deps.isVaultId(auth.accountId)) throw new ApiError("E_AUTH", 401, "Sign with the owner's account, not the vault.");
+  const key = await deps.viewAccessKey(auth.accountId, publicKey);
+  if (!key) throw new ApiError("E_KEY_GONE", 401);
+  return { kind: "owner", accountId: auth.accountId, publicKey };
+}
+
+// ---------- read tools ----------
+
+const DAY_NS = 86_400_000_000_000n;
+const WEEK_NS = 7n * DAY_NS;
+const money = (units: string, token: Token | "usdc+usdt") => ({
+  units, token: token === "usdc+usdt" ? "USDC+USDT" : token.toUpperCase(), display: `${formatAmount(units)} ${token === "usdc+usdt" ? "USDC + USDT" : token.toUpperCase()}`,
+});
+const bal = (b: Balances) => ({ usdc: money(b.usdc, "usdc"), usdt: money(b.usdt, "usdt"), total: money((BigInt(b.usdc) + BigInt(b.usdt)).toString(), "usdc+usdt") });
+const KIND_LABEL: Record<string, string> = { flex: "Spend", autosave: "Savings", locked: "Locked", goal: "Goal", bills: "Bills" };
+
+export function remainingCaps(p: AgentView, nowMs: number) {
+  const ns = BigInt(nowMs) * 1_000_000n;
+  const day = Number(ns / DAY_NS), week = Number(ns / WEEK_NS);
+  const usedDay = p.spent_day[0] === day ? BigInt(p.spent_day[1]) : 0n;
+  const usedWeek = p.spent_week[0] === week ? BigInt(p.spent_week[1]) : 0n;
+  const left = (cap: string, used: bigint) => (BigInt(cap) > used ? BigInt(cap) - used : 0n).toString();
+  return {
+    per_tx: money(p.per_tx, "usdc+usdt"),
+    day: { cap: money(p.daily, "usdc+usdt"), used: money(usedDay.toString(), "usdc+usdt"), remaining: money(left(p.daily, usedDay), "usdc+usdt") },
+    week: { cap: money(p.weekly, "usdc+usdt"), used: money(usedWeek.toString(), "usdc+usdt"), remaining: money(left(p.weekly, usedWeek), "usdc+usdt") },
+  };
+}
+
+function potView(p: Pot, nowMs: number) {
+  return {
+    id: p.id, name: p.name, kind: p.kind, kind_label: KIND_LABEL[p.kind] ?? p.kind, balances: bal(p.balances), earning: bal(p.earn_supplied),
+    locked_until: p.unlock_at && BigInt(p.unlock_at) > BigInt(nowMs) * 1_000_000n ? new Date(Number(BigInt(p.unlock_at) / 1_000_000n)).toISOString() : null,
+    target: p.target ? money(p.target, "usdc+usdt") : null, target_date: p.target_date ? new Date(Number(BigInt(p.target_date) / 1_000_000n)).toISOString() : null,
+    earn: p.earn,
+  };
+}
+
+export const HELP = {
+  money: "Every amount is { units: integer string in base units (6 decimals), token, display }. 1 USDC = 1000000 units. USDC and USDT are stablecoins, not dollars.",
+  pots: "Pots split the owner's money. Spend (kind flex, id 0) is spendable now; Locked pots cannot send money out before locked_until; Goals have targets.",
+  splits: "Your plan: rules applied to every incoming payment, in order. percent value is basis points (2500 = 25%); fixed value is units. Spend gets the rest.",
+  caps: "Caps are enforced by the account's contract, per payment, per UTC day and per week, with USDC and USDT summed.",
+  act: "To move money: POST /api/agent/prepare {kind:'act'|'propose', action, reason}, sign the returned unsignedTx bytes' sha256 with your key, POST /api/agent/submit {signedTx}.",
+};
+
+export async function readTool(ctx: AuthedAgent, tool: string, params: Record<string, string | undefined>, r: NearRpc = rpc(), nowMs = Date.now()): Promise<unknown> {
+  const v = ctx.vaultId;
+  const ov = () => r.view<Overview>(v, "get_overview");
+  switch (tool) {
+    case "me": {
+      const p = ctx.policy;
+      return {
+        _help: "Your own permissions and how much of your limits is left. " + HELP.caps,
+        vault: v, public_key: ctx.publicKey, label: p.label, agent_name: p.agent_name, scopes: p.scopes, allowed_actions: p.allowed_actions,
+        allowlist: p.allowlist, expires_at: new Date(Number(BigInt(p.expires_at) / 1_000_000n)).toISOString(), caps: remainingCaps(p, nowMs),
+      };
+    }
+    case "overview": {
+      const o = await ov();
+      return {
+        _help: { money: HELP.money, pots: HELP.pots, splits: HELP.splits, act: HELP.act },
+        owner: o.owner, totals: bal(o.totals), spend_available: bal(o.flex), locked: bal(o.locked), earning: bal(o.earning),
+        pots: o.pots.map((p) => potView(p, nowMs)),
+        goals: o.pots.filter((p) => p.kind === "goal").map((p) => potView(p, nowMs)),
+        splits: o.splits.map((s) => ({ ...s, pot_name: o.pots.find((p) => p.id === s.pot_id)?.name ?? null })),
+        bills: o.bills.map((b) => ({ id: b.id, name: b.name, amount: money(b.amount, b.token), due_day: b.due_day, payee: b.payee, pot_id: b.pot_id, ...statusOf(b, nowMs) })),
+        my_pending_proposals: o.proposals.filter((p) => p.public_key === ctx.publicKey),
+        my_caps: remainingCaps(ctx.policy, nowMs),
+      };
+    }
+    case "pots": {
+      const o = await ov();
+      return { _help: HELP.pots + " " + HELP.money, pots: o.pots.map((p) => potView(p, nowMs)) };
+    }
+    case "activity": {
+      const limit = Math.max(1, Math.min(100, Number(params.limit ?? 20) || 20));
+      const rows = await r.view<Array<Record<string, unknown>>>(v, "get_activity", { from_seq: null, limit });
+      return {
+        _help: "Newest first. kind is the event name; by says who did it (owner, agent:<key>, schedule, proposal:<id>). amount is in units (6 decimals).",
+        activity: rows.map((a) => ({ ...a, at_iso: typeof a.at === "string" ? new Date(Number(BigInt(a.at) / 1_000_000n)).toISOString() : null, display: a.amount && a.token ? money(a.amount as string, a.token as Token).display : null })),
+      };
+    }
+    case "goals": {
+      const [o, acts] = await Promise.all([ov(), r.view<import("@oiko/sdk").Activity[]>(v, "get_activity", { from_seq: null, limit: 200 })]);
+      return {
+        _help: "Goals with targets and an estimated finish date from the last 30 days of money coming in (the assumption is stated).",
+        goals: o.pots.filter((p) => p.kind === "goal" || p.target).map((p) => {
+          const eta = goalEta(p, acts, nowMs);
+          return { ...potView(p, nowMs), eta: eta.etaMs === null ? null : new Date(eta.etaMs).toISOString(), assumption: eta.assumption };
+        }),
+      };
+    }
+    case "splits": {
+      const o = await ov();
+      return {
+        _help: HELP.splits,
+        rules: o.splits.map((s) => ({ ...s, pot_name: o.pots.find((p) => p.id === s.pot_id)?.name ?? null })),
+        preview_for_100: splitPreview(o.splits, "100000000", o.pots).map((x) => ({ ...x, display: `${formatAmount(x.amount)}` })),
+      };
+    }
+    case "bills": {
+      const bills = await r.view<import("@oiko/sdk").Bill[]>(v, "get_bills");
+      return {
+        _help: "Recurring bills. status: upcoming, due (within 3 days or today), paid (this month), missed. Pay with action {type:'pay_bill', bill_id}.",
+        bills: bills.map((b) => ({ id: b.id, name: b.name, amount: money(b.amount, b.token), due_day: b.due_day, payee: b.payee, pot_id: b.pot_id, last_paid_month: b.last_paid_month, ...statusOf(b, nowMs) })),
+      };
+    }
+    case "insights": {
+      const month = params.month && /^\d{6}$/.test(params.month) ? Number(params.month) : monthOfMs(nowMs);
+      let from = month;
+      for (let i = 0; i < 5; i++) from = prevMonth(from);
+      const [stats, acts] = await Promise.all([
+        r.view<import("@oiko/sdk").MonthStats[]>(v, "get_month_stats", { from_month: from, to_month: month }),
+        r.view<import("@oiko/sdk").Activity[]>(v, "get_activity", { from_seq: null, limit: 200 }),
+      ]);
+      const ins = computeInsights(stats, acts, month);
+      return {
+        _help: `Insights for ${month} (yyyymm, UTC). savings_rate_bps = saved / money in × 10000. top_payees is from the last 200 activity rows.`,
+        month, money_in: bal(ins.moneyIn), money_out: bal(ins.moneyOut), saved: bal(ins.saved), savings_rate_bps: ins.savingsRateBps,
+        top_payees: ins.topPayees.map((p) => ({ to: p.to, amount: money(p.amount, "usdc+usdt") })), trend: ins.trend,
+      };
+    }
+    case "earn-rates":
+      return { _help: "Variable lending rates today (supplyApr is a percent). Rates change and can go to zero.", ...(await earnRates()) };
+    case "rosca":
+    case "ajo": {
+      const ajo = serverConfig().oiko.contracts.ajo;
+      const help = "ROSCA savings groups this account is in: rotating savings where members contribute each round and one member receives the pot. Amounts in units (6 decimals).";
+      if (!ajo || !serverConfig().features.ajo) return { _help: "ROSCA savings are not enabled here.", groups: [], circles: [] };
+      const groups = await new AjoClient(r, ajo).circlesFor(v).catch(() => []);
+      return { _help: help, groups, circles: groups };
+    }
+    default:
+      throw new ApiError("E_NOT_FOUND", 404);
+  }
+}
+function statusOf(b: import("@oiko/sdk").Bill, nowMs: number) {
+  const s = billStatus(b, nowMs);
+  return { status: s.status, next_due: s.nextDue.toISOString() };
+}
+
+// ---------- prepare / submit ----------
+
+export const AGENT_GAS = (200n * TGAS).toString();
+
+export async function prepare(ctx: AuthedAgent, kind: "propose" | "act", action: AgentAction, reason: string | undefined, r: NearRpc = rpc()) {
+  if (!ctx.policy.scopes.includes(kind)) throw new ApiError("E_SCOPE", 403, `This agent doesn't have the "${kind}" permission.`);
+  if (kind === "propose" && !reason?.trim()) throw new ApiError("E_BAD_REQUEST", 400, "A proposal needs a short reason (up to 280 characters) the owner will read.");
+  const method = kind === "act" ? "agent_execute" : "agent_propose";
+  const args = kind === "act" ? { action } : { action, reason: reason!.trim() };
+  const u = await buildUnsignedTx(r, ctx.vaultId, ctx.publicKey, ctx.vaultId, [act.functionCall(method, args, AGENT_GAS, 0n)]);
+  return { unsignedTx: b64encode(u.bytes), hash: b64encode(u.hash) };
+}
+
+/** Validates that a signed tx is exactly one agent_execute/agent_propose call by this agent on its vault. */
+export function checkAgentTx(ctx: AuthedAgent, signedTx: string) {
+  let stx;
+  try {
+    stx = decodeSignedTx(b64decode(signedTx));
+  } catch {
+    throw new ApiError("E_BAD_REQUEST", 400, "signedTx must be a base64 borsh SignedTransaction.");
+  }
+  const t = stx.transaction;
+  if (t.signerId !== ctx.vaultId || t.receiverId !== ctx.vaultId) throw new ApiError("E_AUTH", 403, "The transaction must be signed by and sent to your connected account.");
+  if (t.publicKey.toString() !== ctx.publicKey) throw new ApiError("E_AUTH", 403, "The transaction must be signed with the same agent key.");
+  if (t.actions.length !== 1) throw new ApiError("E_BAD_REQUEST", 400, "Exactly one action is allowed.");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fc = (t.actions[0] as any).functionCall as { methodName: string; deposit: bigint | string } | undefined;
+  if (!fc || !["agent_execute", "agent_propose"].includes(fc.methodName)) throw new ApiError("E_BAD_REQUEST", 400, "Only agent_execute or agent_propose calls are allowed.");
+  if (BigInt(fc.deposit) !== 0n) throw new ApiError("E_BAD_REQUEST", 400, "No deposit is allowed.");
+  const need: Scope = fc.methodName === "agent_execute" ? "act" : "propose";
+  if (!ctx.policy.scopes.includes(need)) throw new ApiError("E_SCOPE", 403, `This agent doesn't have the "${need}" permission.`);
+  if (!verifySignedTx(stx)) throw new ApiError("E_AUTH", 401, "The transaction signature doesn't verify.");
+  return { stx, method: fc.methodName, txHash: b58encode(sha256(encodeTransaction(t))) };
+}
+
+export async function submit(ctx: AuthedAgent, signedTx: string, r: NearRpc = rpc()) {
+  const { txHash } = checkAgentTx(ctx, signedTx);
+  try {
+    const out = parseOutcome(await r.sendTx(b64encode(b64decode(signedTx))), txHash);
+    if (out.ok) return { txHash: out.txHash, ok: true, value: out.value };
+    const f = friendlyError(out.errorMessage ?? out.errorCode ?? "");
+    return { txHash: out.txHash, ok: false, error: { code: f.code, message: `${f.title} ${f.next}`, detail: out.errorMessage } };
+  } catch (e) {
+    const f = friendlyError((e as Error).message);
+    return { txHash, ok: false, error: { code: f.code, message: `${f.title} ${f.next}`, detail: (e as Error).message.slice(0, 300) } };
+  }
+}
+
+export async function logAccess(row: { vaultId: string; publicKey: string; method: string; path: string; status: number; code?: string | null; tool?: string | null; txHash?: string | null }, s: Store = store()) {
+  await s.logAccess({ vaultId: row.vaultId, publicKey: row.publicKey, method: row.method, path: row.path, status: row.status, code: row.code ?? null, tool: row.tool ?? null, txHash: row.txHash ?? null }).catch((e) => console.warn("[oiko] access log write failed", e));
+}
