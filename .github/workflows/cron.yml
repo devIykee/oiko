@@ -1,0 +1,11 @@
+name: cron
+# Runs permissionless upkeep (autosave schedules, ajo round settlement) on the hosted testnet demo.
+on:
+  schedule: [{ cron: "*/5 * * * *" }]
+  workflow_dispatch:
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -fsS -X POST "${{ vars.OIKO_APP_URL }}/api/cron" -H "authorization: Bearer ${{ secrets.CRON_SECRET }}"

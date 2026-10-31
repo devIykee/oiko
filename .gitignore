@@ -14,3 +14,4 @@ test-results
 contracts/res/*.wasm
 !contracts/res/.gitkeep
 .near-credentials
+.claude/
