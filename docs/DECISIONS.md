@@ -280,3 +280,7 @@ All decimals are 6 unless marked.
 - `@noble/curves@2.4.0`.
 - Effective Node floor is **22.22.2**, because of near-api-js 7.
 - **Decision**: Node 22 LTS (≥22.22.2) with Next 16 App Router, Tailwind 4 and motion 14.
+
+## Product change: global, English only (2026-10-31)
+
+Source: the human, in chat. Removed Pidgin and the language toggle, removed the naira reference line and `/api/rates/ngn`, removed all country-specific wording. "Ajo" is renamed "ROSCA savings" in user-facing copy; the contract (`ajo.<root>`) and method names keep `ajo` so the frozen interface does not change.

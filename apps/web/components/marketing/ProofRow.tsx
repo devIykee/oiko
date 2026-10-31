@@ -9,7 +9,7 @@ export function ProofRow() {
   const c = config.contracts;
   const accounts = [
     c.registry && { label: "Names", id: c.registry },
-    c.ajo && { label: "Ajo circles", id: c.ajo },
+    c.ajo && { label: "ROSCA savings", id: c.ajo },
   ].filter(Boolean) as Array<{ label: string; id: string }>;
   const live = accounts.length > 0 && (config.source === "api" || loaded);
   const names = typeof stats?.names === "number" && stats.names > 0 ? stats.names : null;

@@ -4,7 +4,7 @@ import { explorerAccountUrl, useSiteConfig } from "./live";
 export function FooterContracts() {
   const { config } = useSiteConfig();
   const c = config.contracts;
-  const rows = ([["Names", c.registry], ["USDC", c.usdc], ["USDT", c.usdt], ["Ajo", c.ajo]] as const).filter(([, v]) => v) as Array<[string, string]>;
+  const rows = ([["Names", c.registry], ["USDC", c.usdc], ["USDT", c.usdt], ["ROSCA savings", c.ajo]] as const).filter(([, v]) => v) as Array<[string, string]>;
   return (
     <div>
       <p className="text-[13px] font-semibold text-ink">Contract accounts{config.network ? ` · ${config.network}` : ""}</p>

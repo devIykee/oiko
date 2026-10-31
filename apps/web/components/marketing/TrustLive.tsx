@@ -11,7 +11,7 @@ export function TrustLive() {
     ["USDC", c.usdc, "The USDC stablecoin contract (issued by Circle)."],
     ["USDT", c.usdt, "The USDT stablecoin contract (issued by Tether)."],
     ["Lending (Earn)", c.lending, "Rhea lending market used only by pots with Earn switched on."],
-    ["Ajo circles", c.ajo, "Holds circle contributions and bonds under fixed rules."],
+    ["ROSCA savings", c.ajo, "Holds ROSCA contributions and bonds under fixed rules."],
   ];
   return (
     <div className="space-y-4">

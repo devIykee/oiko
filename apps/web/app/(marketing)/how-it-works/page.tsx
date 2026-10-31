@@ -26,7 +26,7 @@ export default function HowItWorks() {
         </Block>
       ))}
       <Block title="What runs where" tone="grey">
-        <p><strong>On NEAR:</strong> your name, your account and its rules (pots, plan, locks, caps, bills, ajo circles). <strong>In your browser:</strong> your keys. <strong>On Oiko&rsquo;s servers:</strong> a relayer that pays transaction fees for you, the pay-link service and the agent gateway. None of them can move your money.</p>
+        <p><strong>On NEAR:</strong> your name, your account and its rules (pots, plan, locks, caps, bills, ROSCA savings). <strong>In your browser:</strong> your keys. <strong>On Oiko&rsquo;s servers:</strong> a relayer that pays transaction fees for you, the pay-link service and the agent gateway. None of them can move your money.</p>
         <p>Read the <Link className="font-semibold text-accent hover:underline" href="/security">Trust page</Link> for code fingerprints, contract accounts and risks.</p>
         <div className="flex flex-wrap gap-3 pt-2">
           <PillLink href="/start" variant="accent">Get your name</PillLink>

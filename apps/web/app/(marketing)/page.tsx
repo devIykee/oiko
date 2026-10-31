@@ -207,7 +207,7 @@ function UseCases() {
     { title: "Monthly bills", body: "Your Bills pot fills every payday. Pay on the due day yourself, or let your bill payer agent do it.", color: "sun", d: I.docTextFill },
     { title: "Saving for a laptop", body: "A goal with a target and a date. Oiko shows when you will get there at your current pace.", color: "violet", d: I.deviceLaptop },
     { title: "A rainy-day fund", body: "Locked until the date you choose. On a bad day, nobody can open it early, not even you.", color: "stone", glyph: <LockedPotGlyph size={20} /> },
-    { title: "Ajo with friends", body: "Rotating savings where the order and contributions are enforced by code, not by trust in one organiser.", color: "mint", glyph: <AjoCircleGlyph size={20} /> },
+    { title: "ROSCA savings with friends", body: "Rotating savings where the order and contributions are enforced by code, not by trust in one organiser.", color: "mint", glyph: <AjoCircleGlyph size={20} /> },
     { title: "Family sending by name", body: "Your aunt pays ada, not a long account number. It arrives split by your plan.", color: "rose", d: I.person2Fill },
   ];
   return (
@@ -348,7 +348,7 @@ const FAQ: Array<[string, ReactNode]> = [
   ["Where does yield come from?", "Only if you switch on Earn for a pot. That pot is lent on Rhea, a lending market, and borrowers pay interest. The rate is variable, shown as today’s rate, and can go to zero. Before lending, your account checks the pool is not too busy, so you can usually take money back out. That is a safeguard, not a guarantee."],
   ["Can Oiko freeze my money?", "No. Oiko has no admin key to your account and its code cannot be upgraded. Locked pots open on their date and not before, for anyone, including you and us."],
   ["What if an issuer freezes funds?", "Circle (USDC) and Tether (USDT) can freeze their own stablecoins at any address. Oiko cannot prevent or undo that. It is a real risk of holding stablecoins."],
-  ["Do you hold naira?", "No. Oiko only holds USDC and USDT. Where you see a naira figure it is a reference only, from a published exchange rate."],
+  ["Do you hold local currency?", "No. Oiko only holds USDC and USDT. There is no bank account and no local-currency balance."],
   ["What about regulation?", "Oiko is a hackathon project, not a licensed financial service, and does not hold your money for you. Rules differ by country, so check what applies where you live before using it with real money. Nothing here is investment, legal or tax advice."],
 ];
 function Faq() {
