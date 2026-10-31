@@ -14,6 +14,7 @@ export function publicConfig() {
     vaultCodeHash: cfg.vaultCodeHash, explorer: explorerBase(cfg.network), features: cfg.features,
     nodeUrl: cfg.oiko.nodeUrl, relayer: cfg.relayer?.accountId ?? null, oneClick: cfg.oneclick.isMock ? "mock" : "1click",
     vapidPublicKey: cfg.vapid?.publicKey ?? null,
+    vaultFunding: cfg.limits.vaultFunding.toString(),
   };
 }
 

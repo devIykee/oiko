@@ -13,11 +13,26 @@ export class NearRpc {
   constructor(public readonly nodeUrl: string, private readonly fetchImpl: typeof fetch = (...a) => globalThis.fetch(...a)) {}
 
   async request<T>(method: string, params: unknown): Promise<T> {
-    const res = await this.fetchImpl(this.nodeUrl, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: ++this.id, method, params }),
-    });
+    // Retry transport failures, 429 and 5xx. Re-sending a signed transaction is safe: the same signed
+    // bytes have the same hash and nonce, so NEAR executes it at most once.
+    let res: Response | undefined;
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (attempt) await new Promise((r) => setTimeout(r, 250 * 3 ** (attempt - 1)));
+      try {
+        res = await this.fetchImpl(this.nodeUrl, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: ++this.id, method, params }),
+        });
+        if (res.status === 429 || res.status >= 500) { lastErr = new RpcError(`RPC HTTP ${res.status}`); continue; }
+        break;
+      } catch (e) {
+        lastErr = e;
+        res = undefined;
+      }
+    }
+    if (!res) throw lastErr instanceof Error ? lastErr : new RpcError("fetch failed");
     if (!res.ok && res.status !== 200) {
       const text = await res.text().catch(() => "");
       throw new RpcError(`RPC HTTP ${res.status}: ${text.slice(0, 200)}`);

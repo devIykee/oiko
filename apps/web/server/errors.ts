@@ -16,6 +16,6 @@ export function errorBody(e: unknown): { status: number; body: { error: { code: 
   const msg = e instanceof Error ? e.message : String(e);
   const f = friendlyError(msg);
   const status = f.code === "E_RPC" ? 502 : 500;
-  if (status === 500) console.error("[oiko] unhandled", e);
+  console.error(status === 500 ? "[oiko] unhandled" : "[oiko] upstream", e);
   return { status, body: { error: { code: f.code === "E_UNKNOWN" ? "E_INTERNAL" : f.code, message: `${f.title} ${f.next}` } } };
 }

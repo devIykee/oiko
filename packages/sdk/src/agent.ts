@@ -22,7 +22,7 @@ export function decodeConnectionString(s: string): AgentConnection {
 }
 
 export class GatewayError extends Error {
-  constructor(public readonly code: string, message: string, public readonly status: number) {
+  constructor(public readonly code: string, message: string, public readonly status: number, public readonly detail?: string) {
     super(message);
     this.name = "GatewayError";
   }
@@ -43,17 +43,19 @@ export class GatewayClient {
       headers: { authorization: auth, ...(body === undefined ? {} : { "content-type": "application/json" }) },
       body: body === undefined ? undefined : text,
     });
-    const json = (await res.json().catch(() => ({}))) as { error?: { code: string; message: string } };
+    const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: { code: string; message: string; detail?: string } };
+    // A submitted transaction that the account refused is a normal result (ok: false), not a transport error.
+    if (res.ok && json.ok === false) return json as T;
     if (!res.ok || json.error) {
       const code = json.error?.code ?? `HTTP_${res.status}`;
-      throw new GatewayError(code, json.error?.message ?? `${friendlyError(code).title} ${friendlyError(code).next}`, res.status);
+      throw new GatewayError(code, json.error?.message ?? `${friendlyError(code).title} ${friendlyError(code).next}`, res.status, json.error?.detail);
     }
     return json as T;
   }
   get<T>(path: string): Promise<T> { return this.request<T>("GET", path); }
 
   /** prepare → sign locally → submit. Returns the submit result; `ok: false` carries a code + plain-English error. */
-  async run(kind: "propose" | "act", action: AgentAction, reason?: string): Promise<{ txHash: string; ok: boolean; error?: { code: string; message: string }; value?: unknown }> {
+  async run(kind: "propose" | "act", action: AgentAction, reason?: string): Promise<{ txHash: string; ok: boolean; error?: { code: string; message: string; detail?: string }; value?: unknown }> {
     const prep = await this.request<{ unsignedTx: string; hash: string }>("POST", "/api/agent/prepare", { kind, action, reason });
     const { signedTx } = signTransactionBytes(this.conn.sk, b64decode(prep.unsignedTx));
     return this.request("POST", "/api/agent/submit", { signedTx: b64encode(signedTx) });

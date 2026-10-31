@@ -98,6 +98,7 @@ export async function trustedHashes(cfg: ServerConfig): Promise<Set<string>> {
 }
 
 function txFail(r: TxResult): never {
+  console.error("[relayer] tx failed", r.txHash, r.errorCode, r.errorMessage);
   throw new ApiError(r.errorCode ?? "E_TX_FAILED", r.errorCode === "E_RPC" ? 502 : 422);
 }
 function budget(cfg: ServerConfig, amount: bigint) {

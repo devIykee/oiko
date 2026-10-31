@@ -19,6 +19,7 @@ export interface ServerConfig {
   limits: {
     /** Max NEAR (yocto) a relayed SignedDelegate may transfer in total (vault funding). */
     relayMaxTransfer: bigint;
+    vaultFunding: bigint;
     topupThreshold: bigint;
     topupAmount: bigint;
     /** Global relayer spend per UTC day (yocto, attached deposits + transfers + a gas estimate per tx). */
@@ -83,10 +84,11 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     vapid: vapidPub && vapidPriv ? { publicKey: vapidPub, privateKey: vapidPriv, subject: env.VAPID_SUBJECT || "mailto:hello@oiko.app" } : null,
     limits: {
       relayMaxTransfer: nearToYocto(env.RELAY_MAX_TRANSFER_NEAR || "1"),
-      topupThreshold: nearToYocto(env.TOPUP_THRESHOLD_NEAR || "0.05"),
-      topupAmount: nearToYocto(env.TOPUP_AMOUNT_NEAR || "0.1"),
+      topupThreshold: nearToYocto(env.TOPUP_THRESHOLD_NEAR || "0.15"),
+      topupAmount: nearToYocto(env.TOPUP_AMOUNT_NEAR || "0.15"),
       dailyBudget: nearToYocto(env.RELAYER_DAILY_BUDGET_NEAR || "25"),
       accountFunding: env.OIKO_ACCOUNT_FUNDING_NEAR ? nearToYocto(env.OIKO_ACCOUNT_FUNDING_NEAR) : null,
+      vaultFunding: nearToYocto(env.OIKO_VAULT_FUNDING_NEAR || "0.3"),
     },
   };
 }

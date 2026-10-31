@@ -10,6 +10,7 @@ import { encodeTransaction } from "near-api-js";
 import { serverConfig } from "./config";
 import { ApiError } from "./errors";
 import { rpc } from "./near";
+import { topup } from "./relayer";
 import { earnRates } from "./rates";
 import { store, type Store } from "./store";
 
@@ -235,13 +236,17 @@ function statusOf(b: import("@oiko/sdk").Bill, nowMs: number) {
 
 // ---------- prepare / submit ----------
 
-export const AGENT_GAS = (200n * TGAS).toString();
+// 100 Tgas covers a transfer plus its callback. NEAR reserves prepaid gas at a pessimistic price,
+// so keeping this low keeps the NEAR an account must hold low too.
+export const AGENT_GAS = (100n * TGAS).toString();
 
 export async function prepare(ctx: AuthedAgent, kind: "propose" | "act", action: AgentAction, reason: string | undefined, r: NearRpc = rpc()) {
   if (!ctx.policy.scopes.includes(kind)) throw new ApiError("E_SCOPE", 403, `This agent doesn't have the "${kind}" permission.`);
   if (kind === "propose" && !reason?.trim()) throw new ApiError("E_BAD_REQUEST", 400, "A proposal needs a short reason (up to 280 characters) the owner will read.");
   const method = kind === "act" ? "agent_execute" : "agent_propose";
   const args = kind === "act" ? { action } : { action, reason: reason!.trim() };
+  // Make sure the account can pay for the agent's transaction (relayer top-up, rate limited, best effort).
+  await topup(ctx.vaultId, "gateway").catch((e) => console.warn("[oiko] agent top-up skipped", (e as Error).message));
   const u = await buildUnsignedTx(r, ctx.vaultId, ctx.publicKey, ctx.vaultId, [act.functionCall(method, args, AGENT_GAS, 0n)]);
   return { unsignedTx: b64encode(u.bytes), hash: b64encode(u.hash) };
 }
