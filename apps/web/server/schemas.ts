@@ -22,7 +22,7 @@ export const WithdrawQuoteBody = z.object({
   vaultId: AccountIdZ, potId: z.number().int().nonnegative(), token: TokenZ, amount: U128,
   destinationAsset: z.string().min(3).max(200), destinationAddress: z.string().min(2).max(200),
 });
-export const SimulateDepositBody = z.object({ depositAddress: z.string().min(2).max(200), memo: z.string().max(64).optional() });
+export const SimulateDepositBody = z.object({ depositAddress: z.string().min(2).max(200), memo: z.string().max(64).optional(), ticket: z.string().max(8000).optional() });
 export const PrepareBody = z.object({ kind: z.enum(["propose", "act"]), action: AgentActionZ, reason: z.string().max(280).optional() });
 export const SubmitBody = z.object({ signedTx: z.string().min(16).max(100_000) });
 export const PushSubscribeBody = z.object({

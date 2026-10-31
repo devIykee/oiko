@@ -8,6 +8,6 @@ export async function POST(req: Request) {
   return handle(async () => {
     const body = await readBody(req, SimulateDepositBody);
     if (!checkLimits("simulate", clientIp(req), body.depositAddress)) throw new ApiError("E_RATE_LIMIT", 429);
-    return simulateDeposit(body.depositAddress, body.memo);
+    return simulateDeposit(body.depositAddress, body.memo, body.ticket);
   });
 }

@@ -13,7 +13,7 @@ import { useIntentTokens, useNameInfo, type IntentGroup } from "@/lib/data";
 import { useT } from "@/lib/i18n";
 
 type Step = 1 | 2 | 3 | 4;
-interface Deposit { depositAddress: string; depositMemo?: string | null; amountIn: string; amountOut: string; fee: string; deadline: string; quoteId: string; destinationToken: string }
+interface Deposit { ticket?: string; depositAddress: string; depositMemo?: string | null; amountIn: string; amountOut: string; fee: string; deadline: string; quoteId: string; destinationToken: string }
 type Status = "PENDING_DEPOSIT" | "KNOWN_DEPOSIT_TX" | "PROCESSING" | "SUCCESS" | "INCOMPLETE_DEPOSIT" | "REFUNDED" | "FAILED";
 const DIRECT = "__direct__";
 
@@ -48,7 +48,8 @@ export function PayScreen() {
     const poll = async () => {
       if (stop) return;
       try {
-        const s = await api<{ status: Status }>(`/api/intents/status/${encodeURIComponent(dep.depositAddress)}`);
+        const qs = new URLSearchParams({ ...(dep.depositMemo ? { memo: dep.depositMemo } : {}), ...(dep.ticket ? { ticket: dep.ticket } : {}) }).toString();
+        const s = await api<{ status: Status }>(`/api/intents/status/${encodeURIComponent(dep.depositAddress)}${qs ? `?${qs}` : ""}`);
         setStatus(s.status);
         if (["SUCCESS", "REFUNDED", "FAILED"].includes(s.status)) { stop = true; return; }
       } catch { /* keep polling */ }
@@ -80,7 +81,10 @@ export function PayScreen() {
   const simulate = async () => {
     if (!dep) return;
     setSimulating(true);
-    try { await api("/api/intents/simulate-deposit", { body: { depositAddress: dep.depositAddress } }); } catch (e) { setErr(explain(e)); } finally { setSimulating(false); }
+    try {
+      const r = await api<{ ticket?: string }>("/api/intents/simulate-deposit", { body: { depositAddress: dep.depositAddress, memo: dep.depositMemo ?? undefined, ticket: dep.ticket } });
+      if (r.ticket) setDep({ ...dep, ticket: r.ticket });
+    } catch (e) { setErr(explain(e)); } finally { setSimulating(false); }
   };
 
   const current = status === "PENDING_DEPOSIT" ? 0 : status === "KNOWN_DEPOSIT_TX" ? 1 : status === "PROCESSING" ? 2 : status === "SUCCESS" ? 4 : status === "INCOMPLETE_DEPOSIT" ? 1 : 2;

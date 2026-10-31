@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { loadConfig, setServerConfig } from "../config";
 import { MemoryStore, setStore, store } from "../store";
-import { mockQuote, mockStatus, mockStatusAt, mockSubmitDeposit, MINT_DELAY_MS, type Minter, type MockSwap } from "../mock1click";
+import { decodeTicket, mockQuote, mockStatus, mockStatusAt, mockSubmitDeposit, MINT_DELAY_MS, type Minter, type MockSwap } from "../mock1click";
 import { feeUnits, upstreamError } from "../intents";
 
 const TRON_USDT = "nep141:tron-d28a265909efecdcee7c5028585214ea0b96f015.omft.near";
@@ -22,7 +22,9 @@ const quoteReq = (o: Record<string, unknown> = {}) => ({
 describe("mock 1Click", () => {
   it("quotes with the real response shape and a TRON-style deposit address", async () => {
     const r = await mockQuote(quoteReq(), T0);
-    expect(Object.keys(r).sort()).toEqual(["correlationId", "quote", "quoteRequest", "signature", "timestamp"]);
+    // Real 1Click fields, plus the mock-only signed `ticket` that keeps the mock stateless across instances.
+    expect(Object.keys(r).filter((k) => k !== "ticket").sort()).toEqual(["correlationId", "quote", "quoteRequest", "signature", "timestamp"]);
+    expect(typeof (r as { ticket?: string }).ticket).toBe("string");
     expect(r.quote.depositAddress).toMatch(/^T[1-9A-HJ-NP-Za-km-z]{33}$/);
     expect(r.quote.amountIn).toBe("50000000");
     expect(r.quote.amountOut).toBe("49975000"); // 0.05% fee
@@ -84,5 +86,26 @@ describe("1Click proxy helpers", () => {
   it("fee = formatted in − formatted out in 6-decimal units", () => {
     expect(feeUnits("200", "199.974779")).toBe("25221");
     expect(feeUnits("1", "2")).toBe("0");
+  });
+});
+
+describe("mock 1Click tickets (stateless across serverless instances)", () => {
+  const minter: Minter = async () => ({ mintTxHash: "MINT", syncTxHash: "SYNC" });
+  it("rebuilds a swap from its ticket on a fresh instance and mints once on simulate", async () => {
+    const r = (await mockQuote(quoteReq(), T0)) as unknown as { quote: { depositAddress: string }; ticket: string };
+    setStore(new MemoryStore()); // a different instance: nothing in memory
+    const sent = await mockSubmitDeposit({ depositAddress: r.quote.depositAddress, txHash: "SIM1", ticket: r.ticket }, T0, minter);
+    setStore(new MemoryStore());
+    const later = await mockStatus(r.quote.depositAddress, T0 + MINT_DELAY_MS + 1, minter, null, sent.ticket);
+    expect(later.status).toBe("SUCCESS");
+    expect(later.swapDetails.nearTxHashes).toContain("MINT");
+  });
+  it("rejects a tampered ticket or one for another address", async () => {
+    const r = (await mockQuote(quoteReq(), T0)) as unknown as { quote: { depositAddress: string }; ticket: string };
+    const [body, mac] = r.ticket.split(".");
+    expect(decodeTicket(`${body}x.${mac}`, r.quote.depositAddress)).toBeNull();
+    expect(decodeTicket(r.ticket, "TSomeOtherAddress")).toBeNull();
+    setStore(new MemoryStore());
+    await expect(mockStatus(r.quote.depositAddress, T0, minter, null, `${body}x.${mac}`)).rejects.toThrow();
   });
 });

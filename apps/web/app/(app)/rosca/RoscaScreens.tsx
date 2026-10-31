@@ -6,12 +6,13 @@ import {
 import type { Circle, Token } from "@oiko/sdk";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ConfirmSheet } from "@/components/app/ConfirmSheet";
 import { PageHeader } from "@/components/app/PageHeader";
 import { LoadError, PageSkeleton } from "@/components/app/States";
 import { useMoney } from "@/lib/actions";
 import { useCircle, useCircles } from "@/lib/data";
+import { useConfig } from "@/lib/config";
 import { fmtDate, fmtToken, nsToMs, parseUnits } from "@/lib/format";
 import { useT, type TFn } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
@@ -19,6 +20,14 @@ import { PotsTabs } from "../pots/PotsScreen";
 
 const memberName = (id: string) => id.replace(/^vault\./, "").split(".")[0] ?? id;
 const DAY_NS = 86_400_000_000_000n;
+const INVITE_KEY = (id: number) => `oiko-rosca-invite-${id}`;
+async function sha256Hex(s: string) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(d), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+function savedInvite(id: number): string | undefined {
+  try { return localStorage.getItem(INVITE_KEY(id)) ?? undefined; } catch { return undefined; }
+}
 
 function periodLabel(periodNs: string, t: TFn) {
   const d = Number(BigInt(periodNs) / DAY_NS);
@@ -62,11 +71,12 @@ export function RoscaListScreen() {
 export function RoscaNewScreen() {
   const t = useT();
   const router = useRouter();
-  const { execOptional } = useMoney();
+  const { exec } = useMoney();
+  const { isTestMode } = useConfig();
   const [name, setName] = useState("");
   const [coin, setCoin] = useState<Token>("usdt");
   const [amount, setAmount] = useState("");
-  const [period, setPeriod] = useState<"week" | "month">("week");
+  const [period, setPeriod] = useState<"minute" | "week" | "month">("week");
   const [members, setMembers] = useState("5");
   const [bond, setBond] = useState(true);
   const [shuffle, setShuffle] = useState(false);
@@ -81,7 +91,7 @@ export function RoscaNewScreen() {
       <Input label={t("rosca.name")} value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} placeholder={t("rosca.namePlaceholder")} />
       <SegmentedControl label={t("common.token")} value={coin} onChange={setCoin} items={[{ value: "usdt", label: "USDT" }, { value: "usdc", label: "USDC" }]} />
       <Input label={t("rosca.amountPerRound")} value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" suffix={coin.toUpperCase()} placeholder="50" />
-      <SegmentedControl label={t("rosca.period")} value={period} onChange={setPeriod} items={[{ value: "week", label: t("rosca.weekly") }, { value: "month", label: t("rosca.monthly") }]} />
+      <SegmentedControl label={t("rosca.period")} value={period} onChange={setPeriod} items={[...(isTestMode ? [{ value: "minute" as const, label: t("rosca.testMinute") }] : []), { value: "week" as const, label: t("rosca.weekly") }, { value: "month" as const, label: t("rosca.monthly") }]} />
       <Input label={t("rosca.maxMembers")} value={members} onChange={(e) => setMembers(e.target.value.replace(/\D/g, "").slice(0, 2))} inputMode="numeric" hint={t("rosca.maxMembersHint")} />
       <GroupedList label={t("rosca.rules")}>
         <ListRow icon="shield" color="mint" title={t("rosca.bond")} subtitle={t("rosca.bondHelp")} trailing={<Toggle checked={bond} onChange={setBond} label={t("rosca.bond")} />} />
@@ -91,16 +101,20 @@ export function RoscaNewScreen() {
       <Button block size="lg" disabled={!valid} onClick={() => setConfirm(true)}>{t("common.continue")}</Button>
       {confirm && units && (
         <ConfirmSheet open onOpenChange={setConfirm} title={t("rosca.new")}
-          sentence={t("rosca.createSentence", { name, amount: fmtToken(units, coin), period: period === "week" ? t("rosca.weekly") : t("rosca.monthly"), n })}
+          sentence={t("rosca.createSentence", { name, amount: fmtToken(units, coin), period: period === "minute" ? t("rosca.everyMinutes", { n: 1 }) : period === "week" ? t("rosca.weekly") : t("rosca.monthly"), n })}
           confirmLabel={t("rosca.create")} successText={t("rosca.created")}
           onConfirm={async () => {
             const code = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => (b % 36).toString(36)).join("");
-            // Not in the frozen vault interface yet: calls VaultClient.ajoCreate once the SDK/contract add it (else E_DISABLED).
-            await execOptional("ajoCreate", {
-              name, token: coin, amount_per_round: units, period_ns: (BigInt(period === "week" ? 7 : 30) * DAY_NS).toString(),
-              max_members: n, bond_amount: bond ? units : null, shuffle, invite_code: code,
+            const periodNs = period === "minute" ? 60_000_000_000n : BigInt(period === "week" ? 7 : 30) * DAY_NS;
+            const r = await exec("ajoCreate", {
+              name, token: coin, amount_per_round: units, period_ns: periodNs.toString(),
+              max_members: n, bond_amount: bond ? units : null, shuffle, invite_code_hash: await sha256Hex(code),
             });
-            router.push("/rosca");
+            const id = Number(r.value);
+            if (Number.isFinite(id) && id > 0) {
+              try { localStorage.setItem(INVITE_KEY(id), code); } catch { /* invite link still shown this session */ }
+              router.push(`/rosca/${id}`);
+            } else router.push("/rosca");
           }} />
       )}
     </div>
@@ -111,9 +125,10 @@ function RoscaView({ c, inviteCode }: { c: Circle; inviteCode?: string }) {
   const t = useT();
   const { session } = useSession();
   const { exec } = useMoney();
-  const [sheet, setSheet] = useState<null | "pay" | "bond" | "join">(null);
+  const [sheet, setSheet] = useState<null | "pay" | "bond" | "join" | "start">(null);
   const me = session?.vaultId ?? "";
   const member = c.members.includes(me);
+  const organiser = c.organiser === me;
   const order = c.order.length ? c.order : c.members;
   const paidThisRound = c.paid.some(([r, m]) => r === c.round && m === me);
   const hasBond = !!c.bonds[me];
@@ -146,6 +161,11 @@ function RoscaView({ c, inviteCode }: { c: Circle; inviteCode?: string }) {
       {member && c.status === "forming" && BigInt(c.bond_amount) > 0n && !hasBond && (
         <Button block size="lg" variant="secondary" onClick={() => setSheet("bond")}>{t("rosca.postBond", { amount: fmtToken(c.bond_amount, c.token) })}</Button>
       )}
+      {organiser && c.status === "forming" && (
+        <Button block size="lg" variant="secondary" disabled={c.members.length < 2} onClick={() => setSheet("start")} data-testid="rosca-start">
+          {c.members.length < 2 ? t("rosca.needTwo") : t("rosca.start")}
+        </Button>
+      )}
       {!member && inviteCode && c.status === "forming" && (
         <Button block size="lg" onClick={() => setSheet("join")} data-testid="rosca-join">{t("rosca.joinGroup")}</Button>
       )}
@@ -163,6 +183,9 @@ function RoscaView({ c, inviteCode }: { c: Circle; inviteCode?: string }) {
       {sheet === "bond" && <ConfirmSheet open onOpenChange={() => setSheet(null)} title={t("rosca.bond")}
         sentence={t("rosca.bondSentence", { amount: fmtToken(c.bond_amount, c.token), name: c.name })} confirmLabel={t("rosca.postBondShort")} successText={t("rosca.bondPosted")}
         onConfirm={() => exec("ajoPostBond", c.id, c.token, c.bond_amount)} />}
+      {sheet === "start" && <ConfirmSheet open onOpenChange={() => setSheet(null)} title={t("rosca.start")}
+        sentence={t("rosca.startSentence", { name: c.name, n: c.members.length })} confirmLabel={t("rosca.start")} successText={t("rosca.started")}
+        onConfirm={() => exec("ajoStart", c.id)} />}
       {sheet === "join" && inviteCode && <ConfirmSheet open onOpenChange={() => setSheet(null)} title={t("rosca.joinGroup")}
         sentence={t("rosca.joinSentence", { name: c.name, amount: fmtToken(c.amount_per_round, c.token), period: periodLabel(c.period_ns, t) })} confirmLabel={t("rosca.join")} successText={t("rosca.joined")}
         onConfirm={() => exec("ajoJoin", c.id, inviteCode)} />}
@@ -174,10 +197,12 @@ export function RoscaScreen() {
   const t = useT();
   const { id } = useParams<{ id: string }>();
   const q = useCircle(Number(id));
+  const [invite, setInvite] = useState<string | undefined>(undefined);
+  useEffect(() => { setInvite(savedInvite(Number(id))); }, [id]);
   return (
     <div className="oi-col oi-page" data-testid="rosca-group">
       <PageHeader title={t("nav.rosca")} back="/rosca" />
-      {q.error && !q.data ? <LoadError error={q.error} onRetry={q.refresh} /> : q.data === undefined ? <PageSkeleton rows={3} /> : q.data === null ? <EmptyState icon="ajo" title={t("rosca.notFound")} /> : <RoscaView c={q.data} />}
+      {q.error && !q.data ? <LoadError error={q.error} onRetry={q.refresh} /> : q.data === undefined ? <PageSkeleton rows={3} /> : q.data === null ? <EmptyState icon="ajo" title={t("rosca.notFound")} /> : <RoscaView c={q.data} inviteCode={invite} />}
     </div>
   );
 }

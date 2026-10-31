@@ -52,4 +52,9 @@ export const rosca = {
   "rosca.bondPosted": "Bond posted",
   "rosca.joinSentence": "Join {name}. You'll put in {amount}, {period}, from Spend.",
   "rosca.joined": "You're in",
+  "rosca.testMinute": "Every minute (test mode)",
+  "rosca.start": "Start the group",
+  "rosca.needTwo": "Invite at least one more member to start",
+  "rosca.startSentence": "Start {name} with {n} members. The payout order is fixed from now on and nobody can change it.",
+  "rosca.started": "Started",
 } as const;

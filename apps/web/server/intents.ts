@@ -22,7 +22,7 @@ async function oneClick<T>(path: string, init: { method: "GET" | "POST"; body?: 
     // In-process: avoids a self-HTTP call (and works behind deployment protection).
     if (path === "/v0/tokens") return mockTokens() as T;
     if (path === "/v0/quote") return (await mockQuote(init.body as Partial<QuoteRequest>)) as T;
-    if (path === "/v0/status") return (await mockStatus(init.query!.depositAddress!, Date.now(), undefined, init.query?.depositMemo)) as T;
+    if (path === "/v0/status") return (await mockStatus(init.query!.depositAddress!, Date.now(), undefined, init.query?.depositMemo, init.query?.ticket)) as T;
     if (path === "/v0/deposit/submit") return (await mockSubmitDeposit(init.body as { txHash: string; depositAddress: string })) as T;
     throw new ApiError("E_NOT_FOUND", 404);
   }
@@ -124,6 +124,7 @@ export async function depositAddress(input: { name: string; originAsset: string;
     amountIn: q.amountIn, amountOut: q.amountOut, fee: feeUnits(q.amountInFormatted, q.amountOutFormatted),
     deadline: q.deadline ?? body.deadline, quoteId: r.correlationId, destinationToken: dest.token,
     timeEstimate: q.timeEstimate, minAmountOut: q.minAmountOut,
+    ...((r as { ticket?: string }).ticket ? { ticket: (r as { ticket?: string }).ticket } : {}),
   };
 }
 
@@ -158,12 +159,13 @@ export async function withdrawQuote(input: { vaultId: string; potId: number; tok
   return {
     depositAddress: q.depositAddress, ...(q.depositMemo ? { depositMemo: q.depositMemo } : {}), amountIn: q.amountIn, amountOut: q.amountOut,
     fee: feeUnits(q.amountInFormatted, q.amountOutFormatted), deadline: q.deadline ?? body.deadline, timeEstimate: q.timeEstimate,
+    ...((r as { ticket?: string }).ticket ? { ticket: (r as { ticket?: string }).ticket } : {}),
   };
 }
 
-export async function intentStatus(depositAddress: string, memo?: string | null): Promise<{ status: OneClickStatus; updatedAt: string }> {
+export async function intentStatus(depositAddress: string, memo?: string | null, ticket?: string | null): Promise<{ status: OneClickStatus; updatedAt: string }> {
   const r = await oneClick<{ status: OneClickStatus; updatedAt: string; quoteResponse?: QuoteResponse }>("/v0/status", {
-    method: "GET", query: { depositAddress, ...(memo ? { depositMemo: memo } : {}) },
+    method: "GET", query: { depositAddress, ...(memo ? { depositMemo: memo } : {}), ...(ticket && serverConfig().oneclick.isMock ? { ticket } : {}) },
   });
   if (r.status === "SUCCESS" && !serverConfig().oneclick.isMock && !synced.has(depositAddress)) {
     const cfg = serverConfig();
@@ -179,10 +181,10 @@ export async function intentStatus(depositAddress: string, memo?: string | null)
   return { status: r.status, updatedAt: r.updatedAt };
 }
 
-export async function simulateDeposit(depositAddress: string, memo?: string) {
+export async function simulateDeposit(depositAddress: string, memo?: string, ticket?: string) {
   const cfg = serverConfig();
   if (cfg.network === "mainnet" || !cfg.oneclick.isMock) throw new ApiError("E_TEST_ONLY", 403);
   const fakeTx = "SIM" + Math.random().toString(36).slice(2, 12).toUpperCase();
-  const r = await mockSubmitDeposit({ depositAddress, txHash: fakeTx, memo });
-  return { ok: true, status: r.status };
+  const r = await mockSubmitDeposit({ depositAddress, txHash: fakeTx, memo, ticket });
+  return { ok: true, status: r.status, ticket: r.ticket };
 }

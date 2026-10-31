@@ -5,6 +5,6 @@ import { intentStatus } from "@/server/intents";
 export async function GET(req: Request, ctx: { params: Promise<{ depositAddress: string }> }) {
   await connection();
   const { depositAddress } = await ctx.params;
-  const memo = new URL(req.url).searchParams.get("memo");
-  return handle(() => intentStatus(decodeURIComponent(depositAddress), memo));
+  const q = new URL(req.url).searchParams;
+  return handle(() => intentStatus(decodeURIComponent(depositAddress), q.get("memo"), q.get("ticket")));
 }

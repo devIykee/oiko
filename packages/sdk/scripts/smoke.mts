@@ -54,9 +54,9 @@ const toks = await api("/api/intents/tokens");
 const tron = toks.groups.find((g: any) => /tron/i.test(g.chain) && g.symbol === "USDT") ?? toks.groups[0];
 const dep = await api("/api/intents/deposit-address", { name, originAsset: tron.assetId, amount: toUnits("100", tron.decimals), refundTo: "TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf" });
 check(dep.depositAddress, "deposit address issued");
-await api("/api/intents/simulate-deposit", { depositAddress: dep.depositAddress });
+const sim = await api("/api/intents/simulate-deposit", { depositAddress: dep.depositAddress, ticket: dep.ticket });
 let status = "";
-for (let i = 0; i < 40 && status !== "SUCCESS"; i++) { await sleep(2000); status = (await api(`/api/intents/status/${encodeURIComponent(dep.depositAddress)}`)).status; }
+for (let i = 0; i < 40 && status !== "SUCCESS"; i++) { await sleep(2000); status = (await api(`/api/intents/status/${encodeURIComponent(dep.depositAddress)}?ticket=${encodeURIComponent(sim.ticket ?? "")}`)).status; }
 check(status === "SUCCESS", "deposit reached SUCCESS");
 await api("/api/sync", { vaultId }).catch(() => {});
 let ov = await vault.overview();

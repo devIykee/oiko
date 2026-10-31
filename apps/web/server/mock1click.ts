@@ -3,6 +3,7 @@
 // USDC/USDT to the recipient vault (the relayer is the mock-ft minter) ~3 s after it is marked sent, walking
 // PENDING_DEPOSIT → KNOWN_DEPOSIT_TX → PROCESSING → SUCCESS, then calls the vault's permissionless sync().
 import { sha256 } from "@noble/hashes/sha2.js";
+import { hmac } from "@noble/hashes/hmac.js";
 import { b58encode, hexEncode, isVaultId, TGAS, utf8 } from "@oiko/sdk";
 import { serverConfig } from "./config";
 import { ApiError } from "./errors";
@@ -32,6 +33,29 @@ export interface MockSwap {
 
 export const MINT_DELAY_MS = 3000;
 export const KNOWN_TX_MS = 1000;
+
+// Signed tickets make the mock stateless across serverless instances: the quote response carries a
+// ticket (HMAC over the swap), and status/simulate calls pass it back so any instance can rebuild the swap.
+function ticketKey(): Uint8Array {
+  const c = serverConfig();
+  return sha256(utf8("oiko-mock-1click-ticket:" + (c.relayer?.privateKey ?? c.cronSecret ?? "local-dev")));
+}
+const b64u = (b: Uint8Array) => Buffer.from(b).toString("base64url");
+export function encodeTicket(s: MockSwap): string {
+  const body = b64u(utf8(JSON.stringify(s)));
+  return `${body}.${b64u(hmac(sha256, ticketKey(), utf8(body)))}`;
+}
+export function decodeTicket(t: string, key: string): MockSwap | null {
+  const [body, mac] = t.split(".");
+  if (!body || !mac) return null;
+  if (b64u(hmac(sha256, ticketKey(), utf8(body))) !== mac) return null;
+  try {
+    const s = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as MockSwap;
+    return s.depositAddress === key ? s : null;
+  } catch {
+    return null;
+  }
+}
 const FEE_BPS = 5n; // 0.05%, in line with observed stablecoin routes
 const WITHDRAW_FEE_UNITS = 5_000n; // 0.005 of the destination token, like the observed withdrawFee
 
@@ -130,6 +154,7 @@ export async function mockQuote(req: Partial<QuoteRequest>, now = Date.now()): P
       mintTxHash: null, syncTxHash: null, originDecimals: origin.decimals,
     };
     await store().putMockSwap(key, swap);
+    (resp as QuoteResponse & { ticket?: string }).ticket = encodeTicket(swap);
   }
   return resp;
 }
@@ -140,7 +165,7 @@ export function mockStatusAt(s: MockSwap, now: number): { status: OneClickStatus
   if (s.sentAt === null) return { status: Number.isFinite(deadline) && now > deadline ? "FAILED" : "PENDING_DEPOSIT", shouldMint: false };
   const elapsed = now - s.sentAt;
   if (s.mint === "failed") return { status: "FAILED", shouldMint: false };
-  if (s.mint === "done") return { status: "SUCCESS", shouldMint: false };
+  if (s.mint === "done") return { status: elapsed < KNOWN_TX_MS ? "KNOWN_DEPOSIT_TX" : elapsed < MINT_DELAY_MS ? "PROCESSING" : "SUCCESS", shouldMint: false };
   if (s.mint === "skip") return { status: elapsed < KNOWN_TX_MS ? "KNOWN_DEPOSIT_TX" : elapsed < MINT_DELAY_MS ? "PROCESSING" : "SUCCESS", shouldMint: false };
   if (elapsed < KNOWN_TX_MS) return { status: "KNOWN_DEPOSIT_TX", shouldMint: false };
   return { status: "PROCESSING", shouldMint: elapsed >= MINT_DELAY_MS && s.mint === "none" };
@@ -166,16 +191,16 @@ export const relayerMinter: Minter = async (s) => {
 export function swapKey(depositAddress: string, memo?: string | null): string {
   return memo ? `${depositAddress}#${memo}` : depositAddress;
 }
-async function loadSwap(key: string): Promise<MockSwap> {
-  const s = await store().getMockSwap<MockSwap>(key);
+async function loadSwap(key: string, ticket?: string | null): Promise<MockSwap> {
+  const s = (await store().getMockSwap<MockSwap>(key)) ?? (ticket ? decodeTicket(ticket, key) : null);
   if (!s) throw new ApiError("E_NOT_FOUND", 404, "Deposit address not found");
   return s;
 }
 
 /** Advances a swap (mints when due) and returns the GetExecutionStatusResponse shape. */
-export async function mockStatus(depositAddress: string, now = Date.now(), minter: Minter = relayerMinter, memo?: string | null) {
+export async function mockStatus(depositAddress: string, now = Date.now(), minter: Minter = relayerMinter, memo?: string | null, ticket?: string | null) {
   const key = swapKey(depositAddress, memo);
-  let s = await loadSwap(key);
+  let s = await loadSwap(key, ticket);
   const st = mockStatusAt(s, now);
   if (st.shouldMint) {
     s = { ...s, mint: "pending", updatedAt: now };
@@ -212,21 +237,34 @@ function statusBody(s: MockSwap, status: OneClickStatus) {
 }
 
 /** POST /v0/deposit/submit and the test-only simulate-deposit: marks the deposit as sent. */
-export async function mockSubmitDeposit(body: { txHash?: string; depositAddress?: string; memo?: string }, now = Date.now(), minter: Minter = relayerMinter) {
+export async function mockSubmitDeposit(body: { txHash?: string; depositAddress?: string; memo?: string; ticket?: string }, now = Date.now(), minter: Minter = relayerMinter) {
   if (!body.depositAddress) throw new ApiError("E_BAD_REQUEST", 400, "depositAddress should not be empty");
   if (!body.txHash) throw new ApiError("E_BAD_REQUEST", 400, "txHash should not be empty");
   const key = swapKey(body.depositAddress, body.memo);
-  let s = await loadSwap(key);
+  let s = await loadSwap(key, body.ticket);
   if (s.sentAt === null) {
     s = { ...s, sentAt: now, depositTxHash: body.txHash, updatedAt: now };
     await store().putMockSwap(key, s);
-    // Best effort on long-running servers; on serverless the next status poll performs the mint.
     if (s.mint === "none") {
-      const t = setTimeout(() => void mockStatus(body.depositAddress!, Date.now(), minter, body.memo).catch(() => undefined), MINT_DELAY_MS + 100);
-      (t as { unref?: () => void }).unref?.();
+      if (body.ticket) {
+        // Ticket mode (serverless): mint now so no instance needs to remember the swap; the returned ticket
+        // records the result and status walks KNOWN_DEPOSIT_TX -> PROCESSING -> SUCCESS by elapsed time.
+        try {
+          const r = await minter(s);
+          s = { ...s, mint: "done", mintTxHash: r.mintTxHash, syncTxHash: r.syncTxHash, updatedAt: Date.now() };
+        } catch (e) {
+          console.error("[oiko] mock 1Click mint failed", e);
+          s = { ...s, mint: "failed", updatedAt: Date.now() };
+        }
+        await store().putMockSwap(key, s);
+      } else {
+        // Long-running servers: the timer (or the next status poll) performs the mint.
+        const t = setTimeout(() => void mockStatus(body.depositAddress!, Date.now(), minter, body.memo).catch(() => undefined), MINT_DELAY_MS + 100);
+        (t as { unref?: () => void }).unref?.();
+      }
     }
   }
-  return statusBody(s, mockStatusAt(s, now).status);
+  return { ...statusBody(s, mockStatusAt(s, now).status), ticket: encodeTicket(s) };
 }
 
 export function isMockEnabled(): boolean {

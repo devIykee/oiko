@@ -14,7 +14,7 @@ import { useT } from "@/lib/i18n";
 import { validAddress } from "@/lib/address";
 
 type Step = "from" | "where" | "dest" | "address" | "amount" | "review" | "sent";
-type Quote = { depositAddress: string; amountIn: string; amountOut: string; fee: string; deadline: string; timeEstimate: number };
+type Quote = { depositAddress: string; depositMemo?: string | null; ticket?: string; amountIn: string; amountOut: string; fee: string; deadline: string; timeEstimate: number };
 
 
 export function WithdrawScreen() {
@@ -54,7 +54,8 @@ export function WithdrawScreen() {
     if (where === "exchange" && quote) {
       poll = setInterval(async () => {
         try {
-          const s = await api<{ status: string }>(`/api/intents/status/${encodeURIComponent(quote.depositAddress)}`);
+          const qs = new URLSearchParams({ ...(quote.depositMemo ? { memo: quote.depositMemo } : {}), ...(quote.ticket ? { ticket: quote.ticket } : {}) }).toString();
+          const s = await api<{ status: string }>(`/api/intents/status/${encodeURIComponent(quote.depositAddress)}${qs ? `?${qs}` : ""}`);
           if (s.status === "SUCCESS") setArrived(Date.now());
         } catch { /* keep polling */ }
       }, 3000);
@@ -92,7 +93,7 @@ export function WithdrawScreen() {
     if (where === "oiko") { setQuote(null); setStep("review"); return; }
     setBusy(true);
     try {
-      const q = await api<Quote>("/api/intents/withdraw-quote", { body: { vaultId: o.owner ? `vault.${o.owner}` : "", potId: pot.id, coin, amount: units, destinationAsset: dest!.assetId, destinationAddress: address.trim() } });
+      const q = await api<Quote>("/api/intents/withdraw-quote", { body: { vaultId: o.owner ? `vault.${o.owner}` : "", potId: pot.id, token: coin, amount: units, destinationAsset: dest!.assetId, destinationAddress: address.trim() } });
       setQuote(q);
       setStep("review");
     } catch (e) { setErr(explain(e)); } finally { setBusy(false); }
@@ -104,7 +105,13 @@ export function WithdrawScreen() {
     const to = where === "oiko" ? address : quote!.depositAddress;
     const amt = where === "oiko" ? units : quote!.amountIn;
     try {
-      await (large ? execOwner("withdrawLarge", pot.id, coin, amt, to) : exec("withdraw", pot.id, coin, amt, to));
+      const memo = where === "oiko" ? undefined : quote!.depositMemo ?? undefined;
+      await (large ? execOwner("withdrawLarge", pot.id, coin, amt, to, memo) : exec("withdraw", pot.id, coin, amt, to, memo));
+      // Test mode: tell the built-in payment service the deposit was sent (the real service detects it on its own).
+      if (quote?.ticket) {
+        const r = await api<{ ticket?: string }>("/api/intents/simulate-deposit", { body: { depositAddress: quote.depositAddress, memo, ticket: quote.ticket } }).catch(() => null);
+        if (r?.ticket) setQuote({ ...quote, ticket: r.ticket });
+      }
       setSentAt(Date.now());
       setStep("sent");
     } catch (e) { setErr(explain(e)); } finally { setBusy(false); }
