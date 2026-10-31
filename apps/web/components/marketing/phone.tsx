@@ -176,7 +176,7 @@ export function ProposalScreen() {
 export function ActivityScreen() {
   const rows: Array<[string, string, string, TileColor, string]> = [
     ["Paid Ikeja Electric", "Bill payer · agent", "−25.00", "violet", I.boltFill],
-    ["From Tunde", "Your plan ran: 4 pots", "+300.00", "mint", I.arrowDown],
+    ["From Sam", "Your plan ran: 4 pots", "+300.00", "mint", I.arrowDown],
     ["Moved to Laptop", "You approved Money coach", "40.00", "blue", I.arrowRightArrowLeft],
     ["Refused: gadgets.shop", "Not on the allowed list", "0.00", "rose", I.xmarkShieldFill],
     ["Paid rent", "Bill payer · agent", "−45.00", "violet", I.houseFill],

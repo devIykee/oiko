@@ -73,7 +73,7 @@ function Hero() {
             <HomeScreen />
           </Phone>
         </div>
-        <FloatCard className="left-0 top-16 hidden md:flex xl:left-10" tile="mint" d={I.arrowDown} title="From Tunde, 300.00 USDT" sub="Your plan ran: Bills, Savings, Laptop, Spend" />
+        <FloatCard className="left-0 top-16 hidden md:flex xl:left-10" tile="mint" d={I.arrowDown} title="From Sam, 300.00 USDT" sub="Your plan ran: Bills, Savings, Laptop, Spend" />
         <FloatCard className="right-0 top-40 hidden md:flex xl:right-10" tile="stone" glyph={<LockedPotGlyph size={18} />} title="Rainy day, locked" sub="Opens 1 Jan 2027. Not before." />
         <a href="#proof" className="absolute bottom-6 left-1/2 hidden -translate-x-1/2 translate-y-[calc(100%+40px)] items-center gap-1 text-[13px] text-ink-2 md:flex" aria-label="Scroll to the next section">
           <Glyph d={I.chevronDown} size={14} />
