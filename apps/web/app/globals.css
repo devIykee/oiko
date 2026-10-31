@@ -1,26 +1,92 @@
 @import "tailwindcss";
+/* Design tokens are owned by @oiko/ui (light, dark via prefers-color-scheme and [data-theme], motion). */
+@import "@oiko/ui/tokens.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Class-based dark variant that matches the token rules: forced [data-theme=dark], or system dark unless forced light. */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-ink: var(--accent-soft-ink);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-ink: var(--success-ink);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-ink: var(--warning-ink);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-ink: var(--danger-ink);
+  --color-focus: var(--focus);
+  --color-pill: var(--pill-black);
+  --color-pill-ink: var(--pill-black-ink);
+  --color-tile-blue: var(--tile-blue);
+  --color-tile-blue-soft: var(--tile-blue-soft);
+  --color-tile-violet: var(--tile-violet);
+  --color-tile-violet-soft: var(--tile-violet-soft);
+  --color-tile-mint: var(--tile-mint);
+  --color-tile-mint-soft: var(--tile-mint-soft);
+  --color-tile-sun: var(--tile-sun);
+  --color-tile-sun-soft: var(--tile-sun-soft);
+  --color-tile-rose: var(--tile-rose);
+  --color-tile-rose-soft: var(--tile-rose-soft);
+  --color-tile-stone: var(--tile-stone);
+  --color-tile-stone-soft: var(--tile-stone-soft);
+
+  --font-sans: var(--font-ui);
+  --font-display: var(--font-display);
+  --font-brand: var(--font-acorn), var(--font-display);
+
+  --radius-card: var(--r-card);
+  --radius-sheet: var(--r-sheet);
+  --radius-input: var(--r-input);
+
+  --shadow-float: var(--shadow-float);
+
+  --ease-out: var(--ease-out);
+  --ease-in: var(--ease-in);
+  --ease-inout: var(--ease-inout);
 }
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3, h4 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  ::selection { background: var(--accent-soft); color: var(--ink); }
+}
+
+@utility tabular { font-variant-numeric: tabular-nums; }

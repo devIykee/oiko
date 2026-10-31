@@ -1,0 +1,168 @@
+/* Website-only styles: reveals, hero lines, the agents scroll story, flip tiles. Only transform/opacity animate. */
+.mk {
+  --mk-ink-bg: #111317;
+  --mk-ink-surface: #1b1e23;
+  --mk-ink-line: #2a2d33;
+  --mk-ink-text: #f5f6f8;
+  --mk-ink-text-2: #a4a9b3;
+}
+:root[data-theme="dark"] .mk {
+  --mk-ink-bg: #000000;
+  --mk-ink-surface: #121418;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .mk {
+    --mk-ink-bg: #000000;
+    --mk-ink-surface: #121418;
+  }
+}
+
+.mk-display {
+  font-family: var(--font-acorn), var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 0.98;
+}
+.mk-hero { font-size: clamp(46px, 8vw, 104px); }
+.mk-section-title { font-size: clamp(36px, 5vw, 64px); line-height: 1.02; }
+
+/* Hero: line-by-line rise, 12px, 80ms stagger, once on load. */
+@keyframes mk-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.mk-line {
+  display: block;
+  animation: mk-rise var(--dur-reveal) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+
+/* Section reveals: fade up 16px, driven by scroll where supported; static otherwise. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .mk-reveal {
+      animation: mk-fade-up linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 70%;
+    }
+    .mk-stagger > * {
+      animation: mk-fade-up linear both;
+      animation-timeline: view();
+      animation-range: entry calc(var(--i, 0) * 6%) entry calc(60% + var(--i, 0) * 6%);
+    }
+  }
+}
+@keyframes mk-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Flip tiles (before/after) */
+.mk-flip { perspective: 1200px; }
+.mk-flip-inner {
+  display: grid;
+  transform-style: preserve-3d;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+.mk-flip-inner > * { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.mk-flip-back { transform: rotateY(180deg); }
+.mk-flip[data-flipped="true"] .mk-flip-inner { transform: rotateY(180deg); }
+
+/* Agents scroll story: one pinned phone, four screens. */
+.mk-story-screen {
+  opacity: 0;
+  transform: translateY(12px) scale(0.98);
+  transition: opacity var(--dur-slow) var(--ease-out), transform var(--dur-slow) var(--ease-out);
+}
+.mk-story[data-step="0"] .mk-story-screen[data-s="0"],
+.mk-story[data-step="1"] .mk-story-screen[data-s="1"],
+.mk-story[data-step="2"] .mk-story-screen[data-s="2"],
+.mk-story[data-step="3"] .mk-story-screen[data-s="3"] { opacity: 1; transform: none; }
+.mk-story-step { opacity: 0.35; transition: opacity var(--dur-base) var(--ease-out); }
+.mk-story[data-step="0"] .mk-story-step[data-s="0"],
+.mk-story[data-step="1"] .mk-story-step[data-s="1"],
+.mk-story[data-step="2"] .mk-story-step[data-s="2"],
+.mk-story[data-step="3"] .mk-story-step[data-s="3"] { opacity: 1; }
+
+/* CSS scroll-driven version: each step publishes a view timeline; the screens and step text follow it. */
+@supports (animation-timeline: view()) {
+  .mk-story[data-css="true"] { timeline-scope: --s0, --s1, --s2, --s3; }
+  .mk-story[data-css="true"] .mk-story-step[data-s="0"] { view-timeline-name: --s0; }
+  .mk-story[data-css="true"] .mk-story-step[data-s="1"] { view-timeline-name: --s1; }
+  .mk-story[data-css="true"] .mk-story-step[data-s="2"] { view-timeline-name: --s2; }
+  .mk-story[data-css="true"] .mk-story-step[data-s="3"] { view-timeline-name: --s3; }
+  .mk-story[data-css="true"] .mk-story-screen,
+  .mk-story[data-css="true"] .mk-story-step {
+    transition: none;
+    animation: mk-story-show linear both;
+    animation-range: cover 27% cover 73%;
+  }
+  .mk-story[data-css="true"] .mk-story-screen[data-s="0"] { animation-name: mk-story-show-first; }
+  .mk-story[data-css="true"] .mk-story-screen[data-s="3"] { animation-name: mk-story-show-last; }
+  .mk-story[data-css="true"] [data-s="0"] { animation-timeline: --s0; }
+  .mk-story[data-css="true"] [data-s="1"] { animation-timeline: --s1; }
+  .mk-story[data-css="true"] [data-s="2"] { animation-timeline: --s2; }
+  .mk-story[data-css="true"] [data-s="3"] { animation-timeline: --s3; }
+  .mk-story[data-css="true"] .mk-story-step { animation-name: mk-story-text; }
+  /* the phone drifts up to 24px across the whole story */
+  .mk-story[data-css="true"] .mk-story-phone {
+    animation: mk-parallax linear both;
+    animation-timeline: view();
+  }
+}
+@keyframes mk-story-show {
+  0% { opacity: 0; transform: translateY(12px) scale(0.98); }
+  10%, 90% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-12px) scale(0.98); }
+}
+@keyframes mk-story-show-first {
+  0%, 90% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-12px) scale(0.98); }
+}
+@keyframes mk-story-show-last {
+  0% { opacity: 0; transform: translateY(12px) scale(0.98); }
+  10%, 100% { opacity: 1; transform: none; }
+}
+@keyframes mk-story-text {
+  0% { opacity: 0.35; }
+  10%, 90% { opacity: 1; }
+  100% { opacity: 0.35; }
+}
+@keyframes mk-parallax {
+  from { transform: translateY(12px); }
+  to { transform: translateY(-12px); }
+}
+
+/* Interactions only on hover-capable devices */
+@media (hover: hover) {
+  .mk-hover-lift { transition: transform var(--dur-base) var(--ease-out); }
+  .mk-hover-lift:hover { transform: translateY(-2px); }
+}
+.mk-press { transition: transform var(--dur-instant) var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
+.mk-press:active { transform: scale(0.98); }
+
+/* range input, designed: the visible track and fill are divs (see Slider); the native input is transparent on top. */
+.mk-range { -webkit-appearance: none; appearance: none; position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; background: transparent; cursor: pointer; }
+.mk-range::-webkit-slider-runnable-track { height: 100%; background: transparent; }
+.mk-range::-moz-range-track { background: transparent; }
+.mk-range::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: 3px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); box-shadow: 0 1px 3px rgba(22,24,29,.2); }
+.mk-range::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); }
+.mk-range:focus-visible { outline: none; }
+.mk-range:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--focus); outline-offset: 2px; }
+.mk-range:focus-visible::-moz-range-thumb { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.mk-details summary { list-style: none; cursor: pointer; }
+.mk-details summary::-webkit-details-marker { display: none; }
+.mk-details[open] .mk-chev { transform: rotate(180deg); }
+.mk-chev { transition: transform var(--dur-base) var(--ease-out); }
+
+.mk-hairline { border-width: var(--hairline); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-line, .mk-reveal, .mk-stagger > * { animation: none !important; }
+  .mk-flip-inner, .mk-story-screen, .mk-story-step, .mk-hover-lift { transition: none !important; }
+  .mk-story .mk-story-phone { animation: none !important; }
+}
+:root[data-low-data="1"] .mk-line, :root[data-low-data="1"] .mk-reveal, :root[data-low-data="1"] .mk-stagger > * { animation: none !important; }
+
+:root[data-hide-announce] .mk-announce { display: none; }
