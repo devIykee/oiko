@@ -3,11 +3,11 @@
 Oiko is a personal finance app with your name on it. Get paid from anywhere, plan every bit, and let your own AI agent help, on limits you set.
 
 - Live demo (NEAR testnet): **https://oikodotnear.vercel.app**
-- Built at NEAR HACKATHON 2026 (tracks: `realworld` primary, `security`, `agents`, `defi`, `social`)
+- Built at NEAR HACKATHON 2026 (tracks: 08 Real-World Money `RWM` primary, 06 AI Security & Defense `SEC`, 07 Agent Economy `AGT`, 01 Unstoppable DeFi `DFI`)
 
 ## What it is
 
-You claim a name (`ada.oiko.testnet`) and share a pay link. Anyone can pay that link, and every payment is split by your plan into pots: Spend, Bills, Savings, Goals and Locked. Money sits in a separate account (`vault.ada.oiko.testnet`) that has **no keys at all** and code with no upgrade or admin method. Locks, plans and agent limits are enforced by that code, not by Oiko. Oiko has no built-in AI. You connect the agent you already use (over MCP or REST), and it can read, propose, or act only within caps the account enforces.
+You claim a name (`ada.oiko.testnet`) and share a pay link. Anyone can pay that link, and every payment is split by your plan into pots: Spend, Bills, Savings, Goals and Locked. Money sits in a separate account (`vault.ada.oiko.testnet`) that holds no owner keys at all (only the capped agent keys it adds to itself) and runs code with no upgrade or admin method. Locks, plans and agent limits are enforced by that code, not by Oiko. Oiko has no built-in AI. You connect the agent you already use (over MCP or REST), and it can read, propose, or act only within caps the account enforces.
 
 Why personal finance: payday is where people lose control of money. Oiko makes the plan run on every payment and lets an agent help without ever holding your keys.
 
@@ -113,15 +113,14 @@ Named accounts and sub-accounts, Global Contracts (NEP-591, vault code by hash),
 
 | Track | Fit |
 |---|---|
-| `realworld` | pay-by-name from any chain, plan, bills, savings, locks, no seed phrase |
-| `security` | keyless account, immutable locks, scoped capped agent keys, NEP-413 gateway, one-tap revoke |
-| `agents` | any agent manages money over MCP (stdio + HTTP) or REST, within on-chain budgets |
-| `defi` | Earn on Rhea with an on-chain utilization guard (refuses above 92%) |
-| `social` | ROSCA savings: contract-enforced order, bonds and recorded defaults |
+| 08 Real-World Money `RWM` (primary) | pay-by-name from any chain, plan, bills, savings, locks, no seed phrase |
+| 06 AI Security & Defense `SEC` | keyless account, immutable locks, scoped capped agent keys, NEP-413 gateway, one-tap revoke |
+| 07 Agent Economy `AGT` | any agent manages money over MCP (stdio + HTTP) or REST, within on-chain budgets |
+| 01 Unstoppable DeFi `DFI` | Earn on Rhea with an on-chain utilization guard (refuses above 92%) |
 
 ## Security model
 
-Summary: Oiko holds no keys over user money; the savings account has none either. Six invariants (ledger balance, locks never decrease early, agent caps/allowlist/expiry, no lending from Spend, idempotent sync, owner-only configuration) are property-tested in `contracts/vault/src/core.rs` and exercised in `contracts/tests`. Error codes: `contracts/ERRORS.md`. Details: `docs/DECISIONS.md`, `docs/interfaces/`.
+Summary: Oiko holds no keys over user money, and the savings account holds no owner keys. The vault invariants listed in `docs/SECURITY.md` are property-tested in `contracts/vault/src/core.rs` and exercised in `contracts/tests`. Error codes: `contracts/ERRORS.md`. Full threat model and review findings: `docs/SECURITY.md`. Agent developers: `docs/AGENTS.md`. Details: `docs/DECISIONS.md`, `docs/interfaces/`.
 
 ## Honest limits
 

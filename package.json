@@ -16,7 +16,8 @@
     "check:no-llm": "node scripts/check-no-llm.mjs",
     "check:copy": "node scripts/check-copy.mjs",
     "example:agent": "pnpm --filter @oiko/example-agent start",
-    "smoke": "pnpm --filter @oiko/sdk exec tsx scripts/smoke.mts"
+    "smoke": "pnpm --filter @oiko/sdk exec tsx scripts/smoke.mts",
+    "mainnet-proof": "pnpm --filter @oiko/sdk exec tsx ../../scripts/mainnet-proof.ts"
   },
   "devDependencies": {
     "@fontsource/inter": "^5.3.0",

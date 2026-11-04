@@ -102,7 +102,21 @@ export function agentManifest() {
       read: ["me", "overview", "pots", "activity", "goals", "splits", "bills", "insights", "earn-rates", "rosca"].map((t) => `GET ${base}/api/agent/${t}`),
       write: [`POST ${base}/api/agent/prepare`, `POST ${base}/api/agent/submit`],
     },
-    mcp: { tools: TOOL_NAMES, stdio: "npx @oiko/mcp (env OIKO_CONNECTION=oiko1:…)", http: `${base}/api/mcp` },
+    mcp: { tools: TOOL_NAMES, stdio: "npx @oiko/mcp (env OIKO_CONNECTION=oiko1:…); until published, from the repo: node packages/mcp/bin/oiko-mcp.mjs", http: `${base}/api/mcp` },
+    connect: {
+      owner_issued: "Owner opens Agents → Connect in the app and gives you a one-time connection string oiko1:<base64url json {api, vault, sk}>",
+      agent_initiated: `${base}/connect?name=<agent name>&url=<https agent site>&pk=ed25519:<your public key>&scopes=read,propose,act&actions=pay,save,move_between_pots&allow=<a.near,b.near>&per_tx=<amount>&daily=<amount>&weekly=<amount>&days=<1-90>&callback=<https url>`,
+      params: {
+        pk: "required; ed25519 public key you generated (keep the secret key yourself)",
+        scopes: "comma list of read, propose, act (default read)",
+        actions: "comma list of pay, move_between_pots, save",
+        allow: "comma list of NEAR accounts you may pay",
+        per_tx: "decimal amount in USDC + USDT (e.g. 20), not base units", daily: "decimal amount", weekly: "decimal amount",
+        days: "access lifetime in days, 1-90 (default 30)",
+        callback: "optional https URL; after approval the owner can return there with ?vault=<vault id> appended",
+      },
+      note: "The owner reviews and can change every limit before approving. Oiko cannot verify who runs an agent.",
+    },
     actions: {
       pay: { type: "pay", token: "usdc|usdt", amount: "units", to: "account.near", memo: "string|null" },
       pay_bill: { type: "pay_bill", bill_id: 0 },
@@ -123,9 +137,12 @@ If you are an AI agent, you can be connected to one person's Oiko account. You n
 
 ## Connect
 - The owner opens Oiko → Agents → Connect and gives you a connection string \`oiko1:<base64url json {api, vault, sk}>\`, or adds your public key.
-- Easiest: run the MCP server locally: \`OIKO_CONNECTION=oiko1:… npx @oiko/mcp\` (stdio). It signs everything with your key.
+- Easiest: run the MCP server locally (stdio): \`OIKO_CONNECTION=oiko1:… npx @oiko/mcp\`, or from the repo (not on the npm registry yet): \`pnpm --filter @oiko/mcp build && OIKO_CONNECTION=oiko1:… node packages/mcp/bin/oiko-mcp.mjs\`. It signs everything with your key.
 - Remote MCP: POST ${b}/api/mcp (streamable HTTP, stateless) with the NEP-413 header below on every request.
 - REST: ${b}/api/agent/* — see ${b}/openapi.json and ${b}/.well-known/oiko-agent.json
+- Agent-initiated: generate your own ed25519 key and send the owner this link (they review and can change every limit before approving):
+  ${b}/connect?name=<agent name>&url=<https agent site>&pk=ed25519:<your public key>&scopes=read,propose,act&actions=pay,save,move_between_pots&allow=a.near,b.near&per_tx=20&daily=50&weekly=200&days=30&callback=<https url>
+  per_tx/daily/weekly here are plain amounts (20 = 20 USDC + USDT), not base units. days is 1-90. After approval the callback (https only) gets ?vault=<vault id>; use it as accountId.
 
 ## Auth (every request)
 Authorization: NEP413 <base64(JSON {accountId, publicKey, signature, nonce, message})>
@@ -136,6 +153,7 @@ Authorization: NEP413 <base64(JSON {accountId, publicKey, signature, nonce, mess
 
 ## Tools
 get_overview, get_pots, get_activity(limit), get_goals, get_splits, get_bills, get_insights(month yyyymm), get_earn_rates, get_rosca_groups, propose(action, reason), act(action, reason?)
+REST read paths: /api/agent/me (your own limits and what is left), overview, pots, activity?limit=, goals, splits, bills, insights?month=, earn-rates, rosca.
 
 Actions: {type:"pay", token, amount, to, memo} · {type:"pay_bill", bill_id} · {type:"move", from_pot, to_pot, token, amount} · {type:"save", to_pot, token, amount}
 Amounts are integer strings in base units with 6 decimals: "1500000" = 1.50.

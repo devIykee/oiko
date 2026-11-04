@@ -57,7 +57,9 @@ export function configFor(network: NetworkId, env: Record<string, string | undef
   };
 }
 
-export const NAME_RE = /^[a-z0-9_-]{2,32}$/;
+/** 2-32 chars of a-z, 0-9, `_`, `-`, and a valid NEAR account label: no leading/trailing or doubled `_`/`-`.
+ *  (The registry contract accepts `^[a-z0-9_-]{2,32}$`, but names like `a_` or `-ab` cannot be NEAR accounts and fail on create.) */
+export const NAME_RE = /^(?=.{2,32}$)[a-z0-9]+(?:[_-][a-z0-9]+)*$/;
 export function accountIdFor(name: string, cfg: OikoConfig): string {
   return `${name.toLowerCase()}.${cfg.root}`;
 }

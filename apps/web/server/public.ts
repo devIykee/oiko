@@ -12,7 +12,7 @@ export function publicConfig() {
     network: cfg.network, root: cfg.oiko.root,
     contracts: { registry: c.registry, usdc: c.usdc, usdt: c.usdt, lending: c.lending, ajo: c.ajo, mpcSigner: c.mpcSigner },
     vaultCodeHash: cfg.vaultCodeHash, explorer: explorerBase(cfg.network), features: cfg.features,
-    nodeUrl: cfg.oiko.nodeUrl, relayer: cfg.relayer?.accountId ?? null, oneClick: cfg.oneclick.isMock ? "mock" : "1click",
+    nodeUrl: cfg.publicNodeUrl, relayer: cfg.relayer?.accountId ?? null, oneClick: cfg.oneclick.isMock ? "mock" : "1click",
     vapidPublicKey: cfg.vapid?.publicKey ?? null,
     vaultFunding: cfg.limits.vaultFunding.toString(),
   };
@@ -23,7 +23,7 @@ export async function nameInfo(raw: string) {
   const name = decodeURIComponent(raw).toLowerCase();
   const accountId = accountIdFor(name, cfg.oiko), vaultId = vaultIdFor(name, cfg.oiko);
   if (!NAME_RE.test(name)) {
-    return { name, available: false, accountId, vaultId, exists: false, suggestions: [], error: { code: "E_NAME_INVALID", message: "Use 2 to 32 lowercase letters, numbers, - or _." } };
+    return { name, available: false, accountId, vaultId, exists: false, suggestions: [], error: { code: "E_NAME_INVALID", message: "Use 2 to 32 lowercase letters and numbers. - or _ can go between them, one at a time." } };
   }
   const reg = new RegistryClient(rpc(), cfg.oiko.contracts.registry);
   const [available, exists] = await Promise.all([reg.isAvailable(name), rpc().accountExists(accountId)]);
