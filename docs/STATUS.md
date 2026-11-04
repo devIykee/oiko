@@ -12,7 +12,7 @@
 ## Blocked on you
 
 1. **Fund the relayer**: send testnet NEAR to `oiko-relayer.testnet` (faucet: https://near-faucet.io). It has ~0.6 NEAR; each signup costs ~0.6 + fees. 20-30 NEAR ≈ 35 signups. Until then, signup on the hosted demo fails with "needs a top-up".
-2. **Database (optional, recommended)**: `vercel integration add neon` in the repo root (it was blocked for me as an account change). It sets `DATABASE_URL`; the server then keeps nonces and the agent access log in Postgres instead of memory.
+2. ~~Database~~ Done (2026-11-04): Neon is connected to the Vercel project (`DATABASE_URL`). Nonces, the agent access log and test-mode payments are now stored in Postgres; verified on production by looking up a deposit across instances without its ticket.
 3. **Make the repo public** before submitting: `gh repo edit devIykee/oiko --visibility public --accept-visibility-change-consequences`. Check first that you may publish the Acorn font files in `apps/web/fonts` (otherwise remove them; the site falls back to Inter Tight).
 4. **Cron**: set GitHub repo variable `OIKO_APP_URL=https://oikodotnear.vercel.app` and secret `CRON_SECRET` (same value as the Vercel env var) so `.github/workflows/cron.yml` runs schedules and ROSCA settlement every 5 minutes.
 

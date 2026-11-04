@@ -129,7 +129,7 @@ Summary: Oiko holds no keys over user money; the savings account has none either
 - Testnet uses mock tokens and a mock lending contract.
 - No audit. Contracts are deployed on testnet only.
 - Not finished: zero-config `docker compose` sandbox mode, Playwright e2e suite, Lighthouse reports, rescue sweeper UI, Invest (flagged off).
-- Without `DATABASE_URL`, nonces and the agent access log are kept in memory per server instance.
+- The hosted demo stores nonces and the agent access log in Postgres (Neon). Without `DATABASE_URL` (e.g. a fresh local run) they are kept in memory per server instance.
 - The agent connector has not been validated with users.
 - Not a bank; balances are not insured; yields are variable and can go to zero; not investment, legal or tax advice. Rules for stablecoin yield products are still forming in many places.
 
