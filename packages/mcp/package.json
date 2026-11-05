@@ -7,11 +7,9 @@
   "bin": {
     "oiko-mcp": "./bin/oiko-mcp.mjs"
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/cli.mjs",
   "exports": {
-    ".": "./src/index.ts",
-    "./tools": "./src/tools.ts"
+    ".": "./dist/cli.mjs"
   },
   "scripts": {
     "build": "node build.mjs",
@@ -23,7 +21,6 @@
     "@modelcontextprotocol/sdk": "1.32.2",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
-    "@oiko/sdk": "workspace:*",
     "@scure/base": "2.2.0",
     "borsh": "2.0.0",
     "near-api-js": "7.4.0",
@@ -32,7 +29,6 @@
   "files": [
     "dist",
     "bin",
-    "src",
     "README.md"
   ],
   "publishConfig": {
@@ -43,6 +39,15 @@
     "esbuild": "0.28.2",
     "tsx": "4.23.15",
     "typescript": "^5.9.3",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "@oiko/sdk": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/devIykee/oiko",
+    "directory": "packages/mcp"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
