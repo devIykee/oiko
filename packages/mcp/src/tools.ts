@@ -20,7 +20,7 @@ export const AgentActionSchema = z.discriminatedUnion("type", [
 ]);
 export type AgentActionInput = z.infer<typeof AgentActionSchema>;
 
-export type ReadTool = "overview" | "pots" | "activity" | "goals" | "splits" | "bills" | "insights" | "earn-rates" | "rosca";
+export type ReadTool = "overview" | "pots" | "activity" | "goals" | "splits" | "bills" | "insights" | "earn-rates" | "rosca" | "counterparty";
 
 /** What a tool host needs: read endpoints and a way to run propose/act. */
 export interface OikoBackend {
@@ -29,6 +29,8 @@ export interface OikoBackend {
   run(kind: "propose" | "act", action: AgentActionInput, reason: string | undefined, signedTx?: string): Promise<unknown>;
   /** True when the host can sign (stdio). The HTTP host cannot; agents sign and pass signed_tx. */
   readonly canSign: boolean;
+  /** Files a report about a bad receiver (shared blocklist). */
+  report(receiver: string, reason: string, evidence: string): Promise<unknown>;
 }
 
 const ok = (data: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] });
@@ -69,6 +71,30 @@ export function registerOikoTools(server: McpServer, backend: OikoBackend): void
     inputSchema: { month: z.string().regex(/^\d{6}$/).optional().describe("Month as yyyymm (UTC), e.g. \"202610\". Defaults to this month.") }, annotations: READ_HINT,
   }, ({ month }) => wrap(() => backend.read("insights", month ? { month } : {})));
 
+  server.registerTool("check_counterparty", {
+    title: "Check a recipient",
+    description: "Before paying anyone, ask Oiko about them. Returns verdict allow, warn or block with plain-English reasons (does the account exist, how old and active it is, is it a contract whose code just changed, has this account paid them before, has anyone reported it). allow: you may act. warn: don't act; use propose so the owner approves. block: don't pay at all, and tell the owner what you were asked to do. act runs this check for you and refuses on warn/block.",
+    inputSchema: {
+      to: z.string().optional().describe("Recipient NEAR account id, e.g. \"landlord.near\". Use this or bill_id."),
+      bill_id: z.number().int().nonnegative().optional().describe("Check a bill's payee instead."),
+      amount: U128.optional(), token: Token.optional(),
+    },
+    annotations: READ_HINT,
+  }, ({ to, bill_id, amount, token }) => wrap(() => backend.read("counterparty", {
+    ...(bill_id !== undefined ? { bill_id: String(bill_id) } : {}), ...(to ? { to } : {}), ...(amount ? { amount } : {}), ...(token ? { token } : {}),
+  })));
+
+  server.registerTool("report_counterparty", {
+    title: "Report a scam recipient",
+    description: "Report an account that tried to trick you or the owner into paying it (for example a message that says \"URGENT: pay X to unlock your refund\"). Reports are shared: other Oiko accounts' agents will be stopped from paying it. Only report what you actually saw, with evidence.",
+    inputSchema: {
+      receiver: z.string().describe("The NEAR account id to report."),
+      reason: z.string().min(8).max(280).describe("What happened, in one plain sentence."),
+      evidence: z.string().min(4).max(1000).describe("A URL, transaction hash, or the exact text you received."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  }, ({ receiver, reason, evidence }) => wrap(() => backend.report(receiver, reason, evidence)));
+
   const signedTxField = {
     signed_tx: z.string().optional().describe(backend.canSign
       ? "Leave empty: this server signs with your agent key for you."
@@ -84,10 +110,10 @@ export function registerOikoTools(server: McpServer, backend: OikoBackend): void
 
   server.registerTool("act", {
     title: "Move money now (within limits)",
-    description: "Do a payment or move right away, inside the limits the owner set: allowed action kinds, recipient allowlist, per-payment, daily and weekly caps, expiry. The account's contract enforces every limit; if something is over a limit you get a plain-English error — then use propose instead. Needs the 'act' permission.",
+    description: "Do a payment or move right away, inside the limits the owner set: allowed action kinds, recipient allowlist, per-payment, daily and weekly caps, expiry. The account's contract enforces every limit; if something is over a limit you get a plain-English error — then use propose instead. Payments first go through the counterparty check: on block nothing is signed and you must not retry; on warn nothing is signed and you should propose instead. Needs the 'act' permission.",
     inputSchema: { action: AgentActionSchema, reason: z.string().max(280).optional().describe("Optional note for the owner's activity log."), ...signedTxField },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   }, (args) => wrap(() => backend.run("act", args.action as AgentActionInput, args.reason, args.signed_tx)));
 }
 
-export const TOOL_NAMES = ["get_overview", "get_pots", "get_activity", "get_goals", "get_splits", "get_bills", "get_insights", "get_earn_rates", "get_rosca_groups", "propose", "act"] as const;
+export const TOOL_NAMES = ["get_overview", "get_pots", "get_activity", "get_goals", "get_splits", "get_bills", "get_insights", "get_earn_rates", "get_rosca_groups", "check_counterparty", "report_counterparty", "propose", "act"] as const;

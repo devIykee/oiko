@@ -15,7 +15,7 @@ async function connect(backend: OikoBackend) {
 
 describe("Oiko MCP tools", () => {
   it("exposes exactly the documented tools with descriptions", async () => {
-    const client = await connect({ canSign: true, read: async () => ({}), run: async () => ({}) });
+    const client = await connect({ canSign: true, read: async () => ({}), run: async () => ({}), report: async () => ({}) });
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([...TOOL_NAMES].sort());
     for (const t of tools) expect((t.description ?? "").length).toBeGreaterThan(40);
@@ -27,6 +27,7 @@ describe("Oiko MCP tools", () => {
     const client = await connect({
       canSign: true,
       read: async (tool, params) => { calls.push([tool, params]); return { tool }; },
+      report: async () => ({ ok: true }),
       run: async (kind, action) => { if (kind === "act") throw Object.assign(new Error("That's over the agent's per-payment limit."), { code: "E_AGENT_PER_TX" }); return { ok: true, action }; },
     });
     const r = await client.callTool({ name: "get_activity", arguments: { limit: 5 } });
@@ -68,5 +69,56 @@ describe("stdio backend", () => {
     expect(m.path).toBe("/api/agent/activity?limit=3");
     expect(m.bodyHash).toBe(sha256Hex(""));
     expect(verifyNep413({ ...h, recipient: "oiko-gateway" })).toBe(true);
+  });
+});
+
+describe("agent-side counterparty wrapper", () => {
+  const kp = keyPairFromSeed(new Uint8Array(32).fill(32));
+  const conn = { api: "https://oiko.example", vault: "vault.ada.oiko.testnet", sk: kp.secretKey };
+  const pay = { type: "pay" as const, token: "usdt" as const, amount: "50000000", to: "urgent-refund-desk.testnet", memo: null };
+  /** Fake gateway: answers the counterparty check with `check`, records every other path. */
+  function fake(check: unknown, status = 200) {
+    const paths: string[] = [];
+    const fetchImpl = (async (url: string) => {
+      const path = new URL(url).pathname;
+      paths.push(path);
+      if (path === "/api/agent/counterparty") return new Response(JSON.stringify(check), { status });
+      if (path === "/api/agent/prepare") return new Response(JSON.stringify({ unsignedTx: "AAAA", hash: "AAAA" }), { status: 200 });
+      return new Response(JSON.stringify({ ok: true, txHash: "h" }), { status: 200 });
+    }) as unknown as typeof fetch;
+    return { paths, backend: new GatewayBackend(conn, fetchImpl) };
+  }
+  const result = (verdict: string, act: string, propose: string) => ({
+    receiver: pay.to, verdict, score: verdict === "block" ? 100 : 20, checkedAt: "", sources: [],
+    reasons: [{ code: verdict === "block" ? "REPORTED" : "NEW_ACCOUNT", severity: verdict === "block" ? "block" : "warn", message: "Reported as a scam." }],
+    decision: { act, propose, message: verdict === "block" ? "Oiko won't help pay this account." : "Use propose instead." },
+  });
+
+  it("refuses to sign on block (act and propose) and never calls prepare", async () => {
+    const { paths, backend } = fake(result("block", "refused", "refused"));
+    const r = await backend.client.run("act", pay);
+    expect(r).toMatchObject({ ok: false, signed: false, error: { code: "E_COUNTERPARTY_BLOCKED" } });
+    const p = await backend.client.run("propose", pay, "Pay the refund desk");
+    expect(p.error?.code).toBe("E_COUNTERPARTY_BLOCKED");
+    expect(paths).not.toContain("/api/agent/prepare");
+  });
+  it("on warn refuses act with a propose instruction, but lets propose through", async () => {
+    const { paths, backend } = fake(result("warn", "refused", "allowed"));
+    const r = await backend.client.run("act", pay);
+    expect(r).toMatchObject({ ok: false, signed: false, error: { code: "E_COUNTERPARTY_WARN" } });
+    expect(r.error!.message).toMatch(/propose/i);
+    expect(paths).not.toContain("/api/agent/prepare");
+    await expect(backend.run("act", pay)).rejects.toMatchObject({ code: "E_COUNTERPARTY_WARN" });
+  });
+  it("fails closed for act when the check can't run", async () => {
+    const { paths, backend } = fake({ error: { code: "E_RPC", message: "down" } }, 502);
+    const r = await backend.client.run("act", pay);
+    expect(r).toMatchObject({ ok: false, signed: false, error: { code: "E_COUNTERPARTY_UNAVAILABLE" } });
+    expect(paths).not.toContain("/api/agent/prepare");
+  });
+  it("skips the check for moves between the owner's own pots", async () => {
+    const { paths, backend } = fake(result("block", "refused", "refused"));
+    await backend.client.run("act", { type: "save", to_pot: 1, token: "usdt", amount: "1" }).catch(() => null);
+    expect(paths).not.toContain("/api/agent/counterparty");
   });
 });

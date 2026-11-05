@@ -1,13 +1,19 @@
 // Persistence: Postgres via drizzle when DATABASE_URL is set; otherwise an in-memory fallback.
 // NOTE: the in-memory store is per process. On serverless hosts it resets on cold start and is not shared between
 // instances, so nonce replay protection and the access log are best-effort there. Set DATABASE_URL for production.
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
 import { serverConfig } from "./config";
-import { agentAccessLog, CREATE_SQL, mockOneclickSwaps, pushSubscriptions, usedNonces } from "./db/schema";
+import { agentAccessLog, counterpartyCodeHashes, counterpartyReports, CREATE_SQL, mockOneclickSwaps, pushSubscriptions, usedNonces } from "./db/schema";
 
 export interface AccessLogRow {
   at: string; vaultId: string; publicKey: string; method: string; path: string; status: number; code: string | null; tool: string | null; txHash: string | null;
+  /** Payment receiver, set on successful agent submits of a pay action. */
+  receiver?: string | null;
 }
+export interface CounterpartyReport {
+  receiver: string; reason: string; evidence: string; reporter: string; reporterVault: string; verified: boolean; createdAt: string;
+}
+export interface CodeHashSeen { codeHash: string; changedAt: string | null }
 export interface PushSub { accountId: string; endpoint: string; p256dh: string; auth: string }
 
 export interface Store {
@@ -21,6 +27,13 @@ export interface Store {
   listPush(accountId: string): Promise<PushSub[]>;
   getMockSwap<T>(depositAddress: string): Promise<T | null>;
   putMockSwap<T>(depositAddress: string, data: T): Promise<void>;
+  /** Counterparty blocklist. Returns false if this vault already reported this receiver. */
+  addReport(r: Omit<CounterpartyReport, "createdAt"> & { createdAt?: string }): Promise<boolean>;
+  listReports(receiver: string, limit?: number): Promise<CounterpartyReport[]>;
+  getCodeHash(accountId: string): Promise<CodeHashSeen | null>;
+  setCodeHash(accountId: string, seen: CodeHashSeen): Promise<void>;
+  /** Successful agent payments from this vault to this receiver recorded in the gateway access log. */
+  countPaymentsTo(vaultId: string, receiver: string): Promise<number>;
 }
 
 export class MemoryStore implements Store {
@@ -29,6 +42,8 @@ export class MemoryStore implements Store {
   private log: AccessLogRow[] = [];
   private push = new Map<string, PushSub>();
   private swaps = new Map<string, unknown>();
+  private reports: CounterpartyReport[] = [];
+  private codeHashes = new Map<string, CodeHashSeen>();
   async useNonce(nonce: string, _pk: string, expiresAt: number) {
     const now = Date.now();
     if (this.nonces.size > 10_000) for (const [k, exp] of this.nonces) if (exp < now) this.nonces.delete(k);
@@ -48,6 +63,17 @@ export class MemoryStore implements Store {
   async listPush(accountId: string) { return [...this.push.values()].filter((p) => p.accountId === accountId); }
   async getMockSwap<T>(a: string) { return (this.swaps.get(a) as T) ?? null; }
   async putMockSwap<T>(a: string, d: T) { this.swaps.set(a, structuredClone(d)); }
+  async addReport(r: Omit<CounterpartyReport, "createdAt"> & { createdAt?: string }) {
+    if (this.reports.some((x) => x.receiver === r.receiver && x.reporterVault === r.reporterVault)) return false;
+    this.reports.push({ ...r, createdAt: r.createdAt ?? new Date().toISOString() });
+    return true;
+  }
+  async listReports(receiver: string, limit = 50) { return this.reports.filter((r) => r.receiver === receiver).slice(-limit).reverse(); }
+  async getCodeHash(a: string) { return this.codeHashes.get(a) ?? null; }
+  async setCodeHash(a: string, seen: CodeHashSeen) { this.codeHashes.set(a, { ...seen }); }
+  async countPaymentsTo(vaultId: string, receiver: string) {
+    return this.log.filter((r) => r.vaultId === vaultId && r.receiver === receiver && r.status === 200 && !r.code).length;
+  }
 }
 
 class PgStore implements Store {
@@ -83,7 +109,7 @@ class PgStore implements Store {
     const db = await this.db();
     const where = publicKey ? and(eq(agentAccessLog.vaultId, vaultId), eq(agentAccessLog.publicKey, publicKey)) : eq(agentAccessLog.vaultId, vaultId);
     const rows = await db.select().from(agentAccessLog).where(where).orderBy(desc(agentAccessLog.at)).limit(limit);
-    return rows.map((r: typeof agentAccessLog.$inferSelect) => ({ at: r.at.toISOString(), vaultId: r.vaultId, publicKey: r.publicKey, method: r.method, path: r.path, status: r.status, code: r.code, tool: r.tool, txHash: r.txHash }));
+    return rows.map((r: typeof agentAccessLog.$inferSelect) => ({ at: r.at.toISOString(), vaultId: r.vaultId, publicKey: r.publicKey, method: r.method, path: r.path, status: r.status, code: r.code, tool: r.tool, txHash: r.txHash, receiver: r.receiver }));
   }
   async savePush(sub: PushSub) {
     const db = await this.db();
@@ -106,6 +132,37 @@ class PgStore implements Store {
   async putMockSwap<T>(a: string, d: T) {
     const db = await this.db();
     await db.insert(mockOneclickSwaps).values({ depositAddress: a, data: d }).onConflictDoUpdate({ target: mockOneclickSwaps.depositAddress, set: { data: d, updatedAt: new Date() } });
+  }
+  async addReport(r: Omit<CounterpartyReport, "createdAt"> & { createdAt?: string }) {
+    const db = await this.db();
+    const out = await db.insert(counterpartyReports)
+      .values({ receiver: r.receiver, reason: r.reason, evidence: r.evidence, reporter: r.reporter, reporterVault: r.reporterVault, verified: r.verified, createdAt: r.createdAt ? new Date(r.createdAt) : new Date() })
+      .onConflictDoNothing().returning({ id: counterpartyReports.id });
+    return out.length === 1;
+  }
+  async listReports(receiver: string, limit = 50) {
+    const db = await this.db();
+    const rows = await db.select().from(counterpartyReports).where(eq(counterpartyReports.receiver, receiver)).orderBy(desc(counterpartyReports.createdAt)).limit(limit);
+    return rows.map((r: typeof counterpartyReports.$inferSelect) => ({
+      receiver: r.receiver, reason: r.reason, evidence: r.evidence, reporter: r.reporter, reporterVault: r.reporterVault, verified: r.verified, createdAt: r.createdAt.toISOString(),
+    }));
+  }
+  async getCodeHash(a: string) {
+    const db = await this.db();
+    const rows = await db.select().from(counterpartyCodeHashes).where(eq(counterpartyCodeHashes.accountId, a)).limit(1);
+    const r = rows[0] as typeof counterpartyCodeHashes.$inferSelect | undefined;
+    return r ? { codeHash: r.codeHash, changedAt: r.changedAt ? r.changedAt.toISOString() : null } : null;
+  }
+  async setCodeHash(a: string, seen: CodeHashSeen) {
+    const db = await this.db();
+    const v = { codeHash: seen.codeHash, changedAt: seen.changedAt ? new Date(seen.changedAt) : null, updatedAt: new Date() };
+    await db.insert(counterpartyCodeHashes).values({ accountId: a, ...v }).onConflictDoUpdate({ target: counterpartyCodeHashes.accountId, set: v });
+  }
+  async countPaymentsTo(vaultId: string, receiver: string) {
+    const db = await this.db();
+    const rows = await db.select({ n: sql<number>`count(*)::int` }).from(agentAccessLog)
+      .where(and(eq(agentAccessLog.vaultId, vaultId), eq(agentAccessLog.receiver, receiver), eq(agentAccessLog.status, 200), isNull(agentAccessLog.code)));
+    return Number(rows[0]?.n ?? 0);
   }
 }
 

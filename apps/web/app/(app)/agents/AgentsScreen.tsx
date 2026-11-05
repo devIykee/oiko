@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmSheet } from "@/components/app/ConfirmSheet";
 import { ConnectFlow } from "@/components/app/ConnectFlow";
+import { CounterpartyBadge } from "@/components/app/CounterpartyBadge";
 import { PageHeader } from "@/components/app/PageHeader";
 import { LoadError, PageSkeleton } from "@/components/app/States";
 import { capUsage, consentItems, templateDraft, type Draft, type TemplateId } from "@/components/app/agentPolicy";
@@ -13,6 +14,7 @@ import { explain, useMoney } from "@/lib/actions";
 import { useAgentLog, useOverview } from "@/lib/data";
 import { fmt, fmtDate, fmtDateTime, nsToMs, shortKey } from "@/lib/format";
 import { useT } from "@/lib/i18n";
+import { useSession } from "@/lib/session";
 
 
 export function AgentsScreen() {
@@ -98,6 +100,7 @@ function ConnectedAgent({ a, o }: { a: AgentView; o: Overview }) {
   const act = a.scopes.includes("act");
   const expired = nsToMs(a.expires_at) < Date.now();
   const proposals = o.proposals.filter((p) => p.public_key === a.public_key);
+  const { session } = useSession();
   const items = useMemo(() => consentItems(a, t).filter((i) => i.allowed), [a, t]);
 
   const disconnect = async () => {
@@ -126,10 +129,18 @@ function ConnectedAgent({ a, o }: { a: AgentView; o: Overview }) {
       disconnectLabel={t("agents.disconnect")}
     >
       <ScopeList label={t("agents.permissions")} items={items} />
-      {proposals.map((p) => (
-        <ProposalCard key={p.id} testId={`proposal-${p.id}`} agentName={a.agent_name} sentence={actionSentence(p.action, o.pots, o.bills, t)} reason={p.reason}
-          approveLabel={t("home.approve")} rejectLabel={t("home.reject")} onApprove={() => setPending({ p, kind: "approve" })} onReject={() => setPending({ p, kind: "reject" })} />
-      ))}
+      {proposals.map((p) => {
+        const bill = p.action.type === "pay_bill" ? o.bills.find((b) => p.action.type === "pay_bill" && b.id === p.action.bill_id) : undefined;
+        const payee = p.action.type === "pay" ? p.action.to : bill?.payee;
+        const amount = p.action.type === "pay" ? p.action.amount : bill?.amount;
+        return (
+          <div key={p.id} style={{ display: "grid", gap: 6 }}>
+            <ProposalCard testId={`proposal-${p.id}`} agentName={a.agent_name} sentence={actionSentence(p.action, o.pots, o.bills, t)} reason={p.reason}
+              approveLabel={t("home.approve")} rejectLabel={t("home.reject")} onApprove={() => setPending({ p, kind: "approve" })} onReject={() => setPending({ p, kind: "reject" })} />
+            {payee && <CounterpartyBadge accountId={payee} vault={session?.vaultId ?? null} amount={amount} testId={`proposal-${p.id}-counterparty`} />}
+          </div>
+        );
+      })}
       <button type="button" className="oi-btn oi-btn--secondary oi-btn--sm" onClick={() => setShowLog((v) => !v)} aria-expanded={showLog} style={{ alignSelf: "flex-start" }}>
         {showLog ? t("agents.hideLog") : t("agents.showLog")}
       </button>

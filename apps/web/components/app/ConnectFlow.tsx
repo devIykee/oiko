@@ -6,6 +6,7 @@ import { explain, useMoney } from "@/lib/actions";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { consentItems, draftToPolicy, type Draft } from "./agentPolicy";
+import { CounterpartyBadge } from "./CounterpartyBadge";
 
 type Step = "setup" | "consent" | "secret";
 
@@ -76,6 +77,7 @@ export function ConnectFlow({ open, onOpenChange, initial, overview, agentPublic
                 <Input label={t("agents.allowlist")} value={d.allowlist.join(", ")} onChange={(e) => setD({ ...d, allowlist: e.target.value.split(/[,\s]+/).filter(Boolean) })}
                   hint={t("agents.allowlistHint")} placeholder="citypower.near, sam.oiko.near" autoComplete="off" spellCheck={false} />
               )}
+              {d.actions.includes("pay") && d.allowlist.slice(0, 10).map((acct) => <CounterpartyBadge key={acct} accountId={acct} debounceMs={600} testId={`allowlist-check-${acct}`} />)}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                 <Input label={t("agents.perTx")} value={d.perTx} onChange={(e) => setD({ ...d, perTx: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" />
                 <Input label={t("agents.daily")} value={d.daily} onChange={(e) => setD({ ...d, daily: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" />
@@ -92,6 +94,7 @@ export function ConnectFlow({ open, onOpenChange, initial, overview, agentPublic
         <>
           <p style={{ margin: 0, fontWeight: 600, fontSize: 17 }}>{t("agents.headline")}</p>
           <ScopeList label={t("agents.permissions")} items={consentItems(policy, t)} />
+          {d.actions.includes("pay") && d.allowlist.slice(0, 10).map((acct) => <CounterpartyBadge key={acct} accountId={acct} testId={`consent-allowlist-check-${acct}`} />)}
           <p className="oi-small oi-muted" style={{ margin: 0 }}>{t("agents.expiresOn", { n: d.days })}</p>
           <Note tone="warning" title={t("agents.verifyTitle")}>{t("agents.verifyBody")}</Note>
           {err && <div role="alert"><Note tone="danger" title={err.title}>{t("error.next", { next: err.next })}</Note></div>}

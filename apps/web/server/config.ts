@@ -8,6 +8,8 @@ export interface Features { earn: boolean; ajo: boolean; mcp: boolean; rescue: b
 export interface ServerConfig {
   network: NetworkId;
   oiko: OikoConfig;
+  /** RPC URL handed to browsers (/api/config). Differs from oiko.nodeUrl only when the server reaches the node by another host (Docker). */
+  publicNodeUrl: string;
   vaultCodeHash: string | null;
   relayer: { accountId: string; privateKey: string } | null;
   oneclick: { baseUrl: string; jwt: string | null; isMock: boolean };
@@ -46,6 +48,7 @@ function flag(env: Record<string, string | undefined>, name: string, dflt: boole
 const LOCAL_ONECLICK_MOCK = "mock";
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): ServerConfig {
+  if (env === process.env) env = withLocalDevnetEnv(env);
   const network: NetworkId = isNetworkId(env.OIKO_NETWORK) ? env.OIKO_NETWORK : "local";
   const oiko = configFor(network, env);
   const publicUrl = (env.OIKO_PUBLIC_URL || env.NEXT_PUBLIC_SITE_URL || (env.VERCEL_URL ? `https://${env.VERCEL_URL}` : "http://localhost:3000")).replace(/\/+$/, "");
@@ -67,6 +70,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   return {
     network,
     oiko,
+    publicNodeUrl: env.OIKO_PUBLIC_NODE_URL?.trim() || oiko.nodeUrl,
     vaultCodeHash: env.OIKO_VAULT_CODE_HASH?.trim() || null,
     relayer: relayerId && relayerKey ? { accountId: relayerId, privateKey: relayerKey } : null,
     oneclick: { baseUrl: oneclickBase, jwt: env.ONECLICK_JWT?.trim() || null, isMock },
@@ -110,8 +114,32 @@ export function explorerBase(network: NetworkId): string | null {
  * near-cli style credentials JSON {account_id, private_key}. Default locations (local mode, written by scripts/deploy):
  * `$RELAYER_KEY_FILE`, `./.oiko/relayer.json`, `../../.oiko/relayer.json`.
  */
+/**
+ * Local mode only: fills empty OIKO_* settings from `.oiko/local.env`, written by the local devnet
+ * (contracts/tests/src/bin/devnet.rs). Values already set in the environment win.
+ */
+function withLocalDevnetEnv(env: Record<string, string | undefined>): Record<string, string | undefined> {
+  if (env.OIKO_NETWORK && env.OIKO_NETWORK !== "local") return env;
+  const dir = env.OIKO_STATE_DIR;
+  const candidates = dir ? [join(dir, "local.env")] : [join(process.cwd(), ".oiko", "local.env"), join(process.cwd(), "..", "..", ".oiko", "local.env")];
+  for (const f of candidates) {
+    try {
+      if (!existsSync(f)) continue;
+      const out = { ...env };
+      for (const line of readFileSync(f, "utf8").split(/\r?\n/)) {
+        const m = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
+        if (m && !out[m[1]]?.trim()) out[m[1]] = m[2].trim();
+      }
+      return out;
+    } catch {
+      /* ignore unreadable file */
+    }
+  }
+  return env;
+}
+
 function readKeyFile(explicit?: string): { account_id?: string; private_key?: string; secret_key?: string } | null {
-  const candidates = explicit ? [explicit] : [join(process.cwd(), ".oiko", "relayer.json"), join(process.cwd(), "..", "..", ".oiko", "relayer.json")];
+  const candidates = explicit ? [explicit] : process.env.OIKO_STATE_DIR ? [join(process.env.OIKO_STATE_DIR, "relayer.json")] : [join(process.cwd(), ".oiko", "relayer.json"), join(process.cwd(), "..", "..", ".oiko", "relayer.json")];
   for (const f of candidates) {
     try {
       if (existsSync(f)) return JSON.parse(readFileSync(f, "utf8"));

@@ -33,6 +33,7 @@ const M: Record<string, [string, string]> = {
   E_TRANSFER_FAILED: ["The transfer didn't go through.", "Your money is back in the pot. Check the details and try again."],
   // earn
   E_UTILIZATION: ["Earn is paused right now.", "The lending pool is too busy to take new money safely. Try again later."],
+  E_EARN_BUSY: ["Earn is still finishing your last move.", "Wait a few seconds for it to settle, then try again."],
   E_EARN_PAUSED: ["Earn is paused right now.", "The lending pool isn't accepting money. Try again later."],
   E_NO_LENDING: ["Earn isn't available.", "This account wasn't set up with Earn."],
   E_EARN_INSUFFICIENT: ["Less is earning than that.", "Lower the amount to what this pot has earning."],
@@ -94,6 +95,8 @@ const M: Record<string, [string, string]> = {
   // codes used by contracts/* (vault, registry, ajo)
   E_ACTION_NOT_ALLOWED: ["This agent isn't allowed to make that kind of move.", "Allow the action in Agents, or ask it to propose instead."],
   E_NOT_ALLOWLISTED: ["That recipient isn't on the agent's list.", "Add the recipient in Agents, or approve this as a proposal."],
+  E_COUNTERPARTY_BLOCKED: ["Oiko won't pay this recipient.", "It has been reported or doesn't exist. Check who you're paying before doing anything else."],
+  E_COUNTERPARTY_WARN: ["This recipient needs a closer look.", "The agent can't pay it directly; it can send a proposal for the owner to approve."],
   E_CAP_PER_TX: ["That's over the agent's per-payment limit.", "Use a smaller amount, or raise the limit in Agents."],
   E_CAP_DAY: ["The agent has reached its daily limit.", "Wait until tomorrow or raise the daily limit in Agents."],
   E_CAP_WEEK: ["The agent has reached its weekly limit.", "Wait until next week or raise the weekly limit in Agents."],

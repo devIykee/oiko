@@ -26,6 +26,8 @@ export const LIMITS = {
   gateway: { perIp: [120, 60_000], perAccount: [60, 60_000] },
   intents: { perIp: [30, 60_000], perAccount: [30, 60_000] },
   simulate: { perIp: [10, 60_000], perAccount: [10, 60_000] },
+  counterparty: { perIp: [30, 60_000], perAccount: [30, 60_000] },
+  report: { perIp: [10, 3_600_000], perAccount: [5, 86_400_000] },
 } as const satisfies Record<string, { perIp: readonly [number, number]; perAccount: readonly [number, number] }>;
 
 export function checkLimits(kind: keyof typeof LIMITS, ip: string, account: string | null, now = Date.now()): boolean {

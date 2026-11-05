@@ -48,7 +48,13 @@ Auth: header `Authorization: NEP413 <base64(json)>` where json = `{ accountId (v
 | GET | `/api/agent/ajo` | read | |
 | POST | `/api/agent/prepare` | propose/act | `{ kind: "propose" \| "act", action, reason? }` → `{ unsignedTx: base64, hash: base64 }` (signer = vault, key = agent key, method `agent_propose` / `agent_execute`) |
 | POST | `/api/agent/submit` | propose/act | `{ signedTx: base64 }` → `{ txHash, ok, error? }` |
+| GET | `/api/agent/counterparty?to=&amount=&token=` or `?bill_id=` | read | counterparty check for a payment: `{ receiver, verdict: "allow"\|"warn"\|"block", score, reasons: [{code, severity, message, evidence?}], checkedAt, sources, on_allowlist, decision: {act, propose, message} }` |
+| POST | `/api/agent/report` | read | `{ receiver, reason, evidence }` → `{ ok, receiver, stored, note }` — shared blocklist, one report per account per receiver |
 | GET | `/api/agent/log?vaultId=&publicKey=` | owner (NEP-413 by owner app key) | access log rows |
+
+`/api/agent/prepare` runs the counterparty check for `pay` and `pay_bill` (docs/COUNTERPARTY.md): `block` → 403 `E_COUNTERPARTY_BLOCKED` (act and propose), `warn` on `act` → 409 `E_COUNTERPARTY_WARN` with `error.next = "propose"`. Both errors carry `error.counterparty` (the full result). A successful prepare for a payment includes `counterparty` in the response.
+
+Public: `GET /api/counterparty/:accountId?vault=&amount=&token=` (no auth, 30/min per IP) returns the same result shape without `decision`; `vault` adds the prior-payment signal.
 
 ## Agent discovery
 

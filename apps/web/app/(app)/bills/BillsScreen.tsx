@@ -4,6 +4,7 @@ import { billStatus, toUnits, type Bill, type Overview, type Token } from "@oiko
 import Link from "next/link";
 import { useState } from "react";
 import { ConfirmSheet } from "@/components/app/ConfirmSheet";
+import { CounterpartyBadge } from "@/components/app/CounterpartyBadge";
 import { PageHeader } from "@/components/app/PageHeader";
 import { LoadError, PageSkeleton } from "@/components/app/States";
 import { potById, potColor, potGlyph, potName } from "@/components/app/potmeta";
@@ -132,6 +133,7 @@ function AddBillSheet({ o, onClose }: { o: Overview; onClose: () => void }) {
       <Input label={t("common.amount")} value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" suffix={coin.toUpperCase()} />
       <Input label={t("bills.dueDay")} value={day} onChange={(e) => setDay(e.target.value.replace(/\D/g, "").slice(0, 2))} inputMode="numeric" hint={t("bills.dueDayHint")} error={day && (d < 1 || d > 28) ? t("bills.dueDayHint") : undefined} />
       <Input label={t("bills.payeeLabel")} value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="citypower" autoComplete="off" spellCheck={false} hint={t("bills.payeeHint")} />
+      {payee.trim() && <CounterpartyBadge accountId={payee} amount={units ?? null} debounceMs={600} testId="bill-payee-check" />}
       <div className="oi-label">{t("bills.paidFrom")}</div>
       <SelectList label={t("bills.paidFrom")} value={potId} onChange={setPotId}
         options={o.pots.map((p) => ({ value: p.id, title: potName(p, t), leading: <Tile icon={potGlyph(p)} color={potColor(p)} /> }))} />

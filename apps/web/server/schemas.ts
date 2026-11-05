@@ -28,3 +28,8 @@ export const SubmitBody = z.object({ signedTx: z.string().min(16).max(100_000) }
 export const PushSubscribeBody = z.object({
   accountId: AccountIdZ, subscription: z.object({ endpoint: z.string().url(), keys: z.object({ p256dh: z.string(), auth: z.string() }) }),
 });
+export const ReportBody = z.object({
+  receiver: AccountIdZ,
+  reason: z.string().trim().min(8, "explain what happened in a sentence").max(280),
+  evidence: z.string().trim().min(4, "give a URL, transaction hash or the text you received").max(1000),
+});

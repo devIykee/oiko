@@ -4,7 +4,8 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { normalizePublicKey, parseGatewayAuthHeader } from "@oiko/sdk";
 import { serverConfig } from "./config";
 import { ApiError } from "./errors";
-import { authenticateAgent, logAccess, prepare, readTool, submit, type AuthedAgent } from "./gateway";
+import { fileReport } from "./counterpartyHttp";
+import { authenticateAgent, logAccess, payReceiverOfSignedTx, prepare, readTool, submit, type AuthedAgent } from "./gateway";
 import { clientIp, errorResponse, json, readText } from "./http";
 import { checkLimits } from "./ratelimit";
 
@@ -17,16 +18,22 @@ class InProcessBackend implements OikoBackend {
     await logAccess({ vaultId: this.ctx.vaultId, publicKey: this.ctx.publicKey, method: "MCP", path: `/api/mcp#${tool}`, status: 200, tool });
     return r;
   }
+  async report(receiver: string, reason: string, evidence: string) {
+    const r = await fileReport(this.ctx, { receiver, reason, evidence });
+    await logAccess({ vaultId: this.ctx.vaultId, publicKey: this.ctx.publicKey, method: "MCP", path: "/api/mcp#report_counterparty", status: 200, tool: "report" });
+    return r;
+  }
   async run(kind: "propose" | "act", action: AgentActionInput, reason?: string, signedTx?: string) {
     if (!signedTx) {
+      // prepare runs the counterparty check (block / warn refusals carry the reasons).
       const p = await prepare(this.ctx, kind, action, reason);
       return {
-        needs_signature: true, unsigned_tx: p.unsignedTx, hash: p.hash,
+        needs_signature: true, unsigned_tx: p.unsignedTx, hash: p.hash, ...(p.counterparty ? { counterparty: p.counterparty } : {}),
         how: "Sign the 32-byte hash (sha256 of unsigned_tx bytes) with your ed25519 agent key, build a borsh SignedTransaction, base64 it and call this tool again with signed_tx. @oiko/sdk signTransactionBytes() does this.",
       };
     }
     const r = await submit(this.ctx, signedTx);
-    await logAccess({ vaultId: this.ctx.vaultId, publicKey: this.ctx.publicKey, method: "MCP", path: `/api/mcp#${kind}`, status: r.ok ? 200 : 422, code: r.ok ? null : r.error?.code, tool: kind, txHash: r.txHash });
+    await logAccess({ vaultId: this.ctx.vaultId, publicKey: this.ctx.publicKey, method: "MCP", path: `/api/mcp#${kind}`, status: r.ok ? 200 : 422, code: r.ok ? null : r.error?.code, tool: kind, txHash: r.txHash, receiver: r.ok ? payReceiverOfSignedTx(signedTx) : null });
     if (!r.ok) throw Object.assign(new Error(r.error?.message ?? "That didn't go through."), { code: r.error?.code });
     return { ok: true, txHash: r.txHash, value: r.value };
   }

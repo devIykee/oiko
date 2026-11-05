@@ -28,6 +28,21 @@ export class GatewayError extends Error {
   }
 }
 
+export type CounterpartyVerdict = "allow" | "warn" | "block";
+export interface CounterpartyCheck {
+  receiver: string; verdict: CounterpartyVerdict; score: number; checkedAt: string; sources: string[];
+  reasons: Array<{ code: string; severity: "info" | "warn" | "block"; message: string; evidence?: string }>;
+  on_allowlist?: boolean;
+  decision?: { act: "allowed" | "refused"; propose: "allowed" | "refused"; message: string };
+}
+export interface RunResult {
+  txHash: string; ok: boolean; error?: { code: string; message: string; detail?: string }; value?: unknown;
+  /** Present when the counterparty check ran (pay / pay_bill). */
+  counterparty?: CounterpartyCheck;
+  /** false when the wrapper refused before signing anything. */
+  signed?: boolean;
+}
+
 /** Signs every request with NEP-413 (Authorization: NEP413 …) and signs prepared transactions locally. */
 export class GatewayClient {
   readonly publicKey: string;
@@ -54,10 +69,50 @@ export class GatewayClient {
   }
   get<T>(path: string): Promise<T> { return this.request<T>("GET", path); }
 
-  /** prepare → sign locally → submit. Returns the submit result; `ok: false` carries a code + plain-English error. */
-  async run(kind: "propose" | "act", action: AgentAction, reason?: string): Promise<{ txHash: string; ok: boolean; error?: { code: string; message: string; detail?: string }; value?: unknown }> {
+  /** Asks Oiko about the receiver of a pay / pay_bill action (GET /api/agent/counterparty). null for moves between pots. */
+  async checkCounterparty(action: AgentAction): Promise<CounterpartyCheck | null> {
+    let q: string;
+    if (action.type === "pay") q = `to=${encodeURIComponent(action.to)}&amount=${action.amount}&token=${action.token}`;
+    else if (action.type === "pay_bill") q = `bill_id=${action.bill_id}`;
+    else return null;
+    return this.get<CounterpartyCheck>(`/api/agent/counterparty?${q}`);
+  }
+
+  /** Reports a receiver to the shared blocklist (POST /api/agent/report). */
+  report(receiver: string, reason: string, evidence: string): Promise<{ ok: boolean; stored: boolean; note: string }> {
+    return this.request("POST", "/api/agent/report", { receiver, reason, evidence });
+  }
+
+  /**
+   * Counterparty check → prepare → sign locally → submit. For pay / pay_bill the wrapper refuses to sign when the
+   * check says block (act and propose), or warn (act: use propose so the owner approves), or when the check can't run
+   * (act only: fail closed). Returns `ok: false, signed: false` in those cases. The gateway enforces the same rules,
+   * and the account's contract enforces the allowlist and caps regardless.
+   */
+  async run(kind: "propose" | "act", action: AgentAction, reason?: string): Promise<RunResult> {
+    let counterparty: CounterpartyCheck | null = null;
+    try {
+      counterparty = await this.checkCounterparty(action);
+    } catch (e) {
+      if (kind === "act") {
+        const msg = e instanceof Error ? e.message : String(e);
+        return { txHash: "", ok: false, signed: false, error: { code: "E_COUNTERPARTY_UNAVAILABLE", message: `Couldn't check who this pays, so nothing was signed. Use propose to let the owner decide. (${msg})` } };
+      }
+    }
+    if (counterparty) {
+      const refused = kind === "act" ? counterparty.decision?.act === "refused" : counterparty.decision?.propose === "refused";
+      if (refused || counterparty.verdict === "block") {
+        const code = counterparty.verdict === "block" ? "E_COUNTERPARTY_BLOCKED" : "E_COUNTERPARTY_WARN";
+        const why = counterparty.reasons.filter((r) => r.severity !== "info").map((r) => r.message).join(" ");
+        const message = counterparty.decision?.message ?? (code === "E_COUNTERPARTY_BLOCKED"
+          ? `Refused: ${why} Nothing was signed. Don't pay this account; tell the owner what you were asked to do.`
+          : `Not paid: ${why} Nothing was signed. Use propose instead so the owner can approve it.`);
+        return { txHash: "", ok: false, signed: false, counterparty, error: { code, message } };
+      }
+    }
     const prep = await this.request<{ unsignedTx: string; hash: string }>("POST", "/api/agent/prepare", { kind, action, reason });
     const { signedTx } = signTransactionBytes(this.conn.sk, b64decode(prep.unsignedTx));
-    return this.request("POST", "/api/agent/submit", { signedTx: b64encode(signedTx) });
+    const r = await this.request<RunResult>("POST", "/api/agent/submit", { signedTx: b64encode(signedTx) });
+    return counterparty ? { ...r, counterparty } : r;
   }
 }

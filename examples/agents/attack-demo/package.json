@@ -1,0 +1,20 @@
+{
+  "name": "@oiko/attack-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Prompt-injection attack demo (no LLM): a naive agent is told to pay a scam account and is stopped by the SDK wrapper, the gateway and the vault contract.",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "offline": "tsx src/index.ts --offline",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@oiko/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "4.23.15",
+    "typescript": "^5.9.3"
+  }
+}

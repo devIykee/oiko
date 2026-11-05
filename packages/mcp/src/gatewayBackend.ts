@@ -12,7 +12,11 @@ export class GatewayBackend implements OikoBackend {
     const q = new URLSearchParams(params).toString();
     return this.client.get(`/api/agent/${tool}${q ? `?${q}` : ""}`);
   }
+  report(receiver: string, reason: string, evidence: string) {
+    return this.client.report(receiver, reason, evidence);
+  }
   async run(kind: "propose" | "act", action: AgentActionInput, reason?: string) {
+    // GatewayClient.run checks the counterparty first and refuses to sign on block (and on warn for act).
     const r = await this.client.run(kind, action, reason);
     if (!r.ok) throw Object.assign(new Error(r.error?.message ?? "That didn't go through."), { code: r.error?.code ?? "E_TX_FAILED", txHash: r.txHash });
     return { ok: true, txHash: r.txHash, ...(kind === "propose" ? { proposalId: r.value, note: "The owner will see this in Oiko and can approve or reject it." } : { result: r.value }) };

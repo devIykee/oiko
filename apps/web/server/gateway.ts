@@ -8,6 +8,7 @@ import {
 import { sha256 } from "@noble/hashes/sha2.js";
 import { encodeTransaction } from "near-api-js";
 import { serverConfig } from "./config";
+import { agentDecision, checkCounterparty, type CheckInput, type CounterpartyResult } from "./counterparty";
 import { ApiError } from "./errors";
 import { rpc } from "./near";
 import { topup } from "./relayer";
@@ -138,7 +139,7 @@ export const HELP = {
   act: "To move money: POST /api/agent/prepare {kind:'act'|'propose', action, reason}, sign the returned unsignedTx bytes' sha256 with your key, POST /api/agent/submit {signedTx}.",
 };
 
-export async function readTool(ctx: AuthedAgent, tool: string, params: Record<string, string | undefined>, r: NearRpc = rpc(), nowMs = Date.now()): Promise<unknown> {
+export async function readTool(ctx: AuthedAgent, tool: string, params: Record<string, string | undefined>, r: NearRpc = rpc(), nowMs = Date.now(), check: CounterpartyChecker = defaultChecker): Promise<unknown> {
   const v = ctx.vaultId;
   const ov = () => r.view<Overview>(v, "get_overview");
   switch (tool) {
@@ -215,6 +216,21 @@ export async function readTool(ctx: AuthedAgent, tool: string, params: Record<st
         top_payees: ins.topPayees.map((p) => ({ to: p.to, amount: money(p.amount, "usdc+usdt") })), trend: ins.trend,
       };
     }
+    case "counterparty": {
+      let action: AgentAction;
+      if (params.bill_id !== undefined && /^\d+$/.test(params.bill_id)) action = { type: "pay_bill", bill_id: Number(params.bill_id) };
+      else if (params.to) action = { type: "pay", to: params.to.trim().toLowerCase(), token: params.token === "usdc" ? "usdc" : "usdt", amount: params.amount && /^\d{1,39}$/.test(params.amount) ? params.amount : "0", memo: null };
+      else throw new ApiError("E_BAD_REQUEST", 400, "Give ?to=<account>&amount=<units>&token=usdc|usdt, or ?bill_id=<id>.");
+      const pay = await resolvePayment(ctx, action, r);
+      const result = await check({ agentVault: ctx.vaultId, agentPublicKey: ctx.publicKey, receiver: pay!.receiver, amount: pay!.amount === "0" ? null : pay!.amount, token: pay!.token });
+      const onList = onAllowlist(ctx, pay!.receiver);
+      const a = agentDecision(result, "act", onList), p = agentDecision(result, "propose", onList);
+      return {
+        _help: "Counterparty check. verdict allow: fine to act. warn: don't act, use propose so the owner approves. block: don't pay at all and tell the owner. The account's contract still enforces your allowlist and caps.",
+        ...result, on_allowlist: onList,
+        decision: { act: a.ok ? "allowed" : "refused", propose: p.ok ? "allowed" : "refused", message: a.ok ? a.note ?? "OK to act." : a.message },
+      };
+    }
     case "earn-rates":
       return { _help: "Variable lending rates today (supplyApr is a percent). Rates change and can go to zero.", ...(await earnRates()) };
     case "rosca":
@@ -240,15 +256,64 @@ function statusOf(b: import("@oiko/sdk").Bill, nowMs: number) {
 // so keeping this low keeps the NEAR an account must hold low too.
 export const AGENT_GAS = (100n * TGAS).toString();
 
-export async function prepare(ctx: AuthedAgent, kind: "propose" | "act", action: AgentAction, reason: string | undefined, r: NearRpc = rpc()) {
+// ---------- counterparty pre-flight ----------
+
+export type CounterpartyChecker = (input: CheckInput) => Promise<CounterpartyResult>;
+const defaultChecker: CounterpartyChecker = (i) => checkCounterparty(i);
+
+/** Who an action pays and how much (pay, pay_bill); null for moves between the owner's own pots. */
+export async function resolvePayment(ctx: AuthedAgent, action: AgentAction, r: NearRpc): Promise<{ receiver: string; amount: string; token: Token } | null> {
+  if (action.type === "pay") return { receiver: action.to, amount: action.amount, token: action.token };
+  if (action.type === "pay_bill") {
+    const bills = await r.view<import("@oiko/sdk").Bill[]>(ctx.vaultId, "get_bills");
+    const b = bills.find((x) => x.id === action.bill_id);
+    if (!b) throw new ApiError("E_BAD_REQUEST", 400, `There is no bill with id ${action.bill_id}. Read get_bills first.`);
+    return { receiver: b.payee, amount: b.amount, token: b.token };
+  }
+  return null;
+}
+export function onAllowlist(ctx: AuthedAgent, receiver: string): boolean {
+  return ctx.policy.allowlist.some((x) => x.type === "near" && x.account_id === receiver);
+}
+
+/**
+ * Runs the counterparty check for pay / pay_bill. block refuses act and propose (E_COUNTERPARTY_BLOCKED);
+ * warn refuses act (E_COUNTERPARTY_WARN, use propose) unless agentDecision's narrow allowlist exception applies.
+ */
+export async function enforceCounterparty(ctx: AuthedAgent, kind: "propose" | "act", action: AgentAction, r: NearRpc, check: CounterpartyChecker = defaultChecker) {
+  const pay = await resolvePayment(ctx, action, r);
+  if (!pay) return null;
+  const result = await check({ agentVault: ctx.vaultId, agentPublicKey: ctx.publicKey, receiver: pay.receiver, amount: pay.amount, token: pay.token });
+  const d = agentDecision(result, kind, onAllowlist(ctx, pay.receiver));
+  if (!d.ok) throw new ApiError(d.code, d.code === "E_COUNTERPARTY_BLOCKED" ? 403 : 409, d.message, { counterparty: result, ...(d.code === "E_COUNTERPARTY_WARN" ? { next: "propose" } : {}) });
+  return { result, note: d.note };
+}
+
+export async function prepare(ctx: AuthedAgent, kind: "propose" | "act", action: AgentAction, reason: string | undefined, r: NearRpc = rpc(), check: CounterpartyChecker = defaultChecker) {
   if (!ctx.policy.scopes.includes(kind)) throw new ApiError("E_SCOPE", 403, `This agent doesn't have the "${kind}" permission.`);
   if (kind === "propose" && !reason?.trim()) throw new ApiError("E_BAD_REQUEST", 400, "A proposal needs a short reason (up to 280 characters) the owner will read.");
+  const cp = await enforceCounterparty(ctx, kind, action, r, check);
   const method = kind === "act" ? "agent_execute" : "agent_propose";
   const args = kind === "act" ? { action } : { action, reason: reason!.trim() };
   // Make sure the account can pay for the agent's transaction (relayer top-up, rate limited, best effort).
   await topup(ctx.vaultId, "gateway").catch((e) => console.warn("[oiko] agent top-up skipped", (e as Error).message));
   const u = await buildUnsignedTx(r, ctx.vaultId, ctx.publicKey, ctx.vaultId, [act.functionCall(method, args, AGENT_GAS, 0n)]);
-  return { unsignedTx: b64encode(u.bytes), hash: b64encode(u.hash) };
+  return { unsignedTx: b64encode(u.bytes), hash: b64encode(u.hash), ...(cp ? { counterparty: cp.result, ...(cp.note ? { counterparty_note: cp.note } : {}) } : {}) };
+}
+
+/** The receiver of a signed agent_execute {type:"pay"} (for the access log's prior-interaction signal); null otherwise. */
+export function payReceiverOfSignedTx(signedTx: string): string | null {
+  try {
+    const t = decodeSignedTx(b64decode(signedTx)).transaction;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fc = (t.actions[0] as any)?.functionCall as { methodName: string; args: Uint8Array | number[] } | undefined;
+    if (!fc || fc.methodName !== "agent_execute") return null;
+    // borsh decodes Vec<u8> as a plain number[]
+    const a = JSON.parse(new TextDecoder().decode(Uint8Array.from(fc.args))) as { action?: { type?: string; to?: string } };
+    return a.action?.type === "pay" && typeof a.action.to === "string" ? a.action.to : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Validates that a signed tx is exactly one agent_execute/agent_propose call by this agent on its vault. */
@@ -286,6 +351,6 @@ export async function submit(ctx: AuthedAgent, signedTx: string, r: NearRpc = rp
   }
 }
 
-export async function logAccess(row: { vaultId: string; publicKey: string; method: string; path: string; status: number; code?: string | null; tool?: string | null; txHash?: string | null }, s: Store = store()) {
-  await s.logAccess({ vaultId: row.vaultId, publicKey: row.publicKey, method: row.method, path: row.path, status: row.status, code: row.code ?? null, tool: row.tool ?? null, txHash: row.txHash ?? null }).catch((e) => console.warn("[oiko] access log write failed", e));
+export async function logAccess(row: { vaultId: string; publicKey: string; method: string; path: string; status: number; code?: string | null; tool?: string | null; txHash?: string | null; receiver?: string | null }, s: Store = store()) {
+  await s.logAccess({ vaultId: row.vaultId, publicKey: row.publicKey, method: row.method, path: row.path, status: row.status, code: row.code ?? null, tool: row.tool ?? null, txHash: row.txHash ?? null, receiver: row.receiver ?? null }).catch((e) => console.warn("[oiko] access log write failed", e));
 }

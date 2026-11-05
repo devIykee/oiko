@@ -1,4 +1,4 @@
-import { bigserial, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { bigserial, boolean, index, integer, jsonb, pgTable, text, timestamp, unique } from "drizzle-orm/pg-core";
 
 export const agentAccessLog = pgTable("agent_access_log", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
@@ -11,6 +11,8 @@ export const agentAccessLog = pgTable("agent_access_log", {
   code: text("code"),
   tool: text("tool"),
   txHash: text("tx_hash"),
+  /** Who received the payment (set on successful agent submits of a pay action); used by the counterparty check. */
+  receiver: text("receiver"),
 }, (t) => [index("agent_access_log_vault_idx").on(t.vaultId, t.at)]);
 
 export const usedNonces = pgTable("used_nonces", {
@@ -35,6 +37,29 @@ export const mockOneclickSwaps = pgTable("mock_oneclick_swaps", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Shared counterparty blocklist: reports filed by authenticated agents (POST /api/agent/report). */
+export const counterpartyReports = pgTable("counterparty_reports", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  receiver: text("receiver").notNull(),
+  reason: text("reason").notNull(),
+  /** URL, tx hash or text. */
+  evidence: text("evidence").notNull(),
+  /** "agent:<public key>" of the reporting agent. */
+  reporter: text("reporter").notNull(),
+  reporterVault: text("reporter_vault").notNull(),
+  /** true = the reporter proved control of a live agent key on an Oiko account (NEP-413). */
+  verified: boolean("verified").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("counterparty_reports_receiver_idx").on(t.receiver), unique("counterparty_reports_once").on(t.receiver, t.reporterVault)]);
+
+/** Last code hash the counterparty check saw for a contract account (fallback change detector when NearBlocks is unavailable). */
+export const counterpartyCodeHashes = pgTable("counterparty_code_hashes", {
+  accountId: text("account_id").primaryKey(),
+  codeHash: text("code_hash").notNull(),
+  changedAt: timestamp("changed_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const CREATE_SQL = `
 CREATE TABLE IF NOT EXISTS agent_access_log (id BIGSERIAL PRIMARY KEY, at TIMESTAMPTZ NOT NULL DEFAULT now(), vault_id TEXT NOT NULL,
   public_key TEXT NOT NULL, method TEXT NOT NULL, path TEXT NOT NULL, status INTEGER NOT NULL, code TEXT, tool TEXT, tx_hash TEXT);
@@ -43,4 +68,12 @@ CREATE TABLE IF NOT EXISTS used_nonces (nonce TEXT PRIMARY KEY, public_key TEXT 
 CREATE TABLE IF NOT EXISTS push_subscriptions (id BIGSERIAL PRIMARY KEY, account_id TEXT NOT NULL, endpoint TEXT NOT NULL UNIQUE,
   p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS mock_oneclick_swaps (deposit_address TEXT PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+ALTER TABLE agent_access_log ADD COLUMN IF NOT EXISTS receiver TEXT;
+CREATE INDEX IF NOT EXISTS agent_access_log_receiver_idx ON agent_access_log (vault_id, receiver);
+CREATE TABLE IF NOT EXISTS counterparty_reports (id BIGSERIAL PRIMARY KEY, receiver TEXT NOT NULL, reason TEXT NOT NULL, evidence TEXT NOT NULL,
+  reporter TEXT NOT NULL, reporter_vault TEXT NOT NULL, verified BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT counterparty_reports_once UNIQUE (receiver, reporter_vault));
+CREATE INDEX IF NOT EXISTS counterparty_reports_receiver_idx ON counterparty_reports (receiver);
+CREATE TABLE IF NOT EXISTS counterparty_code_hashes (account_id TEXT PRIMARY KEY, code_hash TEXT NOT NULL, changed_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
 `;
