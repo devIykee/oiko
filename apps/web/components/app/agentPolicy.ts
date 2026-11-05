@@ -1,4 +1,4 @@
-import type { AgentKind, AgentPolicyInput, AgentView, Bill, Recipient, Scope } from "@oiko/sdk";
+import { defaultCaps, plainToUnits, type AgentKind, type AgentPolicyInput, type AgentView, type Bill, type Recipient, type Scope } from "@oiko/sdk";
 import type { TFn } from "@/lib/i18n";
 import { fmt, msToNs } from "@/lib/format";
 
@@ -16,27 +16,23 @@ export interface Draft {
   days: number;
 }
 
-const human = (units: bigint) => (Number(units / 10_000n) / 100).toFixed(2).replace(/\.00$/, "");
-
 export function templateDraft(id: TemplateId, bills: Bill[], t: TFn): Draft {
   switch (id) {
     case "coach":
       return { template: id, name: t("agents.tpl.coach"), url: "", scopes: ["read", "propose"], actions: ["save", "move_between_pots", "pay"], allowlist: [], perTx: "0", daily: "0", weekly: "0", days: 30 };
-    case "bills": {
-      const totalBills = bills.reduce((a, b) => a + BigInt(b.amount), 0n);
-      const cap = (totalBills * 110n) / 100n; // bills total + 10%
-      const maxBill = bills.reduce((a, b) => (BigInt(b.amount) > a ? BigInt(b.amount) : a), 0n);
+    case "bills":
+      // Caps come from the one shared source (@oiko/sdk defaultCaps): biggest bill / bills total + 10%, whole amounts.
       return { template: id, name: t("agents.tpl.bills"), url: "", scopes: ["read", "propose", "act"], actions: ["pay"], allowlist: [...new Set(bills.map((b) => b.payee))],
-        perTx: human((maxBill * 110n) / 100n || 50_000_000n), daily: human(cap || 100_000_000n), weekly: human(cap || 100_000_000n), days: 30 };
-    }
+        ...defaultCaps("bills", bills.map((b) => b.amount)), days: 30 };
     case "autopilot":
-      return { template: id, name: t("agents.tpl.autopilot"), url: "", scopes: ["read", "propose", "act"], actions: ["move_between_pots", "save"], allowlist: [], perTx: "50", daily: "100", weekly: "300", days: 30 };
+      return { template: id, name: t("agents.tpl.autopilot"), url: "", scopes: ["read", "propose", "act"], actions: ["move_between_pots", "save"], allowlist: [], ...defaultCaps("autopilot"), days: 30 };
     default:
-      return { template: id, name: "", url: "", scopes: ["read"], actions: [], allowlist: [], perTx: "0", daily: "0", weekly: "0", days: 30 };
+      // Custom starts read-only; if the owner adds "act", the caps fields are prefilled with the shared defaults.
+      return { template: id, name: "", url: "", scopes: ["read"], actions: [], allowlist: [], ...defaultCaps("custom"), days: 30 };
   }
 }
 
-const toU = (h: string) => { const n = Number(h); return Number.isFinite(n) && n > 0 ? (BigInt(Math.round(n * 100)) * 10_000n).toString() : "0"; };
+const toU = (h: string) => plainToUnits(h);
 
 export function draftToPolicy(d: Draft, nowMs = Date.now()): AgentPolicyInput {
   const act = d.scopes.includes("act");

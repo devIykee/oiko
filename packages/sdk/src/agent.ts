@@ -1,4 +1,4 @@
-// Client side of the agent gateway: connection strings and a signed HTTP client (used by @oiko/mcp and examples).
+// Client side of the agent gateway: connection strings and a signed HTTP client (used by oiko-mcp and examples).
 import { b64decode, b64encode, b64urlEncode, fromUtf8, utf8 } from "./encoding";
 import { friendlyError } from "./errors";
 import { publicKeyFromSecretKey } from "./keys";

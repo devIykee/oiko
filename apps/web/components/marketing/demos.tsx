@@ -182,7 +182,7 @@ export function PlanDemo() {
 
 /* ---------------- 3. Give an agent a budget ---------------- */
 const PAYEES = [
-  { id: "power", label: "City Power", note: "Electricity" },
+  { id: "power", label: "Metro Power", note: "Electricity" },
   { id: "rent", label: "Landlord", note: "Rent" },
   { id: "gadgets", label: "gadgets.shop", note: "Unknown shop" },
 ] as const;

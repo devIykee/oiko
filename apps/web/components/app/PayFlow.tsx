@@ -3,7 +3,7 @@
 // 1 where is your money → 2 how much (skipped when the amount is fixed) → 3 refund address → 4 deposit address + live status.
 import { AmountInput, AssetLogo, Badge, Button, CopyField, Input, Note, QRCodeCard, SelectList, StatusTimeline, SuccessCheck, Skeleton, Loading } from "@oiko/ui";
 import { fromUnits, toUnits, type Token } from "@oiko/sdk";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { validAddress } from "@/lib/address";
 import { api } from "@/lib/api";
 import { explain } from "@/lib/actions";
@@ -92,13 +92,18 @@ export function PayFlow({ name, display, recipient, fixed, invoiceId, onStatus, 
     } catch (e) { setErr(explain(e)); } finally { setBusy(false); }
   };
 
+  // One simulated deposit per address: the ref blocks double clicks before React re-renders; the server is idempotent too.
+  const simRef = useRef(false);
+  const [simulated, setSimulated] = useState(false);
   const simulate = async () => {
-    if (!dep) return;
+    if (!dep || simRef.current) return;
+    simRef.current = true;
     setSimulating(true);
     try {
       const r = await api<{ ticket?: string }>("/api/intents/simulate-deposit", { body: { depositAddress: dep.depositAddress, memo: dep.depositMemo ?? undefined, ticket: dep.ticket, ...(invoiceId ? { invoiceId } : {}) } });
       if (r.ticket) setDep({ ...dep, ticket: r.ticket });
-    } catch (e) { setErr(explain(e)); } finally { setSimulating(false); }
+      setSimulated(true);
+    } catch (e) { simRef.current = false; setErr(explain(e)); } finally { setSimulating(false); }
   };
 
   const current = status === "PENDING_DEPOSIT" ? 0 : status === "KNOWN_DEPOSIT_TX" ? 1 : status === "PROCESSING" ? 2 : status === "SUCCESS" ? 4 : status === "INCOMPLETE_DEPOSIT" ? 1 : 2;
@@ -203,7 +208,7 @@ export function PayFlow({ name, display, recipient, fixed, invoiceId, onStatus, 
             <div className="oi-testmode" data-testid="pay-testmode">
               <Badge tone="warning" icon="warning">{t("common.testMode")}</Badge>
               <p className="oi-small" style={{ margin: 0 }}>{t("pay.simulateNote")}</p>
-              <Button variant="secondary" loading={simulating} onClick={simulate} data-testid="pay-simulate">{t("pay.simulate")}</Button>
+              <Button variant="secondary" loading={simulating} disabled={simulated || status !== "PENDING_DEPOSIT"} onClick={simulate} data-testid="pay-simulate">{simulated ? t("pay.simulated") : t("pay.simulate")}</Button>
             </div>
           )}
           {err && <div role="alert"><Note tone="danger" title={err.title}>{err.next}</Note></div>}

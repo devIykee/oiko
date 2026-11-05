@@ -1,4 +1,5 @@
 // HTTP glue for /api/agent/* (framework-free: takes a web Request, returns a Response).
+import { describeRow, factsOfAction, factsOfSignedTx, outcomeOf, reasonOf, type ActionFacts, type Outcome } from "./accessLog";
 import { parseGatewayAuthHeader, normalizePublicKey } from "@oiko/sdk";
 import { ApiError } from "./errors";
 import { authenticateAgent, authenticateOwner, logAccess, payReceiverOfSignedTx, prepare, readTool, submit, type GatewayRequest } from "./gateway";
@@ -45,15 +46,18 @@ export async function agentWrite(req: Request, op: "prepare" | "submit"): Promis
   const url = new URL(req.url);
   const id = who(req);
   let status = 200, code: string | null = null, txHash: string | null = null, receiver: string | null = null;
+  let facts: ActionFacts | undefined;
   try {
     if (!checkLimits("gateway", clientIp(req), id?.publicKey ?? null)) throw new ApiError("E_RATE_LIMIT", 429);
     const text = await readText(req);
     if (op === "prepare") {
       const b = parseBody(PrepareBody, text);
+      facts = factsOfAction(b.action, b.kind === "act" ? "agent_execute" : "agent_propose");
       const ctx = await authenticateAgent(gatewayRequest(req, text), b.kind);
       return json(await prepare(ctx, b.kind, b.action, b.reason));
     }
     const b = parseBody(SubmitBody, text);
+    facts = factsOfSignedTx(b.signedTx);
     const ctx = await authenticateAgent(gatewayRequest(req, text), null);
     const r = await submit(ctx, b.signedTx);
     txHash = r.txHash;
@@ -65,7 +69,7 @@ export async function agentWrite(req: Request, op: "prepare" | "submit"): Promis
     code = e instanceof ApiError ? e.code : "E_INTERNAL";
     return errorResponse(e);
   } finally {
-    if (id) await logAccess({ ...id, method: "POST", path: url.pathname, status, code, tool: op, txHash, receiver });
+    if (id) await logAccess({ ...id, method: "POST", path: url.pathname, status, code, tool: op, txHash, receiver: receiver ?? facts?.receiver ?? null, facts });
   }
 }
 
@@ -79,7 +83,12 @@ export async function agentLog(req: Request): Promise<Response> {
     if (vaultId !== `vault.${owner.accountId}`) throw new ApiError("E_UNAUTHORIZED", 403, "You can only read your own account's access log.");
     const pk = url.searchParams.get("publicKey");
     const s = store();
-    const rows = await s.listAccess(vaultId, pk ? normalizePublicKey(pk) : null, 200);
+    const raw = await s.listAccess(vaultId, pk ? normalizePublicKey(pk) : null, 200);
+    // Owner-facing: what was tried, the outcome, and the reason in plain words.
+    const rows = raw.map((r) => {
+      const outcome = (r.outcome as Outcome | null) ?? outcomeOf({ tool: r.tool, status: r.status, code: r.code, path: r.path, method: r.method });
+      return { ...r, outcome, summary: describeRow({ tool: r.tool, type: r.actionType, amount: r.amount, token: r.token, receiver: r.receiver }), reason: reasonOf(outcome, r.code) };
+    });
     return json({ vaultId, storage: s.kind, ...(s.kind === "memory" ? { note: "In-memory log: it resets when the server restarts." } : {}), rows });
   } catch (e) {
     return errorResponse(e);

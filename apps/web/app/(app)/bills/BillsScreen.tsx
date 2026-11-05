@@ -3,6 +3,7 @@ import { Badge, Button, EmptyState, GroupedList, Input, ListRow, Note, Segmented
 import { billStatus, toUnits, type Bill, type Overview, type Token } from "@oiko/sdk";
 import Link from "next/link";
 import { useState } from "react";
+import { BillerPicker } from "@/components/app/BillerPicker";
 import { ConfirmSheet } from "@/components/app/ConfirmSheet";
 import { CounterpartyBadge } from "@/components/app/CounterpartyBadge";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -132,7 +133,11 @@ function AddBillSheet({ o, onClose }: { o: Overview; onClose: () => void }) {
       <SegmentedControl label={t("common.token")} value={coin} onChange={setCoin} items={[{ value: "usdt", label: "USDT" }, { value: "usdc", label: "USDC" }]} />
       <Input label={t("common.amount")} value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" suffix={coin.toUpperCase()} />
       <Input label={t("bills.dueDay")} value={day} onChange={(e) => setDay(e.target.value.replace(/\D/g, "").slice(0, 2))} inputMode="numeric" hint={t("bills.dueDayHint")} error={day && (d < 1 || d > 28) ? t("bills.dueDayHint") : undefined} />
-      <Input label={t("bills.payeeLabel")} value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="citypower" autoComplete="off" spellCheck={false} hint={t("bills.payeeHint")} />
+      <BillerPicker testId="bill-billers" selected={[payee.trim().toLowerCase()]} onPick={(b) => {
+        setPayee(b.accountId);
+        if (!name.trim()) setName(t(`billers.cat.${b.category}` as never) || b.name);
+      }} />
+      <Input label={t("bills.orOther")} value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="sam" autoComplete="off" spellCheck={false} hint={t("bills.payeeHint")} />
       {payee.trim() && <CounterpartyBadge accountId={payee} amount={units ?? null} debounceMs={600} testId="bill-payee-check" />}
       <div className="oi-label">{t("bills.paidFrom")}</div>
       <SelectList label={t("bills.paidFrom")} value={potId} onChange={setPotId}

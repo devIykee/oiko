@@ -156,21 +156,22 @@ export function StartScreen() {
   );
 }
 
-/** First run: default pots with one tap to accept or edit. Spend, Bills 30%, Savings 20%, Rainy day (locked), one named Goal 10%. */
+/** First run: default pots with one tap to accept or edit. Bills 30%, Savings 20%, Rainy day 10% (locked), one named Goal 10%, Spend 30% (the rest). */
 function FirstRunPots({ onDone }: { onDone: () => void }) {
   const t = useT();
   const { exec } = useMoney();
   const [goal, setGoal] = useState(t("start.goalDefault"));
   const [bills, setBills] = useState(30);
   const [savings, setSavings] = useState(20);
+  const [rainy, setRainy] = useState(10);
   const [goalPct, setGoalPct] = useState(10);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<{ title: string; next: string } | null>(null);
-  const spend = 100 - bills - savings - goalPct;
+  const spend = 100 - bills - savings - rainy - goalPct;
   const preview = useMemo(() => t("plan.preview", { parts: [
     t("plan.previewPart", { amount: bills, pot: t("pot.kind.bills") }), t("plan.previewPart", { amount: savings, pot: t("pot.kind.autosave") }),
-    t("plan.previewPart", { amount: goalPct, pot: goal || t("pot.kind.goal") }), t("plan.previewPart", { amount: spend, pot: t("pot.kind.flex") }),
+    t("plan.previewPart", { amount: rainy, pot: t("start.rainy") }), t("plan.previewPart", { amount: goalPct, pot: goal || t("pot.kind.goal") }), t("plan.previewPart", { amount: spend, pot: t("pot.kind.flex") }),
   ].join(", ") }), [bills, savings, goalPct, spend, goal, t]);
 
   const accept = async () => {
@@ -183,19 +184,20 @@ function FirstRunPots({ onDone }: { onDone: () => void }) {
       };
       const b = await mk({ name: t("pot.kind.bills"), icon: "bill", color: "sun", kind: "bills" });
       const s = await mk({ name: t("pot.kind.autosave"), icon: "savings", color: "mint", kind: "autosave" });
-      await mk({ name: t("start.rainy"), icon: "rainy", color: "violet", kind: "locked" });
+      const r = await mk({ name: t("start.rainy"), icon: "rainy", color: "violet", kind: "locked" });
       const g = await mk({ name: goal.trim() || t("pot.kind.goal"), icon: "goal", color: "rose", kind: "goal" });
       await exec("setSplits", [
         { pot_id: b, mode: "percent" as const, value: String(bills * 100) },
         { pot_id: s, mode: "percent" as const, value: String(savings * 100) },
+        { pot_id: r, mode: "percent" as const, value: String(rainy * 100) },
         { pot_id: g, mode: "percent" as const, value: String(goalPct * 100) },
       ].filter((r) => r.value !== "0"));
       onDone();
     } catch (e) { setErr(explain(e)); } finally { setBusy(false); }
   };
 
-  const row = (label: string, v: number, set: (n: number) => void, icon: "bill" | "savings" | "goal", color: "sun" | "mint" | "rose") => (
-    <ListRow icon={icon} color={color} title={label} trailing={editing ? (
+  const row = (label: string, v: number, set: (n: number) => void, icon: "bill" | "savings" | "goal" | "locked", color: "sun" | "mint" | "rose" | "violet", subtitle?: string) => (
+    <ListRow icon={icon} color={color} title={label} subtitle={subtitle} trailing={editing ? (
       <input type="number" min={0} max={100} value={v} aria-label={label} className="oi-input" style={{ width: 64, height: 36, textAlign: "right", border: "1px solid var(--line)", borderRadius: 10, padding: "0 8px" }}
         onChange={(e) => set(Math.max(0, Math.min(100, Number(e.target.value) || 0)))} />
     ) : <span className="oi-num" style={{ fontWeight: 600 }}>{v}%</span>} />
@@ -211,7 +213,7 @@ function FirstRunPots({ onDone }: { onDone: () => void }) {
         <ListRow icon="spend" color="blue" title={t("pot.kind.flex")} subtitle={t("plan.spendRest")} trailing={<span className="oi-num" style={{ fontWeight: 600 }}>{spend}%</span>} />
         {row(t("pot.kind.bills"), bills, setBills, "bill", "sun")}
         {row(t("pot.kind.autosave"), savings, setSavings, "savings", "mint")}
-        <ListRow icon="locked" color="violet" title={t("start.rainy")} subtitle={t("start.rainySub")} />
+        {row(t("start.rainy"), rainy, setRainy, "locked", "violet", t("start.rainySub"))}
         {row(goal || t("pot.kind.goal"), goalPct, setGoalPct, "goal", "rose")}
       </GroupedList>
       <Input label={t("start.goalLabel")} value={goal} onChange={(e) => setGoal(e.target.value.slice(0, 32))} hint={t("start.goalHint")} />

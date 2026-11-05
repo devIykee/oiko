@@ -22,7 +22,14 @@
    - The 13 names in the old registry are not carried over. Their accounts still exist on the old vault code.
 2. ~~Database~~ Done (2026-11-04): Neon is connected to the Vercel project (`DATABASE_URL`). Nonces, the agent access log and test-mode payments are now stored in Postgres; verified on production by looking up a deposit across instances without its ticket.
 3. **Make the repo public** before submitting: `gh repo edit devIykee/oiko --visibility public --accept-visibility-change-consequences`. Check first that you may publish the Acorn font files in `apps/web/fonts` (otherwise remove them; the site falls back to Inter Tight).
-4. **Cron**: set GitHub repo variable `OIKO_APP_URL=https://oikodotnear.vercel.app` and secret `CRON_SECRET` (same value as the Vercel env var) so `.github/workflows/cron.yml` runs schedules and ROSCA settlement every 5 minutes.
+4. **Publish the MCP package** (needs your npm login; `npx oiko-mcp` 404s until then):
+   ```
+   npm login                      # once, as the owner of the @oiko scope (or create the scope)
+   pnpm --filter oiko-mcp build && cd packages/mcp && npm pack --dry-run   # check: dist/cli.mjs, bin, README, package.json only
+   npm publish --access public    # from packages/mcp
+   ```
+   Until it is published, agents use the hosted endpoint instead (no install): see "Connect a hosted agent" on /agents and docs/AGENTS.md.
+5. **Cron**: set GitHub repo variable `OIKO_APP_URL=https://oikodotnear.vercel.app` and secret `CRON_SECRET` (same value as the Vercel env var) so `.github/workflows/cron.yml` runs schedules and ROSCA settlement every 5 minutes.
 
 ## Not finished
 

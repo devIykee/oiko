@@ -10,7 +10,7 @@ import { useT } from "@/lib/i18n";
  * then Confirm (or a custom control such as HoldToConfirm). Errors say what happened and what to do next.
  */
 export function ConfirmSheet({
-  open, onOpenChange, title, sentence, details, confirmLabel, onConfirm, successText, variant = "black", control, testId, full,
+  open, onOpenChange, title, sentence, details, confirmLabel, onConfirm, successText, variant = "black", control, testId, full, doneDetails, stayOpen,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -25,12 +25,17 @@ export function ConfirmSheet({
   control?: (go: () => void, busy: boolean) => ReactNode;
   testId?: string;
   full?: boolean;
+  /** Extra content on the success state (e.g. a transaction link), given the confirm result. */
+  doneDetails?: (r: TxResult | void) => ReactNode;
+  /** Keep the success state open instead of closing after 1.2 s. */
+  stayOpen?: boolean;
 }) {
   const t = useT();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<{ title: string; next: string } | null>(null);
   const [done, setDone] = useState(false);
+  const [result, setResult] = useState<TxResult | void>(undefined);
 
   useEffect(() => { if (open) { setErr(null); setDone(false); setBusy(false); } }, [open]);
 
@@ -38,10 +43,10 @@ export function ConfirmSheet({
     setBusy(true);
     setErr(null);
     try {
-      await onConfirm();
+      setResult(await onConfirm());
       setDone(true);
       toast.show({ message: successText, tone: "success" });
-      setTimeout(() => onOpenChange(false), 1200);
+      if (!stayOpen) setTimeout(() => onOpenChange(false), 1200);
     } catch (e) {
       setErr(explain(e));
     } finally {
@@ -58,6 +63,7 @@ export function ConfirmSheet({
         <div className="oi-stack" style={{ alignItems: "center", textAlign: "center", padding: "24px 0" }} role="status" aria-live="polite">
           <SuccessCheck />
           <div style={{ fontWeight: 600, fontSize: 18 }}>{successText}</div>
+          {doneDetails?.(result)}
         </div>
       ) : (
         <>

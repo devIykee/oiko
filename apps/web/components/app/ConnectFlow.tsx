@@ -1,5 +1,6 @@
 "use client";
-import { Button, CopyField, Input, Note, QRCodeCard, ScopeList, SegmentedControl, Sheet, Toggle, ListRow, GroupedList } from "@oiko/ui";
+import { BillerPicker } from "./BillerPicker";
+import { Button, CopyField, Input, useToast, Note, QRCodeCard, ScopeList, SegmentedControl, Sheet, Toggle, ListRow, GroupedList } from "@oiko/ui";
 import { encodeConnectionString, generateKeyPair, type AgentKind, type Overview, type Scope } from "@oiko/sdk";
 import { useEffect, useState } from "react";
 import { explain, useMoney } from "@/lib/actions";
@@ -7,6 +8,8 @@ import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { consentItems, draftToPolicy, type Draft } from "./agentPolicy";
 import { CounterpartyBadge } from "./CounterpartyBadge";
+import { downloadText } from "./download";
+import { HostedAgentLink } from "./HostedAgentLink";
 
 type Step = "setup" | "consent" | "secret";
 
@@ -25,6 +28,8 @@ export function ConnectFlow({ open, onOpenChange, initial, overview, agentPublic
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<{ title: string; next: string } | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
+  const [secretKey, setSecretKey] = useState<string | null>(null);
+  const toast = useToast();
   const [origin, setOrigin] = useState("");
   useEffect(() => { if (open) { setD(initial); setStep(agentPublicKey ? "consent" : "setup"); setSecret(null); setErr(null); } }, [open, initial, agentPublicKey]);
   useEffect(() => { setOrigin(window.location.origin); }, []);
@@ -41,13 +46,13 @@ export function ConnectFlow({ open, onOpenChange, initial, overview, agentPublic
       const kp = agentPublicKey ? null : generateKeyPair();
       const pk = agentPublicKey ?? kp!.publicKey;
       await exec("addAgent", pk, policy);
-      if (kp && session) setSecret(encodeConnectionString({ api: origin, vault: session.vaultId, sk: kp.secretKey }));
+      if (kp && session) { setSecret(encodeConnectionString({ api: origin, vault: session.vaultId, sk: kp.secretKey })); setSecretKey(kp.secretKey); }
       setStep("secret");
       onDone?.(pk);
     } catch (e) { setErr(explain(e)); } finally { setBusy(false); }
   };
 
-  const mcp = secret ? JSON.stringify({ mcpServers: { oiko: { command: "npx", args: ["-y", "@oiko/mcp"], env: { OIKO_CONNECTION: secret } } } }, null, 2) : "";
+  const mcp = secret ? JSON.stringify({ mcpServers: { oiko: { command: "npx", args: ["-y", "oiko-mcp"], env: { OIKO_CONNECTION: secret } } } }, null, 2) : "";
   const title = step === "setup" ? t("agents.setupTitle") : step === "consent" ? t("agents.consentTitle", { name: d.name || t("agents.yourAgent") }) : t("agents.connectedTitle");
 
   return (
@@ -73,10 +78,12 @@ export function ConnectFlow({ open, onOpenChange, initial, overview, agentPublic
                 <ListRow icon="move" color="stone" title={t("agents.kind.move")} trailing={<Toggle checked={d.actions.includes("move_between_pots")} onChange={(v) => toggleAction("move_between_pots", v)} label={t("agents.kind.move")} />} />
                 <ListRow icon="savings" color="stone" title={t("agents.kind.save")} trailing={<Toggle checked={d.actions.includes("save")} onChange={(v) => toggleAction("save", v)} label={t("agents.kind.save")} />} />
               </GroupedList>
-              {d.actions.includes("pay") && (
+              {d.actions.includes("pay") && (<>
+                <BillerPicker multi testId="agent-billers" selected={d.allowlist}
+                  onPick={(bl) => setD({ ...d, allowlist: d.allowlist.includes(bl.accountId) ? d.allowlist.filter((x) => x !== bl.accountId) : [...d.allowlist, bl.accountId] })} />
                 <Input label={t("agents.allowlist")} value={d.allowlist.join(", ")} onChange={(e) => setD({ ...d, allowlist: e.target.value.split(/[,\s]+/).filter(Boolean) })}
-                  hint={t("agents.allowlistHint")} placeholder="citypower.near, sam.oiko.near" autoComplete="off" spellCheck={false} />
-              )}
+                  hint={t("agents.allowlistHint")} placeholder="sam.oiko.near" autoComplete="off" spellCheck={false} />
+              </>)}
               {d.actions.includes("pay") && d.allowlist.slice(0, 10).map((acct) => <CounterpartyBadge key={acct} accountId={acct} debounceMs={600} testId={`allowlist-check-${acct}`} />)}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                 <Input label={t("agents.perTx")} value={d.perTx} onChange={(e) => setD({ ...d, perTx: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" />
@@ -104,7 +111,10 @@ export function ConnectFlow({ open, onOpenChange, initial, overview, agentPublic
         secret ? (
           <>
             <Note tone="warning" title={t("agents.onceTitle")}>{t("agents.onceBody")}</Note>
-            <CopyField label={t("agents.connectionString")} value={secret} display={`${secret.slice(0, 28)}…`} copyLabel={t("common.copy")} copiedLabel={t("common.copied")} testId="agent-secret" />
+            <CopyField label={t("agents.connectionString")} value={secret} display={`${secret.slice(0, 28)}…`} copyLabel={t("common.copy")} copiedLabel={t("common.copied")} testId="agent-secret"
+              onCopied={() => toast.show({ message: t("common.copied"), tone: "success" })} />
+            <Button variant="ghost" size="sm" onClick={() => downloadText("oiko-agent-connection.txt", `${t("agents.connectionString")}\n${secret}\n\n${t("agents.onceBody")}\n`)} data-testid="agent-secret-download">{t("common.downloadTxt")}</Button>
+            {secretKey && session && <HostedAgentLink secretKey={secretKey} vault={session.vaultId} origin={origin} />}
             <QRCodeCard value={secret} label={t("agents.connectionString")} size={200} caption={t("agents.qrCaption")} />
             <div className="oi-label">{t("agents.mcpTitle")}</div>
             <pre className="oi-code" data-testid="agent-mcp">{mcp}</pre>

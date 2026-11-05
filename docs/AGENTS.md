@@ -41,23 +41,23 @@ https://oikodotnear.vercel.app/connect?name=<agent name>&url=<https agent site>&
 | `scopes` | Comma list of `read`, `propose`, `act`. Default `read` |
 | `actions` | Comma list of `pay`, `move_between_pots`, `save` |
 | `allow` | Comma list of NEAR accounts you may pay |
-| `per_tx`, `daily`, `weekly` | **Plain amounts** (20 = 20 USDC + USDT), not base units |
+| `per_tx`, `daily`, `weekly` | **Plain amounts** (20 = 20 USDC + USDT), not base units. Left out: the shared defaults **40 / 50 / 100** (`DEFAULT_CAPS` in `@oiko/sdk`, the same values the app's templates start from). The consent screen always shows the exact caps that will be written to the contract |
 | `days` | Lifetime in days, 1–90 (default 30) |
 | `callback` | Optional, `https://` only. After approval the owner gets a button back to it with `?vault=<vault id>` appended |
 
 The owner reviews everything in plain words and can change any limit before approving. After approval, your `accountId` is the vault id from the callback (or ask the owner for their name: the vault is `vault.<name>.<root>`).
 
-### C. MCP over stdio (`@oiko/mcp`)
+### C. MCP over stdio (`oiko-mcp`)
 The stdio server signs every request and transaction locally with your key.
 
 ```bash
 # from this repo (the package is not on the npm registry yet)
-pnpm install && pnpm --filter @oiko/mcp build
+pnpm install && pnpm --filter oiko-mcp build
 OIKO_CONNECTION='oiko1:…' node packages/mcp/bin/oiko-mcp.mjs
 # or: OIKO_AGENT_KEY=ed25519:<secret> OIKO_VAULT_ID=vault.ada.oiko.testnet OIKO_API_URL=https://oikodotnear.vercel.app
 ```
 
-Claude Desktop (`claude_desktop_config.json`, see `examples/agents/claude-desktop.json`). Once `@oiko/mcp` is published, `"command": "npx", "args": ["-y", "@oiko/mcp"]` works; until then point at the local build:
+Claude Desktop (`claude_desktop_config.json`, see `examples/agents/claude-desktop.json`). Once `oiko-mcp` is published, `"command": "npx", "args": ["-y", "oiko-mcp"]` works; until then point at the local build:
 
 ```json
 {
@@ -76,6 +76,21 @@ Claude Desktop (`claude_desktop_config.json`, see `examples/agents/claude-deskto
 
 ### E. REST
 Base `https://oikodotnear.vercel.app/api/agent`. Same header. See "Moving money over REST" below.
+
+## Hosted agents (no install): session tokens
+
+For assistants that run in the cloud and can't run `npx` or sign each request (Grok, ChatGPT, Claude.ai custom connectors).
+
+1. The owner opens **Agents → Connect a hosted agent**, picks what it may do and approves. The browser makes the agent key; it never leaves the page and the server never holds it.
+2. The browser signs one request with that key: `POST /api/agent/session` with the usual NEP-413 `Authorization` header and body `{"ttl_hours": 1..24}`. The response is `{ token, expires_at, vault, public_key, scopes }`.
+3. The assistant uses either `https://<host>/api/mcp/t/<token>` (for clients that only take a URL) or `https://<host>/api/mcp` with `Authorization: Bearer <token>`.
+
+Limits, honestly:
+
+- **Reads work fully.** That covers balances, pots, plan, bills, activity, insights and the agent's own caps.
+- **`propose` and `act` still need the agent's own signature.** Without `signed_tx` the tools return the unsigned transaction and how to sign it. A hosted assistant normally can't sign, so in practice a hosted link is read-only plus explanations. Agents that can sign should use the MCP package or the HTTP gateway with NEP-413.
+- **Tokens last at most 24 hours** and never longer than the agent's own expiry. Every request re-checks the key on the vault (`view_access_key`) and the agent policy. **Disconnect**, which deletes the key, ends the session on the next request. `DELETE /api/agent/session` with the bearer token ends just that session.
+- **A token in a URL can end up in logs.** Treat the link like a password and prefer the header form when the client supports it.
 
 ## Authentication (NEP-413), exact format
 

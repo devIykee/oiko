@@ -1,4 +1,4 @@
-# @oiko/mcp
+# oiko-mcp
 
 MCP server that lets your own AI agent (Claude Desktop, Cursor, or any MCP client) read and act on an [Oiko](https://oikodotnear.vercel.app) account, inside limits the account itself enforces.
 
@@ -14,7 +14,7 @@ Oiko has no built-in AI. Your agent brings the intelligence; Oiko brings the rul
   "mcpServers": {
     "oiko": {
       "command": "npx",
-      "args": ["-y", "@oiko/mcp"],
+      "args": ["-y", "oiko-mcp"],
       "env": { "OIKO_CONNECTION": "oiko1:..." }
     }
   }

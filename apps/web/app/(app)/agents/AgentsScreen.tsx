@@ -1,5 +1,5 @@
 "use client";
-import { AgentAccessLog, AgentCard, Badge, CopyField, EmptyState, GroupedList, ListRow, ProposalCard, ScopeList, SectionTitle, useToast } from "@oiko/ui";
+import { AgentAccessLog, AgentCard, Badge, Button, CopyField, EmptyState, GroupedList, ListRow, ProposalCard, ScopeList, SectionTitle, useToast } from "@oiko/ui";
 import type { AgentView, Overview, Proposal } from "@oiko/sdk";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -11,6 +11,7 @@ import { LoadError, PageSkeleton } from "@/components/app/States";
 import { capUsage, consentItems, templateDraft, type Draft, type TemplateId } from "@/components/app/agentPolicy";
 import { actionSentence } from "@/components/app/describe";
 import { explain, useMoney } from "@/lib/actions";
+import { useConfig } from "@/lib/config";
 import { useAgentLog, useOverview } from "@/lib/data";
 import { fmt, fmtDate, fmtDateTime, nsToMs, shortKey } from "@/lib/format";
 import { useT } from "@/lib/i18n";
@@ -74,10 +75,18 @@ export function AgentsScreen() {
         </GroupedList>
       </section>
 
+      <section aria-labelledby="hosted" className="oi-card oi-stack-sm" data-testid="hosted-section">
+        <h2 id="hosted" className="oi-h2" style={{ fontSize: 16 }}>{t("agents.hostedSection")}</h2>
+        <ol className="oi-small oi-muted" style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "grid", gap: 4 }}>
+          <li>{t("agents.hostedSteps1")}</li><li>{t("agents.hostedSteps2")}</li><li>{t("agents.hostedSteps3")}</li>
+        </ol>
+        <Button variant="secondary" onClick={() => setDraft(templateDraft("coach", o.bills, t))} data-testid="hosted-start">{t("agents.hostedStart")}</Button>
+      </section>
+
       <section aria-labelledby="dev" className="oi-card oi-stack-sm">
         <h2 id="dev" className="oi-h2" style={{ fontSize: 16 }}>{t("agents.devTitle")}</h2>
         <p className="oi-small oi-muted" style={{ margin: 0 }}>{t("agents.devBody")}</p>
-        <CopyField label={t("agents.mcpInstall")} value="npx -y @oiko/mcp" copyLabel={t("common.copy")} copiedLabel={t("common.copied")} />
+        <CopyField label={t("agents.mcpInstall")} value="npx -y oiko-mcp" copyLabel={t("common.copy")} copiedLabel={t("common.copied")} />
         <CopyField label={t("agents.mcpHttp")} value={`${origin}/api/mcp`} copyLabel={t("common.copy")} copiedLabel={t("common.copied")} />
         <CopyField label={t("agents.connectLink")} value={`${origin}/connect?name=My%20agent&pk=ed25519:…&scopes=read,propose`} copyLabel={t("common.copy")} copiedLabel={t("common.copied")} />
         <p className="oi-small" style={{ margin: 0 }}><a className="oi-dark-accent-link" href="/llms.txt">llms.txt</a> · <a className="oi-dark-accent-link" href="/.well-known/oiko-agent.json">oiko-agent.json</a></p>
@@ -92,7 +101,7 @@ function ConnectedAgent({ a, o }: { a: AgentView; o: Overview }) {
   const t = useT();
   const toast = useToast();
   const { exec } = useMoney();
-  const [busy, setBusy] = useState(false);
+  const { oiko } = useConfig();
   const [showLog, setShowLog] = useState(false);
   const [pending, setPending] = useState<{ p: Proposal; kind: "approve" | "reject" } | null>(null);
   const log = useAgentLog(showLog ? a.public_key : null);
@@ -103,16 +112,9 @@ function ConnectedAgent({ a, o }: { a: AgentView; o: Overview }) {
   const { session } = useSession();
   const items = useMemo(() => consentItems(a, t).filter((i) => i.allowed), [a, t]);
 
-  const disconnect = async () => {
-    setBusy(true);
-    try {
-      await exec("revokeAgent", a.public_key);
-      toast.show({ message: t("agents.disconnected", { name: a.agent_name }), tone: "success" });
-    } catch (e) {
-      const f = explain(e);
-      toast.show({ message: `${f.title} ${f.next}`, tone: "danger", durationMs: 6000 });
-    } finally { setBusy(false); }
-  };
+  // Disconnect asks first, then shows a clear success state with the key-deleted transaction.
+  const [confirmOff, setConfirmOff] = useState(false);
+  const disconnect = () => setConfirmOff(true);
 
   return (
     <AgentCard
@@ -125,7 +127,7 @@ function ConnectedAgent({ a, o }: { a: AgentView; o: Overview }) {
         { label: t("agents.thisWeek"), used: Number(u.usedWeek), cap: Number(u.weekly), text: t("agents.capText", { used: fmt(u.usedWeek), cap: fmt(u.weekly) }) },
       ] : []}
       onDisconnect={disconnect}
-      disconnecting={busy}
+      disconnecting={confirmOff}
       disconnectLabel={t("agents.disconnect")}
     >
       <ScopeList label={t("agents.permissions")} items={items} />
@@ -161,6 +163,22 @@ function ConnectedAgent({ a, o }: { a: AgentView; o: Overview }) {
           confirmLabel={pending.kind === "approve" ? t("home.approve") : t("home.reject")} variant={pending.kind === "approve" ? "black" : "danger"}
           successText={pending.kind === "approve" ? t("home.approved") : t("home.rejected")}
           onConfirm={() => (pending.kind === "approve" ? exec("approveProposal", pending.p.id) : exec("rejectProposal", pending.p.id))} />
+      )}
+      {confirmOff && (
+        <ConfirmSheet open onOpenChange={(v) => { if (!v) setConfirmOff(false); }} testId="agent-disconnect" variant="danger" stayOpen
+          title={t("agents.disconnectTitle", { name: a.agent_name })}
+          sentence={t("agents.disconnectSentence", { name: a.agent_name })}
+          confirmLabel={t("agents.disconnect")}
+          successText={t("agents.disconnectedTitle")}
+          onConfirm={() => exec("revokeAgent", a.public_key)}
+          doneDetails={(r) => (
+            <>
+              <p className="oi-small oi-muted" style={{ margin: 0 }}>{t("agents.disconnected", { name: a.agent_name })}</p>
+              {r && r.txHash && oiko?.explorerTx && (
+                <a className="oi-small" href={oiko.explorerTx(r.txHash)} target="_blank" rel="noreferrer" data-testid="agent-disconnect-tx">{t("agents.keyDeletedTx")}</a>
+              )}
+            </>
+          )} />
       )}
     </AgentCard>
   );

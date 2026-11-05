@@ -79,7 +79,7 @@ export function Gallery() {
         <GroupedList>
           <ListRow icon="bill" color="sun" title="Electricity" subtitle="Due · 2 Nov" amount="35.00 USDT" meta={<Badge tone="warning">Due</Badge>} />
           <ActivityRow icon="receive" title="From maya.oiko.near" subtitle="Split by your plan · 12:04" amount="200.00 USDT" direction="in" />
-          <ActivityRow icon="agents" color="violet" title="To citypower.near" subtitle="Bills · Agent: Bill payer" amount="35.00 USDT" direction="out" flash />
+          <ActivityRow icon="agents" color="violet" title="To metro-power-co.testnet" subtitle="Bills · Agent: Bill payer" amount="35.00 USDT" direction="out" flash />
           <ListRow icon="settings" color="stone" title="Interactive row" subtitle="With chevron" chevron onClick={() => toast.show({ message: "Row pressed" })} />
         </GroupedList>
         <SelectList label="Pick" value={sel} onChange={setSel} options={[{ value: 1, title: "USDT on TRON", icon: "bank" }, { value: 2, title: "USDC on Base", icon: "bank" }, { value: 3, title: "Disabled", icon: "lock", disabled: true }]} />
@@ -120,7 +120,7 @@ export function Gallery() {
         <ProposalCard agentName="Money coach" agentLabel="Suggested by your agent" sentence="Put 25.00 USDT from Spend into Laptop." reason="You spent less on food this week." approveLabel="Approve" rejectLabel="Reject" onApprove={() => {}} onReject={() => {}} />
         <AgentCard name="Bill payer" subtitle="See · Suggest · Act · until 30 Nov" status={<Badge tone="success">Active</Badge>} disconnectLabel="Disconnect" onDisconnect={() => toast.show({ message: "Disconnected" })}
           caps={[{ label: "Today", used: 45, cap: 80, text: "45.00 of 80.00" }, { label: "This week", used: 101, cap: 120, text: "101.00 of 120.00" }]}>
-          <ScopeList label="Permissions" items={[{ allowed: true, text: "See your balances" }, { allowed: true, text: "Pay only citypower.near" }, { allowed: false, text: "Open a locked pot" }]} />
+          <ScopeList label="Permissions" items={[{ allowed: true, text: "See your balances" }, { allowed: true, text: "Pay only metro-power-co.testnet" }, { allowed: false, text: "Open a locked pot" }]} />
           <AgentAccessLog label="Log" empty="No requests" rows={[{ at: "2026-10-30T10:00:00Z", atLabel: "30 Oct, 10:00", text: "pay_bill", detail: "ok" }, { at: "2026-10-30T09:00:00Z", atLabel: "30 Oct, 09:00", text: "pay · refused", detail: "E_AGENT_WEEKLY" }]} />
         </AgentCard>
         <RiskNote title="Before you turn this on" points={["The rate changes and can go to zero.", "Lending can fail."]} />

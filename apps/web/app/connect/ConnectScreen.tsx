@@ -1,6 +1,6 @@
 "use client";
 import { Button, EmptyState, Note, SuccessCheck } from "@oiko/ui";
-import type { AgentKind, Scope } from "@oiko/sdk";
+import { defaultCaps, type AgentKind, type Scope } from "@oiko/sdk";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -37,13 +37,15 @@ export function ConnectScreen() {
   const safeCallback = callback && /^https:\/\//.test(callback) ? callback : null;
 
   const draft = useMemo<Draft>(() => {
+    const defaults = defaultCaps("custom");
     const list = (k: string) => (sp.get(k) ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     const scopes = list("scopes").filter((s): s is Scope => ["read", "propose", "act"].includes(s));
     const actions = list("actions").filter((s): s is AgentKind => ["pay", "move_between_pots", "save"].includes(s));
     return {
       template: "custom", name: (sp.get("name") ?? "").slice(0, 40) || t("connect.unnamed"), url: sp.get("url") ?? "",
       scopes: scopes.length ? scopes : ["read"], actions, allowlist: list("allow"),
-      perTx: sp.get("per_tx") ?? "0", daily: sp.get("daily") ?? "0", weekly: sp.get("weekly") ?? "0",
+      // Plain amounts (20 = 20 USDC + USDT). Missing caps fall back to the one shared default (@oiko/sdk DEFAULT_CAPS).
+      perTx: sp.get("per_tx") || defaults.perTx, daily: sp.get("daily") || defaults.daily, weekly: sp.get("weekly") || defaults.weekly,
       days: Math.min(90, Math.max(1, Number(sp.get("days")) || 30)),
     };
   }, [sp, t]);

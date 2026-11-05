@@ -16,7 +16,7 @@ const LABEL = { allow: "Looks fine", warn: "Check first", block: "Don't pay" } a
 const TONE = { allow: "success", warn: "warning", block: "danger" } as const;
 const ICON = { block: "⛔", warn: "⚠", info: "•" } as const;
 
-/** Turns what the user typed into an account id the way the bills form does ("citypower" → "citypower.<root>"). */
+/** Turns what the user typed into an account id the way the bills form does ("sam" → "sam.<root>"). */
 function resolve(raw: string, root: string | undefined): string | null {
   const v = raw.trim().toLowerCase();
   if (v.length < 2) return null;

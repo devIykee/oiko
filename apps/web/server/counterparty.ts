@@ -3,6 +3,7 @@
 // that skips the gateway is still bound by it. Signals, sources and rules: docs/COUNTERPARTY.md.
 import type { Activity, NetworkId, Token } from "@oiko/sdk";
 import { serverConfig } from "./config";
+import { verifiedBiller } from "./billers";
 import { seedReportsFor } from "./counterpartySeed";
 import { rpc } from "./near";
 import { store, type Store } from "./store";
@@ -116,6 +117,14 @@ export async function checkCounterparty(input: CheckInput, deps: CounterpartyDep
     }
   } catch {
     add("REPORTS_UNAVAILABLE", "warn", "Couldn't read the shared report list right now.");
+  }
+
+  // 4b. Verified billers (curated directory): allow without age/activity warnings, unless reports raised a concern.
+  const biller = verifiedBiller(receiver, deps.network);
+  if (biller) {
+    sources.add("directory:billers.ts");
+    add("VERIFIED_BILLER", "info", `${biller.name} is a verified biller (${biller.category}).`, biller.evidence);
+    if (!reasons.some((r) => r.severity !== "info")) return done();
   }
 
   // 5. Does the account exist, and is it a contract?

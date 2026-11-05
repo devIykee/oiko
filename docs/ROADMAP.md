@@ -34,7 +34,7 @@ Non-money configuration proposals are stored off-chain (Postgres) and executed b
 ### 1.4 Agent quality of life
 - **Monthly brief tool:** `get_month_brief(month)` returns a deterministic summary (in, out, saved, biggest changes, upcoming bills) the agent can explain in its own words.
 - **Explain refusals:** every refusal returns a `how_to_fix` field, e.g. "ask the owner to raise the weekly cap to 60.00".
-- **Publish the MCP package:** publish `@oiko/mcp` to npm so `npx @oiko/mcp` works.
+- **Publish the MCP package:** publish `oiko-mcp` to npm so `npx oiko-mcp` works.
 - **Agent reputation:** per-agent history of proposals approved vs rejected, shown on the agent card.
 
 ## 2. Invest

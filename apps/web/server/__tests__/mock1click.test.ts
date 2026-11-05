@@ -109,3 +109,75 @@ describe("mock 1Click tickets (stateless across serverless instances)", () => {
     await expect(mockStatus(r.quote.depositAddress, T0, minter, null, `${body}x.${mac}`)).rejects.toThrow();
   });
 });
+
+describe("mock 1Click exactly-once mint (double receipt regression)", () => {
+  // A slow testnet mint (mint + sync > MINT_DELAY_MS) used to let a status poll mint a second time.
+  const slowMinter = () => {
+    const calls: number[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const minter: Minter = async () => { calls.push(Date.now()); await gate; return { mintTxHash: `MINT${calls.length}`, syncTxHash: null }; };
+    return { calls, minter, release };
+  };
+  const quoted = async () => (await mockQuote(quoteReq(), T0)) as unknown as { quote: { depositAddress: string }; ticket: string };
+
+  it("ticket mode: polls during a slow mint never mint again", async () => {
+    const r = await quoted();
+    const m = slowMinter();
+    const submit = mockSubmitDeposit({ depositAddress: r.quote.depositAddress, txHash: "SIM", ticket: r.ticket }, T0, m.minter);
+    await new Promise((res) => setTimeout(res, 0));
+    // Five polls from "other instances" after the 3 s delay, all while the first mint is still running.
+    const polls = Array.from({ length: 5 }, () => mockStatus(r.quote.depositAddress, T0 + MINT_DELAY_MS + 500, m.minter, null, r.ticket));
+    const mid = await Promise.all(polls);
+    expect(mid.every((p) => p.status === "PROCESSING")).toBe(true);
+    m.release();
+    await submit;
+    expect(m.calls).toHaveLength(1);
+    expect((await mockStatus(r.quote.depositAddress, T0 + MINT_DELAY_MS + 1, m.minter)).status).toBe("SUCCESS");
+    expect(m.calls).toHaveLength(1);
+  });
+
+  it("double-clicked simulate (concurrent submits) marks sent once and mints once", async () => {
+    const r = await quoted();
+    const m = slowMinter();
+    const a = mockSubmitDeposit({ depositAddress: r.quote.depositAddress, txHash: "SIM-A", ticket: r.ticket }, T0, m.minter);
+    const b = mockSubmitDeposit({ depositAddress: r.quote.depositAddress, txHash: "SIM-B", ticket: r.ticket }, T0 + 50, m.minter);
+    m.release();
+    const [ra, rb] = await Promise.all([a, b]);
+    expect(m.calls).toHaveLength(1);
+    expect(ra.swapDetails.originChainTxHashes[0]?.hash).toBe("SIM-A");
+    expect(rb.swapDetails.originChainTxHashes[0]?.hash).toBe("SIM-A"); // the second click sees the existing deposit
+    const again = await mockSubmitDeposit({ depositAddress: r.quote.depositAddress, txHash: "SIM-C", ticket: r.ticket }, T0 + 9000, m.minter);
+    expect(again.status).toBe("SUCCESS");
+    expect(m.calls).toHaveLength(1);
+  });
+
+  it("long-running mode: many concurrent polls after the delay mint once", async () => {
+    const r = await quoted();
+    const m = slowMinter();
+    await mockSubmitDeposit({ depositAddress: r.quote.depositAddress, txHash: "S" }, T0, m.minter);
+    const polls = Array.from({ length: 8 }, () => mockStatus(r.quote.depositAddress, T0 + MINT_DELAY_MS + 10, m.minter));
+    m.release();
+    await Promise.all(polls);
+    expect(m.calls).toHaveLength(1);
+  });
+
+  it("a claimed mint that never finishes is reported FAILED after 5 minutes, not re-minted", async () => {
+    const r = await quoted();
+    await mockSubmitDeposit({ depositAddress: r.quote.depositAddress, txHash: "S" }, T0, async () => ({ mintTxHash: "X", syncTxHash: null }));
+    const s = (await store().getMockSwap<MockSwap>(r.quote.depositAddress))!;
+    const stuck: MockSwap = { ...s, mint: "pending", updatedAt: T0 + MINT_DELAY_MS };
+    expect(mockStatusAt(stuck, T0 + MINT_DELAY_MS + 60_000)).toEqual({ status: "PROCESSING", shouldMint: false });
+    expect(mockStatusAt(stuck, T0 + MINT_DELAY_MS + 6 * 60_000)).toEqual({ status: "FAILED", shouldMint: false });
+  });
+
+  it("memory store claims are exclusive", async () => {
+    const st = new MemoryStore();
+    await st.putMockSwap("k", { sentAt: null, mint: "none" });
+    const sent = await Promise.all([st.markMockSent("k", 1, "a"), st.markMockSent("k", 2, "b")]);
+    expect(sent.filter(Boolean)).toHaveLength(1);
+    const claims = await Promise.all([st.claimMockMint("k", 3), st.claimMockMint("k", 4), st.claimMockMint("k", 5)]);
+    expect(claims.filter(Boolean)).toHaveLength(1);
+    expect(await st.claimMockMint("missing", 1)).toBe(false);
+  });
+});

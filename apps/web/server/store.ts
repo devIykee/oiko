@@ -10,6 +10,11 @@ export interface AccessLogRow {
   at: string; vaultId: string; publicKey: string; method: string; path: string; status: number; code: string | null; tool: string | null; txHash: string | null;
   /** Payment receiver, set on successful agent submits of a pay action. */
   receiver?: string | null;
+  amount?: string | null;
+  token?: string | null;
+  actionType?: string | null;
+  /** Read / Approved / Proposed / Blocked / Refused */
+  outcome?: string | null;
 }
 export interface CounterpartyReport {
   receiver: string; reason: string; evidence: string; reporter: string; reporterVault: string; verified: boolean; createdAt: string;
@@ -28,6 +33,12 @@ export interface Store {
   listPush(accountId: string): Promise<PushSub[]>;
   getMockSwap<T>(depositAddress: string): Promise<T | null>;
   putMockSwap<T>(depositAddress: string, data: T): Promise<void>;
+  /** Inserts only if no row exists (a ticket-decoded swap seen first on this store). */
+  putMockSwapIfAbsent<T>(depositAddress: string, data: T): Promise<void>;
+  /** Atomically marks a mock deposit as sent (only if sentAt is still null). True for the single winner. */
+  markMockSent(depositAddress: string, sentAt: number, txHash: string): Promise<boolean>;
+  /** Atomically claims the mint (mint "none" -> "pending"). True for the single winner; everyone else must not mint. */
+  claimMockMint(depositAddress: string, now: number): Promise<boolean>;
   /** Counterparty blocklist. Returns false if this vault already reported this receiver. */
   addReport(r: Omit<CounterpartyReport, "createdAt"> & { createdAt?: string }): Promise<boolean>;
   listReports(receiver: string, limit?: number): Promise<CounterpartyReport[]>;
@@ -76,6 +87,20 @@ export class MemoryStore implements Store {
   async listPush(accountId: string) { return [...this.push.values()].filter((p) => p.accountId === accountId); }
   async getMockSwap<T>(a: string) { return (this.swaps.get(a) as T) ?? null; }
   async putMockSwap<T>(a: string, d: T) { this.swaps.set(a, structuredClone(d)); }
+  async putMockSwapIfAbsent<T>(a: string, d: T) { if (!this.swaps.has(a)) this.swaps.set(a, structuredClone(d)); }
+  // Check-and-set with no await in between: atomic within this process.
+  async markMockSent(a: string, sentAt: number, txHash: string) {
+    const s = this.swaps.get(a) as { sentAt: number | null } | undefined;
+    if (!s || s.sentAt !== null) return false;
+    this.swaps.set(a, { ...s, sentAt, depositTxHash: txHash, updatedAt: sentAt });
+    return true;
+  }
+  async claimMockMint(a: string, now: number) {
+    const s = this.swaps.get(a) as { mint: string } | undefined;
+    if (!s || s.mint !== "none") return false;
+    this.swaps.set(a, { ...s, mint: "pending", updatedAt: now });
+    return true;
+  }
   async addReport(r: Omit<CounterpartyReport, "createdAt"> & { createdAt?: string }) {
     if (this.reports.some((x) => x.receiver === r.receiver && x.reporterVault === r.reporterVault)) return false;
     this.reports.push({ ...r, createdAt: r.createdAt ?? new Date().toISOString() });
@@ -127,7 +152,7 @@ class PgStore implements Store {
     const db = await this.db();
     const where = publicKey ? and(eq(agentAccessLog.vaultId, vaultId), eq(agentAccessLog.publicKey, publicKey)) : eq(agentAccessLog.vaultId, vaultId);
     const rows = await db.select().from(agentAccessLog).where(where).orderBy(desc(agentAccessLog.at)).limit(limit);
-    return rows.map((r: typeof agentAccessLog.$inferSelect) => ({ at: r.at.toISOString(), vaultId: r.vaultId, publicKey: r.publicKey, method: r.method, path: r.path, status: r.status, code: r.code, tool: r.tool, txHash: r.txHash, receiver: r.receiver }));
+    return rows.map((r: typeof agentAccessLog.$inferSelect) => ({ at: r.at.toISOString(), vaultId: r.vaultId, publicKey: r.publicKey, method: r.method, path: r.path, status: r.status, code: r.code, tool: r.tool, txHash: r.txHash, receiver: r.receiver, amount: r.amount, token: r.token, actionType: r.actionType, outcome: r.outcome }));
   }
   async savePush(sub: PushSub) {
     const db = await this.db();
@@ -146,6 +171,25 @@ class PgStore implements Store {
     const db = await this.db();
     const rows = await db.select().from(mockOneclickSwaps).where(eq(mockOneclickSwaps.depositAddress, a)).limit(1);
     return (rows[0]?.data as T) ?? null;
+  }
+  async putMockSwapIfAbsent<T>(a: string, d: T) {
+    const db = await this.db();
+    await db.insert(mockOneclickSwaps).values({ depositAddress: a, data: d }).onConflictDoNothing({ target: mockOneclickSwaps.depositAddress });
+  }
+  // Single-statement conditional updates: Postgres row locking makes exactly one caller win.
+  async markMockSent(a: string, sentAt: number, txHash: string) {
+    const db = await this.db();
+    const rows = await db.execute(sql`UPDATE mock_oneclick_swaps
+      SET data = data || jsonb_build_object('sentAt', ${sentAt}::bigint, 'depositTxHash', ${txHash}::text, 'updatedAt', ${sentAt}::bigint), updated_at = now()
+      WHERE deposit_address = ${a} AND (data->'sentAt' IS NULL OR jsonb_typeof(data->'sentAt') = 'null') RETURNING deposit_address`);
+    return rowCount(rows) === 1;
+  }
+  async claimMockMint(a: string, now: number) {
+    const db = await this.db();
+    const rows = await db.execute(sql`UPDATE mock_oneclick_swaps
+      SET data = data || jsonb_build_object('mint', 'pending', 'updatedAt', ${now}::bigint), updated_at = now()
+      WHERE deposit_address = ${a} AND data->>'mint' = 'none' RETURNING deposit_address`);
+    return rowCount(rows) === 1;
   }
   async putMockSwap<T>(a: string, d: T) {
     const db = await this.db();
@@ -206,6 +250,13 @@ class PgStore implements Store {
     const rows = await db.select().from(invoices).where(eq(invoices.owner, owner)).orderBy(desc(invoices.createdAt)).limit(500);
     return rows.map((r: typeof invoices.$inferSelect) => r.data as Invoice);
   }
+}
+
+// drizzle/postgres-js returns the RETURNING rows as an array-like result.
+function rowCount(r: unknown): number {
+  if (Array.isArray(r)) return r.length;
+  const o = r as { rows?: unknown[]; count?: number; length?: number } | null;
+  return o?.rows?.length ?? o?.length ?? o?.count ?? 0;
 }
 
 const g = globalThis as unknown as { __oikoStore?: Store };

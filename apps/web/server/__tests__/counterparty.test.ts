@@ -280,3 +280,26 @@ describe("NearBlocks client", () => {
     await expect(c.txCount("x.testnet")).rejects.toThrow(/429/);
   });
 });
+
+describe("verified billers", () => {
+  it("allows a verified biller even though it is days old with little history", async () => {
+    accounts["metro-power-co.testnet"] = { created: NOW - 2 * DAY, txns: 2 };
+    const r = await checkCounterparty({ receiver: "metro-power-co.testnet", agentVault: VAULT, amount: "500000000" }, deps());
+    expect(r.verdict).toBe("allow");
+    expect(codes(r)).toContain("VERIFIED_BILLER");
+    expect(codes(r)).not.toContain("NEW_ACCOUNT");
+    expect(agentDecision(r, "act", false).ok).toBe(true);
+  });
+  it("still blocks a verified biller that has been reported", async () => {
+    await store.addReport({ receiver: "brightline-fibre.testnet", reason: "Asked for payment to a new account", evidence: "screenshot", reporter: "x", reporterVault: "vault.x.oiko.testnet", verified: true });
+    const r = await checkCounterparty({ receiver: "brightline-fibre.testnet", agentVault: VAULT }, deps());
+    expect(r.verdict).toBe("block");
+    expect(codes(r)).toEqual(expect.arrayContaining(["REPORTED", "VERIFIED_BILLER"]));
+  });
+  it("is network-scoped: the testnet biller id means nothing on mainnet", async () => {
+    accounts["metro-power-co.testnet"] = { created: NOW - 2 * DAY, txns: 2 };
+    const r = await checkCounterparty({ receiver: "metro-power-co.testnet", agentVault: VAULT }, deps({ network: "mainnet" }));
+    expect(codes(r)).not.toContain("VERIFIED_BILLER");
+    expect(r.verdict).toBe("warn");
+  });
+});

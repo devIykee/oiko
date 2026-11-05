@@ -5,6 +5,6 @@ const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), 
 await build({
   entryPoints: ["src/cli.ts"], outfile: "dist/cli.mjs", bundle: true, platform: "node", format: "esm", target: "node20",
   external: Object.keys(pkg.dependencies).filter((d) => d !== "@oiko/sdk"),
-  banner: { js: "// @oiko/mcp — built file" },
+  banner: { js: "// oiko-mcp — built file" },
 });
 console.log("built dist/cli.mjs");

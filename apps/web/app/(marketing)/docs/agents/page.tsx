@@ -21,7 +21,7 @@ export default function AgentDocs() {
     <>
       <PageHero eyebrow="Agents and developers" title="Let any agent manage money safely." lead="Oiko has no built-in AI. People connect the agent they already use. These docs live on GitHub, next to the code." />
       <Block title="Install">
-        <div className="rounded-card bg-[var(--mk-ink-bg)] p-4 text-[var(--mk-ink-text)]"><CopyLine text="npx @oiko/mcp" /></div>
+        <div className="rounded-card bg-[var(--mk-ink-bg)] p-4 text-[var(--mk-ink-text)]"><CopyLine text="npx oiko-mcp" /></div>
         <p>Or call <strong>POST /api/mcp</strong> (streamable HTTP). Every request is signed with the agent&rsquo;s own key (NEP-413) and checked by the person&rsquo;s account against their caps, payees and expiry.</p>
       </Block>
       <Block title="Read more" tone="grey">

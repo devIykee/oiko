@@ -82,4 +82,4 @@ Status (derived on every read from the 1Click status of the invoice's deposits; 
 
 - `/.well-known/oiko-agent.json` — tools, auth, limits, endpoints.
 - `/llms.txt` — plain-text guide for agents.
-- MCP over streamable HTTP: `POST /api/mcp` (stateless). MCP over stdio: `npx @oiko/mcp` (package `packages/mcp`).
+- MCP over streamable HTTP: `POST /api/mcp` (stateless). MCP over stdio: `npx oiko-mcp` (package `packages/mcp`).

@@ -263,7 +263,7 @@ function Developers() {
       <div className="mt-14 grid gap-10 lg:grid-cols-[1fr_1.15fr] lg:items-start">
         <div>
           <p className="mk-reveal text-[14px] font-semibold text-[var(--mk-ink-text-2)]">Run the MCP server</p>
-          <div className="mk-reveal mt-3"><CopyLine text="npx @oiko/mcp" /></div>
+          <div className="mk-reveal mt-3"><CopyLine text="npx oiko-mcp" /></div>
           <ul className="mk-reveal mt-8 space-y-3 text-[15px]">
             {["MCP over stdio or streamable HTTP", "Every request signed with the agent’s own key (NEP-413)", "Caps, payees and expiry enforced by the person’s account", "Suggest-only mode: proposals wait for the person to approve"].map((t) => (
               <li key={t} className="flex gap-2.5"><Glyph d={I.checkmarkAlt} size={14} className="mt-1 shrink-0 text-[#A9B6FF]" />{t}</li>

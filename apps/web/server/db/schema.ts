@@ -13,6 +13,11 @@ export const agentAccessLog = pgTable("agent_access_log", {
   txHash: text("tx_hash"),
   /** Who received the payment (set on successful agent submits of a pay action); used by the counterparty check. */
   receiver: text("receiver"),
+  /** What the agent tried and how it ended (owner-facing log). */
+  amount: text("amount"),
+  token: text("token"),
+  actionType: text("action_type"),
+  outcome: text("outcome"),
 }, (t) => [index("agent_access_log_vault_idx").on(t.vaultId, t.at)]);
 
 export const usedNonces = pgTable("used_nonces", {
@@ -87,6 +92,10 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (id BIGSERIAL PRIMARY KEY, account
 CREATE TABLE IF NOT EXISTS mock_oneclick_swaps (deposit_address TEXT PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
 ALTER TABLE agent_access_log ADD COLUMN IF NOT EXISTS receiver TEXT;
 CREATE INDEX IF NOT EXISTS agent_access_log_receiver_idx ON agent_access_log (vault_id, receiver);
+ALTER TABLE agent_access_log ADD COLUMN IF NOT EXISTS amount TEXT;
+ALTER TABLE agent_access_log ADD COLUMN IF NOT EXISTS token TEXT;
+ALTER TABLE agent_access_log ADD COLUMN IF NOT EXISTS action_type TEXT;
+ALTER TABLE agent_access_log ADD COLUMN IF NOT EXISTS outcome TEXT;
 CREATE TABLE IF NOT EXISTS counterparty_reports (id BIGSERIAL PRIMARY KEY, receiver TEXT NOT NULL, reason TEXT NOT NULL, evidence TEXT NOT NULL,
   reporter TEXT NOT NULL, reporter_vault TEXT NOT NULL, verified BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT counterparty_reports_once UNIQUE (receiver, reporter_vault));

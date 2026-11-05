@@ -52,7 +52,7 @@ The NearBlocks endpoints and response fields were checked against the live testn
 | Where | allow | warn | block |
 |---|---|---|---|
 | Gateway `POST /api/agent/prepare` (pay, pay_bill; bill payees resolved via `get_bills`) | prepared; response includes `counterparty` | **act refused** `E_COUNTERPARTY_WARN` (409, `error.next = "propose"`); propose prepared | **act and propose refused** `E_COUNTERPARTY_BLOCKED` (403) |
-| SDK `GatewayClient.run` / `@oiko/mcp` `act`, `propose` | signs | act: returns `ok:false, signed:false` with "use propose instead"; propose: signs | returns `ok:false, signed:false`, nothing signed |
+| SDK `GatewayClient.run` / `oiko-mcp` `act`, `propose` | signs | act: returns `ok:false, signed:false` with "use propose instead"; propose: signs | returns `ok:false, signed:false`, nothing signed |
 | SDK wrapper when the check can't run | — | act fails closed (`E_COUNTERPARTY_UNAVAILABLE`) | — |
 | Vault contract | allowlist, caps, kinds, expiry, revoke — always, whatever the check said | | |
 

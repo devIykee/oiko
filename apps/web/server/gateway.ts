@@ -7,6 +7,7 @@ import {
 } from "@oiko/sdk";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { encodeTransaction } from "near-api-js";
+import { outcomeOf, type ActionFacts } from "./accessLog";
 import { serverConfig } from "./config";
 import { agentDecision, checkCounterparty, type CheckInput, type CounterpartyResult } from "./counterparty";
 import { ApiError } from "./errors";
@@ -76,7 +77,12 @@ export function requiredScope(path: string, kind?: "propose" | "act"): Scope {
 /** Agent auth: the key must still be on the vault (view_access_key) and the vault's policy must allow the scope. */
 export async function authenticateAgent(req: GatewayRequest, scope: Scope | null, deps: GatewayDeps = defaultDeps()): Promise<AuthedAgent> {
   const { auth, publicKey } = await verifyRequest(req, deps);
-  const vaultId = auth.accountId;
+  return authorizeAgentKey(auth.accountId, publicKey, scope, deps);
+}
+
+/** The on-chain half of agent auth, run on EVERY request (NEP-413 or bearer session): the key must still exist on the
+ *  vault (so Disconnect, which deletes it, ends access at once), and the agent policy must be live and in scope. */
+export async function authorizeAgentKey(vaultId: string, publicKey: string, scope: Scope | null, deps: GatewayDeps = defaultDeps()): Promise<AuthedAgent> {
   if (!deps.isVaultId(vaultId)) throw new ApiError("E_AUTH", 401, "accountId must be the Oiko account (vault.<name>.<root>) the agent is connected to.");
   const key = await deps.viewAccessKey(vaultId, publicKey);
   if (!key) throw new ApiError("E_KEY_GONE", 401);
@@ -355,6 +361,13 @@ export async function submit(ctx: AuthedAgent, signedTx: string, r: NearRpc = rp
   }
 }
 
-export async function logAccess(row: { vaultId: string; publicKey: string; method: string; path: string; status: number; code?: string | null; tool?: string | null; txHash?: string | null; receiver?: string | null }, s: Store = store()) {
-  await s.logAccess({ vaultId: row.vaultId, publicKey: row.publicKey, method: row.method, path: row.path, status: row.status, code: row.code ?? null, tool: row.tool ?? null, txHash: row.txHash ?? null, receiver: row.receiver ?? null }).catch((e) => console.warn("[oiko] access log write failed", e));
+export interface LogRow { vaultId: string; publicKey: string; method: string; path: string; status: number; code?: string | null; tool?: string | null; txHash?: string | null; receiver?: string | null; facts?: ActionFacts }
+/** Writes one access-log row with what was tried (action, amount, payee) and the outcome. Never throws. */
+export async function logAccess(row: LogRow, s: Store = store()) {
+  const f = row.facts;
+  const outcome = outcomeOf({ tool: row.tool, status: row.status, code: row.code, method: f?.method ?? row.method, path: row.path });
+  await s.logAccess({
+    vaultId: row.vaultId, publicKey: row.publicKey, method: row.method, path: row.path, status: row.status, code: row.code ?? null, tool: row.tool ?? null,
+    txHash: row.txHash ?? null, receiver: row.receiver ?? null, amount: f?.amount ?? null, token: f?.token ?? null, actionType: f?.type ?? null, outcome,
+  }).catch((e) => console.warn("[oiko] access log write failed", e));
 }

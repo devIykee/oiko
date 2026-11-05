@@ -47,9 +47,6 @@ importers:
       '@noble/hashes':
         specifier: ^2.4.0
         version: 2.4.0
-      '@oiko/mcp':
-        specifier: workspace:*
-        version: link:../../packages/mcp
       '@oiko/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
@@ -77,6 +74,9 @@ importers:
       next:
         specifier: 16.4.3
         version: 16.4.3(@babel/core@7.29.7)(@playwright/test@1.64.1)(@types/node@20.19.43)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      oiko-mcp:
+        specifier: workspace:*
+        version: link:../../packages/mcp
       postgres:
         specifier: ^3.4.9
         version: 3.4.9
@@ -167,12 +167,12 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 1.32.2
         version: 1.32.2(zod@4.6.7)
-      '@oiko/mcp':
-        specifier: workspace:*
-        version: link:../../../packages/mcp
       '@oiko/sdk':
         specifier: workspace:*
         version: link:../../../packages/sdk
+      oiko-mcp:
+        specifier: workspace:*
+        version: link:../../../packages/mcp
     devDependencies:
       '@types/node':
         specifier: ^22.20.5
@@ -198,9 +198,6 @@ importers:
       '@noble/hashes':
         specifier: ^2.4.0
         version: 2.4.0
-      '@oiko/sdk':
-        specifier: workspace:*
-        version: link:../sdk
       '@scure/base':
         specifier: 2.2.0
         version: 2.2.0
@@ -214,6 +211,9 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
+      '@oiko/sdk':
+        specifier: workspace:*
+        version: link:../sdk
       '@types/node':
         specifier: ^22.20.5
         version: 22.20.5

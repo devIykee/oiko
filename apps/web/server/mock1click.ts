@@ -160,11 +160,15 @@ export async function mockQuote(req: Partial<QuoteRequest>, now = Date.now()): P
 }
 
 /** Pure state machine: the status a swap shows at `now`, and whether the mint should fire now. */
+/** A claimed mint that never finished (the minting instance died) is reported as failed, never re-minted. */
+const PENDING_GIVE_UP_MS = 5 * 60_000;
+
 export function mockStatusAt(s: MockSwap, now: number): { status: OneClickStatus; shouldMint: boolean } {
   const deadline = Date.parse(s.quoteResponse.quoteRequest.deadline);
   if (s.sentAt === null) return { status: Number.isFinite(deadline) && now > deadline ? "FAILED" : "PENDING_DEPOSIT", shouldMint: false };
   const elapsed = now - s.sentAt;
   if (s.mint === "failed") return { status: "FAILED", shouldMint: false };
+  if (s.mint === "pending" && now - s.updatedAt > PENDING_GIVE_UP_MS) return { status: "FAILED", shouldMint: false };
   if (s.mint === "done") return { status: elapsed < KNOWN_TX_MS ? "KNOWN_DEPOSIT_TX" : elapsed < MINT_DELAY_MS ? "PROCESSING" : "SUCCESS", shouldMint: false };
   if (s.mint === "skip") return { status: elapsed < KNOWN_TX_MS ? "KNOWN_DEPOSIT_TX" : elapsed < MINT_DELAY_MS ? "PROCESSING" : "SUCCESS", shouldMint: false };
   if (elapsed < KNOWN_TX_MS) return { status: "KNOWN_DEPOSIT_TX", shouldMint: false };
@@ -197,25 +201,31 @@ async function loadSwap(key: string, ticket?: string | null): Promise<MockSwap> 
   return s;
 }
 
-/** Advances a swap (mints when due) and returns the GetExecutionStatusResponse shape. */
+/** Mints for a swap whose mint this caller has already claimed (store.claimMockMint), then records the result. */
+async function mintClaimed(key: string, s: MockSwap, minter: Minter): Promise<MockSwap> {
+  let out: MockSwap;
+  try {
+    const r = await minter(s);
+    out = { ...s, mint: "done", mintTxHash: r.mintTxHash, syncTxHash: r.syncTxHash, updatedAt: Date.now() };
+  } catch (e) {
+    console.error("[oiko] mock 1Click mint failed", e);
+    out = { ...s, mint: "failed", updatedAt: Date.now() };
+  }
+  await store().putMockSwap(key, out);
+  return out;
+}
+
+/** Advances a swap (mints when due) and returns the GetExecutionStatusResponse shape.
+ *  Exactly-once: a status poll mints only if it wins the atomic claim; a claimed ("pending") swap is never minted again. */
 export async function mockStatus(depositAddress: string, now = Date.now(), minter: Minter = relayerMinter, memo?: string | null, ticket?: string | null) {
   const key = swapKey(depositAddress, memo);
   let s = await loadSwap(key, ticket);
-  const st = mockStatusAt(s, now);
-  if (st.shouldMint) {
-    s = { ...s, mint: "pending", updatedAt: now };
-    await store().putMockSwap(key, s);
-    try {
-      const r = await minter(s);
-      s = { ...s, mint: "done", mintTxHash: r.mintTxHash, syncTxHash: r.syncTxHash, updatedAt: Date.now() };
-    } catch (e) {
-      console.error("[oiko] mock 1Click mint failed", e);
-      s = { ...s, mint: "failed", updatedAt: Date.now() };
-    }
-    await store().putMockSwap(key, s);
+  if (mockStatusAt(s, now).shouldMint) {
+    await store().putMockSwapIfAbsent(key, s);
+    if (await store().claimMockMint(key, now)) s = await mintClaimed(key, { ...s, mint: "pending", updatedAt: now }, minter);
+    else s = (await store().getMockSwap<MockSwap>(key)) ?? s;
   }
-  const status = mockStatusAt(s, now).status;
-  return statusBody(s, status);
+  return statusBody(s, mockStatusAt(s, now).status);
 }
 
 function statusBody(s: MockSwap, status: OneClickStatus) {
@@ -236,34 +246,30 @@ function statusBody(s: MockSwap, status: OneClickStatus) {
   };
 }
 
-/** POST /v0/deposit/submit and the test-only simulate-deposit: marks the deposit as sent. */
+/** POST /v0/deposit/submit and the test-only simulate-deposit: marks the deposit as sent.
+ *  Idempotent: double clicks and retries return the existing state; only the call that wins markMockSent can claim
+ *  the mint, and the mint is claimed ("pending") before any slow relayer work so concurrent status polls can't mint. */
 export async function mockSubmitDeposit(body: { txHash?: string; depositAddress?: string; memo?: string; ticket?: string }, now = Date.now(), minter: Minter = relayerMinter) {
   if (!body.depositAddress) throw new ApiError("E_BAD_REQUEST", 400, "depositAddress should not be empty");
   if (!body.txHash) throw new ApiError("E_BAD_REQUEST", 400, "txHash should not be empty");
   const key = swapKey(body.depositAddress, body.memo);
   let s = await loadSwap(key, body.ticket);
-  if (s.sentAt === null) {
+  await store().putMockSwapIfAbsent(key, s);
+  if (s.sentAt === null && (await store().markMockSent(key, now, body.txHash))) {
     s = { ...s, sentAt: now, depositTxHash: body.txHash, updatedAt: now };
-    await store().putMockSwap(key, s);
     if (s.mint === "none") {
       if (body.ticket) {
-        // Ticket mode (serverless): mint now so no instance needs to remember the swap; the returned ticket
-        // records the result and status walks KNOWN_DEPOSIT_TX -> PROCESSING -> SUCCESS by elapsed time.
-        try {
-          const r = await minter(s);
-          s = { ...s, mint: "done", mintTxHash: r.mintTxHash, syncTxHash: r.syncTxHash, updatedAt: Date.now() };
-        } catch (e) {
-          console.error("[oiko] mock 1Click mint failed", e);
-          s = { ...s, mint: "failed", updatedAt: Date.now() };
-        }
-        await store().putMockSwap(key, s);
+        // Ticket mode (serverless): mint now so no instance needs to remember the swap; the returned ticket records
+        // the result and status walks KNOWN_DEPOSIT_TX -> PROCESSING -> SUCCESS by elapsed time.
+        if (await store().claimMockMint(key, now)) s = await mintClaimed(key, { ...s, mint: "pending" }, minter);
       } else {
-        // Long-running servers: the timer (or the next status poll) performs the mint.
+        // Long-running servers: the timer (or the next status poll) claims and performs the mint.
         const t = setTimeout(() => void mockStatus(body.depositAddress!, Date.now(), minter, body.memo).catch(() => undefined), MINT_DELAY_MS + 100);
         (t as { unref?: () => void }).unref?.();
       }
     }
   }
+  s = (await store().getMockSwap<MockSwap>(key)) ?? s;
   return { ...statusBody(s, mockStatusAt(s, now).status), ticket: encodeTicket(s) };
 }
 

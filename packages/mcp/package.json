@@ -1,5 +1,5 @@
 {
-  "name": "@oiko/mcp",
+  "name": "oiko-mcp",
   "version": "0.1.0",
   "type": "module",
   "description": "Oiko MCP server: lets your own AI agent read and act on an Oiko account inside the limits you set.",
@@ -9,7 +9,8 @@
   },
   "main": "./dist/cli.mjs",
   "exports": {
-    ".": "./dist/cli.mjs"
+    ".": "./dist/cli.mjs",
+    "./internal": "./src/index.ts"
   },
   "scripts": {
     "build": "node build.mjs",

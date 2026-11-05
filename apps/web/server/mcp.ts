@@ -1,10 +1,12 @@
 // MCP over streamable HTTP (stateless) at POST /api/mcp. Each request carries the agent's NEP-413 Authorization header.
-import { createOikoMcpServer, type AgentActionInput, type OikoBackend, type ReadTool } from "@oiko/mcp";
+import { createOikoMcpServer, type AgentActionInput, type OikoBackend, type ReadTool } from "oiko-mcp/internal";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { normalizePublicKey, parseGatewayAuthHeader } from "@oiko/sdk";
 import { serverConfig } from "./config";
 import { ApiError } from "./errors";
 import { fileReport } from "./counterpartyHttp";
+import { factsOfAction, factsOfSignedTx } from "./accessLog";
+import { authenticateToken } from "./agentSession";
 import { authenticateAgent, logAccess, payReceiverOfSignedTx, prepare, readTool, submit, type AuthedAgent } from "./gateway";
 import { clientIp, errorResponse, json, readText } from "./http";
 import { checkLimits } from "./ratelimit";
@@ -26,30 +28,46 @@ class InProcessBackend implements OikoBackend {
   async run(kind: "propose" | "act", action: AgentActionInput, reason?: string, signedTx?: string) {
     if (!signedTx) {
       // prepare runs the counterparty check (block / warn refusals carry the reasons).
-      const p = await prepare(this.ctx, kind, action, reason);
+      const facts = factsOfAction(action, kind === "act" ? "agent_execute" : "agent_propose");
+      let p: Awaited<ReturnType<typeof prepare>>;
+      try {
+        p = await prepare(this.ctx, kind, action, reason);
+      } catch (e) {
+        await logAccess({ vaultId: this.ctx.vaultId, publicKey: this.ctx.publicKey, method: "MCP", path: `/api/mcp#${kind}`, status: e instanceof ApiError ? e.status : 500, code: e instanceof ApiError ? e.code : "E_INTERNAL", tool: "prepare", facts });
+        throw e;
+      }
+      await logAccess({ vaultId: this.ctx.vaultId, publicKey: this.ctx.publicKey, method: "MCP", path: `/api/mcp#${kind}`, status: 200, tool: "prepare", facts });
       return {
         needs_signature: true, unsigned_tx: p.unsignedTx, hash: p.hash, ...(p.counterparty ? { counterparty: p.counterparty } : {}),
         how: "Sign the 32-byte hash (sha256 of unsigned_tx bytes) with your ed25519 agent key, build a borsh SignedTransaction, base64 it and call this tool again with signed_tx. @oiko/sdk signTransactionBytes() does this.",
       };
     }
     const r = await submit(this.ctx, signedTx);
-    await logAccess({ vaultId: this.ctx.vaultId, publicKey: this.ctx.publicKey, method: "MCP", path: `/api/mcp#${kind}`, status: r.ok ? 200 : 422, code: r.ok ? null : r.error?.code, tool: kind, txHash: r.txHash, receiver: r.ok ? payReceiverOfSignedTx(signedTx) : null });
+    await logAccess({ vaultId: this.ctx.vaultId, publicKey: this.ctx.publicKey, method: "MCP", path: `/api/mcp#${kind}`, status: r.ok ? 200 : 422, code: r.ok ? null : r.error?.code, tool: kind, txHash: r.txHash, receiver: r.ok ? payReceiverOfSignedTx(signedTx) : null, facts: factsOfSignedTx(signedTx) });
     if (!r.ok) throw Object.assign(new Error(r.error?.message ?? "That didn't go through."), { code: r.error?.code });
     return { ok: true, txHash: r.txHash, value: r.value };
   }
 }
 
-export async function handleMcp(req: Request): Promise<Response> {
+/** POST /api/mcp. Auth: NEP-413 per request (stdio/SDK agents), or a hosted session token from POST /api/agent/session
+ *  as `Authorization: Bearer <token>` or in the URL (/api/mcp/t/<token>) for remote MCP clients that only take a URL.
+ *  Either way the key + policy are re-checked on chain on every request, and propose/act still need the agent's own
+ *  signature: without signed_tx the tools return the unsigned transaction and how to sign it. */
+export async function handleMcp(req: Request, urlToken?: string): Promise<Response> {
   if (!serverConfig().features.mcp) return errorResponse(new ApiError("E_DISABLED", 404));
   if (req.method !== "POST") {
     return json({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed: this MCP endpoint is stateless; use POST." }, id: null }, 405, { allow: "POST" });
   }
   const url = new URL(req.url);
-  const a = parseGatewayAuthHeader(req.headers.get("authorization"));
+  const authz = req.headers.get("authorization");
+  const bearer = urlToken ?? (/^Bearer\s+(\S+)$/i.exec(authz?.trim() ?? "")?.[1] ?? null);
+  const a = bearer ? null : parseGatewayAuthHeader(authz);
   try {
-    if (!checkLimits("gateway", clientIp(req), a?.publicKey ?? null)) throw new ApiError("E_RATE_LIMIT", 429);
+    if (!checkLimits("gateway", clientIp(req), a?.publicKey ?? (bearer ? `session:${bearer.slice(-16)}` : null))) throw new ApiError("E_RATE_LIMIT", 429);
     const text = await readText(req, 256 * 1024);
-    const ctx = await authenticateAgent({ method: "POST", path: url.pathname + url.search, body: text, authorization: req.headers.get("authorization") }, null);
+    const ctx = bearer
+      ? await authenticateToken(bearer, null)
+      : await authenticateAgent({ method: "POST", path: url.pathname + url.search, body: text, authorization: authz }, null);
     let parsed: unknown;
     try {
       parsed = JSON.parse(text);
