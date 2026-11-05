@@ -14,6 +14,7 @@ export const rosca = {
   "rosca.status.forming": "Gathering people",
   "rosca.status.active": "Running",
   "rosca.status.completed": "Finished",
+  "rosca.status.cancelled": "Cancelled",
   "rosca.haveInvite": "Have an invite code?",
   "rosca.inviteCode": "Invite code",
   "rosca.join": "Join",
@@ -57,4 +58,10 @@ export const rosca = {
   "rosca.needTwo": "Invite at least one more member to start",
   "rosca.startSentence": "Start {name} with {n} members. The payout order is fixed from now on and nobody can change it.",
   "rosca.started": "Started",
+  "rosca.cancel": "Cancel the group",
+  "rosca.cancelSentence": "Cancel {name}. Everyone's bond goes back to them. This can't be undone.",
+  "rosca.cancelled": "Cancelled",
+  "rosca.leave": "Leave the group",
+  "rosca.leaveSentence": "Leave {name}. Your bond comes back to your Spend pot.",
+  "rosca.left": "You left",
 } as const;

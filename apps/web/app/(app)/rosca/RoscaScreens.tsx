@@ -129,7 +129,7 @@ function RoscaView({ c, inviteCode }: { c: Circle; inviteCode?: string }) {
   const t = useT();
   const { session } = useSession();
   const { exec } = useMoney();
-  const [sheet, setSheet] = useState<null | "pay" | "bond" | "join" | "start">(null);
+  const [sheet, setSheet] = useState<null | "pay" | "bond" | "join" | "start" | "cancel" | "leave">(null);
   const me = session?.vaultId ?? "";
   const member = c.members.includes(me);
   const organiser = c.organiser === me;
@@ -170,6 +170,12 @@ function RoscaView({ c, inviteCode }: { c: Circle; inviteCode?: string }) {
           {c.members.length < 2 ? t("rosca.needTwo") : t("rosca.start")}
         </Button>
       )}
+      {organiser && c.status === "forming" && (
+        <Button block variant="ghost" onClick={() => setSheet("cancel")} data-testid="rosca-cancel">{t("rosca.cancel")}</Button>
+      )}
+      {member && !organiser && c.status === "forming" && (
+        <Button block variant="ghost" onClick={() => setSheet("leave")} data-testid="rosca-leave">{t("rosca.leave")}</Button>
+      )}
       {!member && inviteCode && c.status === "forming" && (
         <Button block size="lg" onClick={() => setSheet("join")} data-testid="rosca-join">{t("rosca.joinGroup")}</Button>
       )}
@@ -187,6 +193,12 @@ function RoscaView({ c, inviteCode }: { c: Circle; inviteCode?: string }) {
       {sheet === "bond" && <ConfirmSheet open onOpenChange={() => setSheet(null)} title={t("rosca.bond")}
         sentence={t("rosca.bondSentence", { amount: fmtToken(c.bond_amount, c.token), name: c.name })} confirmLabel={t("rosca.postBondShort")} successText={t("rosca.bondPosted")}
         onConfirm={() => exec("ajoPostBond", c.id, c.token, c.bond_amount)} />}
+      {sheet === "cancel" && <ConfirmSheet open onOpenChange={() => setSheet(null)} title={t("rosca.cancel")}
+        sentence={t("rosca.cancelSentence", { name: c.name })} confirmLabel={t("rosca.cancel")} successText={t("rosca.cancelled")}
+        onConfirm={() => exec("ajoCancel", c.id)} />}
+      {sheet === "leave" && <ConfirmSheet open onOpenChange={() => setSheet(null)} title={t("rosca.leave")}
+        sentence={t("rosca.leaveSentence", { name: c.name })} confirmLabel={t("rosca.leave")} successText={t("rosca.left")}
+        onConfirm={() => exec("ajoLeave", c.id)} />}
       {sheet === "start" && <ConfirmSheet open onOpenChange={() => setSheet(null)} title={t("rosca.start")}
         sentence={t("rosca.startSentence", { name: c.name, n: c.members.length })} confirmLabel={t("rosca.start")} successText={t("rosca.started")}
         onConfirm={() => exec("ajoStart", c.id)} />}
