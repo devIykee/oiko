@@ -11,7 +11,15 @@
 
 ## Blocked on you
 
-1. **Fund the relayer**: send testnet NEAR to `oiko-relayer.testnet` (faucet: https://near-faucet.io). It has ~0.6 NEAR; each signup costs ~0.6 + fees. 20-30 NEAR ≈ 35 signups. Until then, signup on the hosted demo fails with "needs a top-up".
+1. **Fund and redeploy testnet contracts** (the app on main expects the new contracts):
+   - Send **30 testnet NEAR to `oiko.testnet`**. Publishing the new vault (298,917 bytes) as a global contract burns 29.9 NEAR. The new registry's storage is about 1.6 NEAR. The script keeps 0.5 NEAR for gas and refunds. The account holds 1.99 NEAR today; the script prints the exact shortfall.
+   - Send **20 testnet NEAR to `oiko-relayer.testnet`**: about 30 signups at 0.6 NEAR + gas each.
+   - `ajo.oiko.testnet` (2.90 NEAR) and the mocks need nothing.
+   - Faucet: https://near-faucet.io.
+   - Run `bash scripts/redeploy-testnet.sh`. It is safe to re-run and aborts with the exact amount if anything is short.
+   - Set the printed env block in Vercel and redeploy the app.
+   - Once signup, receive and a ROSCA round work, run `bash scripts/redeploy-testnet.sh --lock`. This makes `oiko.testnet` and `ajo.oiko.testnet` keyless, so no further changes are possible after it.
+   - The 13 names in the old registry are not carried over. Their accounts still exist on the old vault code.
 2. ~~Database~~ Done (2026-11-04): Neon is connected to the Vercel project (`DATABASE_URL`). Nonces, the agent access log and test-mode payments are now stored in Postgres; verified on production by looking up a deposit across instances without its ticket.
 3. **Make the repo public** before submitting: `gh repo edit devIykee/oiko --visibility public --accept-visibility-change-consequences`. Check first that you may publish the Acorn font files in `apps/web/fonts` (otherwise remove them; the site falls back to Inter Tight).
 4. **Cron**: set GitHub repo variable `OIKO_APP_URL=https://oikodotnear.vercel.app` and secret `CRON_SECRET` (same value as the Vercel env var) so `.github/workflows/cron.yml` runs schedules and ROSCA settlement every 5 minutes.

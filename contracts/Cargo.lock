@@ -2612,6 +2612,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "oiko-state-wipe"
+version = "1.0.0"
+dependencies = [
+ "near-sdk",
+]
+
+[[package]]
 name = "oiko-tests"
 version = "1.0.0"
 dependencies = [

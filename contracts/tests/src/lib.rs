@@ -30,7 +30,7 @@ pub fn ensure_built() {
     BUILD.call_once(|| {
         let res = contracts_dir().join("res");
         let have_all = [
-            "oiko_vault", "oiko_registry", "oiko_ajo", "oiko_mock_ft", "oiko_mock_lending",
+            "oiko_vault", "oiko_registry", "oiko_ajo", "oiko_mock_ft", "oiko_mock_lending", "oiko_state_wipe",
         ]
         .iter()
         .all(|n| res.join(format!("{n}.wasm")).exists());

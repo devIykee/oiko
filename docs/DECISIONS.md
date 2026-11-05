@@ -456,3 +456,19 @@ Vault code hash is now **`72sdtZyfMEdLh2RSqSjBAPt73PpsHCr24irGCi9yahex`** (298,9
 - "fills pending returns FIFO" and "`ft_on_transfer` needs ≥25 TGas" are replaced by the V-2 and V-9 rules above.
 - `earn_off`'s "pro-rata share by principal" is replaced by shares.
 - Global publish cost at the new size ≈ 298.9 KB × 1e20 yocto/byte ≈ **29.9 NEAR**. The DeployContract fallback ≈ **3.0 NEAR** of code storage per vault.
+
+### Redeploy tooling (2026-11-05)
+- **`contracts/tools/state-wipe`**: a testnet maintenance tool, not part of the product.
+  - `wipe({"keys":[base64…]})` removes storage keys, callable only by the account itself. It uses raw exports, so it works over any stored layout.
+  - It is built to `res/oiko_state_wipe.wasm`.
+  - Sandbox test `state_wipe.rs` runs the full wipe → redeploy-with-init procedure.
+- **`scripts/redeploy-testnet.sh`**: an idempotent testnet upgrade.
+  - Steps: balance check (aborts with the exact NEAR needed) → publish the vault global contract by hash → state-wipe and new init for registry (`oiko.testnet`) and ajo (`ajo.oiko.testnet`) → code-only redeploy of the mocks when their hash differs (sources unchanged, state kept) → ajo `storage_deposit` on the mock tokens → view checks.
+  - `--lock` deletes the full-access keys on the registry and ajo accounts, after a typed confirmation.
+  - Old registry names are not migrated.
+- **`scripts/deploy-mainnet.sh`**: a fresh mainnet root (default `oiko.near`, which does not exist yet).
+  - It uses the real tokens, `contract.main.burrow.near` and `v1.signer`.
+  - It prints the full estimate. Today that is ≈ 34.7 NEAR on the root: 29.9 publish + 1.6 registry + 2.4 ajo + 0.8 gas/float. Relayer ≈ 1.55 NEAR per signup.
+  - It requires a TTY and typing the root name before any transaction, and refuses to overwrite existing code.
+  - `--lock` works as on testnet.
+- `scripts/near-rpc.py` is the shared read-only RPC helper for both scripts.

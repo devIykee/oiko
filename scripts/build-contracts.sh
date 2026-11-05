@@ -33,6 +33,7 @@ build ajo            oiko_ajo                 # short-periods ON (60 s minimum):
 build ajo            oiko_ajo_mainnet --no-default-features   # 1 day minimum period
 build mocks/ft       oiko_mock_ft
 build mocks/lending  oiko_mock_lending
+build tools/state-wipe oiko_state_wipe        # testnet maintenance tool only (scripts/redeploy-testnet.sh)
 
 b58() { python3 -c '
 import sys,hashlib

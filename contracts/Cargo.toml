@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["common", "registry", "vault", "ajo", "mocks/ft", "mocks/lending", "tests"]
+members = ["common", "registry", "vault", "ajo", "mocks/ft", "mocks/lending", "tests", "tools/state-wipe"]
 
 [workspace.package]
 version = "1.0.0"
