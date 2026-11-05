@@ -163,8 +163,19 @@ export async function withdrawQuote(input: { vaultId: string; potId: number; tok
   };
 }
 
-export async function intentStatus(depositAddress: string, memo?: string | null, ticket?: string | null): Promise<{ status: OneClickStatus; updatedAt: string }> {
-  const r = await oneClick<{ status: OneClickStatus; updatedAt: string; quoteResponse?: QuoteResponse }>("/v0/status", {
+export interface IntentStatusDetail {
+  status: OneClickStatus; updatedAt: string;
+  /** NEAR transaction hashes reported by 1Click (delivery to the account and, in test mode, the account's sync). */
+  nearTxHashes: string[];
+  /** Origin decimals; what the payer actually deposited, when known. */
+  depositedAmount: string | null;
+  /** 6 decimals; what was delivered, on SUCCESS. */
+  amountOut: string | null;
+}
+
+/** Full status (used by invoices). On SUCCESS the recipient vault is synced (real 1Click; the mock syncs after its mint). */
+export async function intentStatusDetail(depositAddress: string, memo?: string | null, ticket?: string | null): Promise<IntentStatusDetail> {
+  const r = await oneClick<{ status: OneClickStatus; updatedAt: string; quoteResponse?: QuoteResponse; swapDetails?: { nearTxHashes?: string[]; depositedAmount?: string; amountOut?: string } }>("/v0/status", {
     method: "GET", query: { depositAddress, ...(memo ? { depositMemo: memo } : {}), ...(ticket && serverConfig().oneclick.isMock ? { ticket } : {}) },
   });
   if (r.status === "SUCCESS" && !serverConfig().oneclick.isMock && !synced.has(depositAddress)) {
@@ -178,7 +189,22 @@ export async function intentStatus(depositAddress: string, memo?: string | null,
       });
     }
   }
+  const sd = r.swapDetails ?? {};
+  return {
+    status: r.status, updatedAt: r.updatedAt, nearTxHashes: (sd.nearTxHashes ?? []).filter((h) => typeof h === "string" && h.length > 0),
+    depositedAmount: sd.depositedAmount && /^\d+$/.test(sd.depositedAmount) ? sd.depositedAmount : null,
+    amountOut: r.status === "SUCCESS" && sd.amountOut && /^\d+$/.test(sd.amountOut) ? sd.amountOut : null,
+  };
+}
+
+export async function intentStatus(depositAddress: string, memo?: string | null, ticket?: string | null): Promise<{ status: OneClickStatus; updatedAt: string }> {
+  const r = await intentStatusDetail(depositAddress, memo, ticket);
   return { status: r.status, updatedAt: r.updatedAt };
+}
+
+/** A payable stablecoin by 1Click asset id (null if unknown or not USDC/USDT). */
+export async function originToken(assetId: string): Promise<TokenGroup | null> {
+  return (await tokenGroups()).groups.find((g) => g.assetId === assetId) ?? null;
 }
 
 export async function simulateDeposit(depositAddress: string, memo?: string, ticket?: string) {

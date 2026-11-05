@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { describeActivity } from "@/components/app/describe";
 import { useConfig } from "@/lib/config";
 import { useActivity, useOverview } from "@/lib/data";
+import { downloadInvoicesCsv } from "@/lib/invoices";
+import { explain } from "@/lib/actions";
 import { nsToMs } from "@/lib/format";
 import { fromUnits } from "@oiko/sdk";
 import { useT } from "@/lib/i18n";
@@ -73,6 +75,8 @@ export function SettingsScreen() {
           <ListRow icon="shield" color="mint" title={t(`settings.method.${session.method}`)} subtitle={t(`settings.methodSub.${session.method}`)} />
           <ListRow icon="security" color="stone" title={t("settings.recovery")} subtitle={t("settings.recoverySub")} />
           <ListRow icon="export" color="blue" title={t("settings.export")} subtitle={t("settings.exportSub")} onClick={exportCsv} chevron />
+          <ListRow icon="export" color="blue" title={t("settings.exportInvoices")} subtitle={t("settings.exportInvoicesSub")} chevron data-testid="settings-export-invoices"
+            onClick={() => { downloadInvoicesCsv(session).then(() => toast.show({ message: t("inv.exported") }), (e) => { const f = explain(e); toast.show({ message: `${f.title} ${f.next}` }); }); }} />
         </GroupedList>
       </section>
 

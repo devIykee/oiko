@@ -1,6 +1,7 @@
 // Dev-only fixture data and a tiny in-memory backend so screens can be built and screenshotted without the API.
 // Never imported in production (see ./mode.ts).
 import type { Activity, AgentView, Bill, Circle, MonthStats, Overview, Pot, Proposal } from "@oiko/sdk";
+import { invoicesCsv, newInvoiceId, ownerView, publicView, invoiceNumber, type Invoice, type InvoicePayment } from "../../server/invoices";
 
 const U = (n: number) => Math.round(n * 1e6).toString();
 const NOW = Date.now();
@@ -103,6 +104,73 @@ const circles: Circle[] = [{
   collected: U(50), status: "active", shuffle: false, payouts: [[0, "vault.maya.oiko.testnet", U(200)]],
 }];
 
+// ---------- invoices ----------
+const iso = (ms: number) => new Date(ms).toISOString();
+const isoDay = (ms: number) => iso(ms).slice(0, 10);
+const EXPLORER = "https://testnet.nearblocks.io";
+const fxPayment = (p: Partial<InvoicePayment>): InvoicePayment => ({
+  depositAddress: "TQ9fixtureInvoice", depositMemo: null, ticket: null, originLabel: "USDT on TRON", originAsset: "nep141:tron-usdt", originDecimals: 6,
+  amountIn: U(0), amountOut: U(0), fee: U(0), deadline: iso(NOW + 3600_000), createdAt: iso(NOW - 3600_000), status: "PENDING_DEPOSIT", updatedAt: iso(NOW - 3600_000),
+  checkedAt: null, receivedAmount: null, depositedAmount: null, nearTxHashes: [], completedAt: null, ...p,
+});
+const fxInvoice = (p: Partial<Invoice> & Pick<Invoice, "id" | "number" | "client" | "items" | "token">): Invoice => ({
+  owner: `ada.${root}`, fromName: "Ada Okafor Design", issueDate: isoDay(NOW - 3 * DAY), dueDate: isoDay(NOW + 14 * DAY), note: null, state: "open",
+  payments: [], createdAt: iso(NOW - 3 * DAY), updatedAt: iso(NOW - 3 * DAY), ...p,
+});
+const invoices: Invoice[] = [
+  fxInvoice({
+    id: "7Fq2LmXz9RkPw4TbNc8HsV", number: "INV-0006", client: { name: "Lena Fischer", email: "lena@fischer.example" }, token: "usdt",
+    items: [{ description: "Translation, German to English (hours)", quantity: "7.5", unitPrice: U(40) }, { description: "Proofreading", quantity: "1", unitPrice: U(60) }],
+    note: "Thank you, Lena. Payment within 14 days, please.", createdAt: iso(NOW - 1 * DAY), issueDate: isoDay(NOW - DAY),
+  }),
+  fxInvoice({
+    id: "3bYk8QnWv5JtHc2RpMx7Ga", number: "INV-0005", client: { name: "Kofi & Co", email: null }, token: "usdc", createdAt: iso(NOW - 2 * DAY),
+    items: [{ description: "Brand workshop", quantity: "1", unitPrice: U(300) }],
+    payments: [fxPayment({ originLabel: "USDC on Base", amountIn: U(300), amountOut: U(299.85), fee: U(0.15), status: "PROCESSING", depositedAmount: U(300) })],
+  }),
+  fxInvoice({
+    id: "9KcVt4ZpQ2mWx8RbLn6Hfd", number: "INV-0004", client: { name: "Northwind Studio", email: "accounts@northwind.example" }, token: "usdc", createdAt: iso(NOW - 9 * DAY),
+    issueDate: isoDay(NOW - 9 * DAY), dueDate: isoDay(NOW + 5 * DAY),
+    items: [{ description: "Website redesign", quantity: "1", unitPrice: U(850) }, { description: "Hosting setup", quantity: "1", unitPrice: U(45) }],
+    payments: [fxPayment({ originLabel: "USDC on Base", amountIn: U(895), amountOut: U(894.55), fee: U(0.45), status: "SUCCESS", receivedAmount: U(894.55), depositedAmount: U(895),
+      nearTxHashes: ["8vQn3XkL2mRt9WpZc4HbYs7JfGd5NaE1uKoPq6TxVy"], completedAt: iso(NOW - 2 * DAY), updatedAt: iso(NOW - 2 * DAY) })],
+  }),
+  fxInvoice({
+    id: "5HtRw8NcKz3QbVm7Xp2LgJ", number: "INV-0003", client: { name: "Bright Path School", email: null }, token: "usdt", createdAt: iso(NOW - 25 * DAY),
+    issueDate: isoDay(NOW - 25 * DAY), dueDate: isoDay(NOW - 4 * DAY),
+    items: [{ description: "Yearbook layout", quantity: "40", unitPrice: U(6.5) }],
+  }),
+  fxInvoice({
+    id: "2WmPx6RtQv9KbNc4HzLs8F", number: "INV-0007", client: { name: "Sam Mensah", email: null }, token: "usdt", state: "draft", createdAt: iso(NOW - 3600_000),
+    items: [{ description: "Podcast cover art", quantity: "1", unitPrice: U(120) }],
+  }),
+  fxInvoice({
+    id: "6NvLq3TbXw8ZkRm2Pc5HtY", number: "INV-0002", client: { name: "Acme Events", email: null }, token: "usdc", state: "cancelled", createdAt: iso(NOW - 40 * DAY),
+    issueDate: isoDay(NOW - 40 * DAY), dueDate: isoDay(NOW - 26 * DAY), items: [{ description: "Event poster", quantity: "2", unitPrice: U(75) }],
+  }),
+];
+const invoiceDeposits = new Map<string, string>();
+
+function invoiceHandler(p: string, method: string, b: Record<string, unknown>): unknown {
+  const now = Date.now();
+  if (p === "/api/invoices/export.csv") return invoicesCsv(invoices, now, EXPLORER);
+  if (p === "/api/invoices" && method === "GET") return { storage: "memory", invoices: [...invoices].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).map((i) => ownerView(i, now, EXPLORER)) };
+  if (p === "/api/invoices" && method === "POST") {
+    const max = Math.max(0, ...invoices.map((i) => Number(i.number.slice(4))));
+    const inv = fxInvoice({ ...(b as unknown as Invoice), id: newInvoiceId(), number: invoiceNumber(max + 1), issueDate: isoDay(now), createdAt: iso(now), updatedAt: iso(now), state: (b.state as Invoice["state"]) ?? "open", note: (b.note as string) ?? null });
+    invoices.push(inv);
+    return ownerView(inv, now, EXPLORER);
+  }
+  const id = decodeURIComponent(p.slice("/api/invoices/".length));
+  const inv = invoices.find((i) => i.id === id);
+  if (!inv || (method === "GET" && inv.state === "draft")) throw Object.assign(new Error("E_NOT_FOUND"), { code: "E_NOT_FOUND" });
+  if (method === "PATCH") {
+    Object.assign(inv, Object.fromEntries(Object.entries(b).filter(([, v]) => v !== undefined)), { updatedAt: iso(now) });
+    return ownerView(inv, now, EXPLORER);
+  }
+  return publicView(inv, now, EXPLORER);
+}
+
 const deposits = new Map<string, { created: number; simulated: number | null }>();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -125,17 +193,31 @@ export async function handle(path: string, method: string, body: unknown): Promi
     { id: "sol-usdc", label: "USDC on Solana", chain: "sol", symbol: "USDC", assetId: "nep141:sol-usdc", decimals: 6 },
     { id: "arb-usdt", label: "USDT on Arbitrum", chain: "arb", symbol: "USDT", assetId: "nep141:arb-usdt", decimals: 6 },
   ] };
+  if (p.startsWith("/api/invoices")) return invoiceHandler(p, method, (body ?? {}) as Record<string, unknown>);
   if (p === "/api/intents/deposit-address") {
     const addr = "TQ9fixture" + Math.random().toString(36).slice(2, 12).toUpperCase();
     deposits.set(addr, { created: Date.now(), simulated: null });
-    const amt = BigInt(b.amount ?? "0");
+    const fxInv = b.invoiceId ? invoices.find((i) => i.id === b.invoiceId) : undefined;
+    if (fxInv) invoiceDeposits.set(addr, fxInv.id);
+    const amt = fxInv ? BigInt(ownerView(fxInv, Date.now(), EXPLORER).remaining) : BigInt(b.amount ?? "0");
     return { depositAddress: addr, depositMemo: null, amountIn: amt.toString(), amountOut: (amt - amt / 200n).toString(), fee: (amt / 200n).toString(), deadline: new Date(Date.now() + 30 * 60_000).toISOString(), quoteId: "q1", destinationToken: "usdt" };
   }
   if (p.startsWith("/api/intents/status/")) {
     const d = deposits.get(decodeURIComponent(p.slice(20)));
     if (!d?.simulated) return { status: "PENDING_DEPOSIT", updatedAt: new Date().toISOString() };
     const el = Date.now() - d.simulated;
-    return { status: el < 2500 ? "KNOWN_DEPOSIT_TX" : el < 6000 ? "PROCESSING" : "SUCCESS", updatedAt: new Date().toISOString() };
+    const status = el < 2500 ? "KNOWN_DEPOSIT_TX" : el < 6000 ? "PROCESSING" : "SUCCESS";
+    const addr = decodeURIComponent(p.slice(20));
+    const fxInv = invoices.find((i) => i.id === invoiceDeposits.get(addr));
+    if (fxInv && !fxInv.payments.some((x) => x.depositAddress === addr && x.status === "SUCCESS")) {
+      const amt = ownerView(fxInv, Date.now(), EXPLORER).remaining;
+      fxInv.payments = [...fxInv.payments.filter((x) => x.depositAddress !== addr), fxPayment({
+        depositAddress: addr, amountIn: amt, amountOut: (BigInt(amt) - BigInt(amt) / 200n).toString(), fee: (BigInt(amt) / 200n).toString(),
+        status, createdAt: new Date(d.created).toISOString(), updatedAt: new Date().toISOString(), receivedAmount: status === "SUCCESS" ? (BigInt(amt) - BigInt(amt) / 200n).toString() : null,
+        nearTxHashes: status === "SUCCESS" ? ["Fx" + addr.slice(-10) + "mintTx", "Fx" + addr.slice(-10) + "syncTx"] : [], completedAt: status === "SUCCESS" ? new Date().toISOString() : null,
+      })];
+    }
+    return { status, updatedAt: new Date().toISOString() };
   }
   if (p === "/api/intents/simulate-deposit") { const d = deposits.get(b.depositAddress ?? ""); if (d) d.simulated = Date.now(); return { ok: true }; }
   if (p === "/api/intents/withdraw-quote") {

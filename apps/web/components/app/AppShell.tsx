@@ -23,6 +23,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { href: "/home", label: t("nav.home"), icon: "home", testId: "nav-home" },
     { href: "/plan", label: t("nav.plan"), icon: "plan", testId: "nav-plan" },
     { href: "/bills", label: t("nav.bills"), icon: "bills", testId: "nav-bills" },
+    { href: "/invoices", label: t("nav.invoices"), icon: "work", testId: "nav-invoices" },
     { href: "/pots", label: t("nav.pots"), icon: "pots", match: ["/rosca"], testId: "nav-pots" },
     { href: "/insights", label: t("nav.insights"), icon: "insights", testId: "nav-insights" },
     { href: "/agents", label: t("nav.agents"), icon: "agents", testId: "nav-agents" },
@@ -30,8 +31,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     { href: "/settings", label: t("nav.settings"), icon: "settings", testId: "nav-settings" },
   ];
   const tabs: NavItem[] = [
-    side[0]!, side[1]!, side[3]!, side[5]!,
-    { href: "/more", label: t("nav.more"), icon: "more", match: ["/bills", "/insights", "/activity", "/settings", "/invest", "/receive", "/withdraw", "/move"], testId: "tab-more" },
+    side[0]!, side[1]!, side[4]!, side[6]!,
+    { href: "/more", label: t("nav.more"), icon: "more", match: ["/bills", "/invoices", "/insights", "/activity", "/settings", "/invest", "/receive", "/withdraw", "/move"], testId: "tab-more" },
   ];
 
   return (

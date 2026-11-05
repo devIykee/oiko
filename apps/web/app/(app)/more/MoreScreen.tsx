@@ -18,6 +18,7 @@ export function MoreScreen() {
       </GroupedList>
       <GroupedList label={t("nav.more")}>
         <ListRow as={Link} href="/bills" icon="bills" color="sun" title={t("nav.bills")} subtitle={t("more.billsSub")} chevron />
+        <ListRow as={Link} href="/invoices" icon="work" color="blue" title={t("nav.invoices")} subtitle={t("more.invoicesSub")} chevron data-testid="more-invoices" />
         <ListRow as={Link} href="/insights" icon="insights" color="violet" title={t("nav.insights")} subtitle={t("more.insightsSub")} chevron />
         <ListRow as={Link} href="/activity" icon="activity" color="stone" title={t("nav.activity")} subtitle={t("more.activitySub")} chevron />
         {config?.features.earn !== false && <ListRow as={Link} href="/pots/earn" icon="earn" color="mint" title={t("pot.earnTitle")} subtitle={t("more.earnSub")} chevron />}

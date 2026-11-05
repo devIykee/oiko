@@ -18,13 +18,14 @@ const SCOPE_B = [/\bgas\b/i, /seed phrase/i, /\bbridge\b/i, /\bnetwork\b/i, /\bR
 
 // Files whose strings are user-facing.
 const A_DIRS = ["app", "components", "lib/i18n", "../../packages/ui/src"];
-const B_DIRS = ["app/(app)", "app/pay", "app/start", "app/connect", "lib/i18n"];
+const B_DIRS = ["app/(app)", "app/pay", "app/i", "app/start", "app/connect", "lib/i18n", "components/app/PayFlow.tsx"];
 const SKIP_FILES = /(\.test\.|fixtures|\/api\/|\/dev\/|opengraph|llms\.txt|well-known|route\.ts$)/;
 
 function files(dir) {
   const out = [];
   const abs = join(WEB, dir);
   if (!existsSync(abs)) return out;
+  if (statSync(abs).isFile()) return [abs];
   (function walk(d) {
     for (const e of readdirSync(d)) {
       if (e === "node_modules" || e === ".next") continue;

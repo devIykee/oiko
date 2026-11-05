@@ -231,6 +231,10 @@ export async function readTool(ctx: AuthedAgent, tool: string, params: Record<st
         decision: { act: a.ok ? "allowed" : "refused", propose: p.ok ? "allowed" : "refused", message: a.ok ? a.note ?? "OK to act." : a.message },
       };
     }
+    case "invoices": {
+      const { agentInvoices, invoiceDeps } = await import("./invoicesHttp");
+      return agentInvoices(v, invoiceDeps());
+    }
     case "earn-rates":
       return { _help: "Variable lending rates today (supplyApr is a percent). Rates change and can go to zero.", ...(await earnRates()) };
     case "rosca":

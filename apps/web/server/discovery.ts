@@ -3,7 +3,7 @@ import { z } from "zod";
 import { TOOL_NAMES } from "@oiko/mcp";
 import { serverConfig } from "./config";
 import {
-  AgentActionZ, DepositAddressBody, PrepareBody, PushSubscribeBody, RegisterBody, RelayBody, ReportBody, SimulateDepositBody, SubmitBody, SyncBody, TopupBody, WithdrawQuoteBody,
+  AgentActionZ, DepositAddressBody, InvoiceBody, InvoicePatchBody, PrepareBody, PushSubscribeBody, RegisterBody, RelayBody, ReportBody, SimulateDepositBody, SubmitBody, SyncBody, TopupBody, WithdrawQuoteBody,
 } from "./schemas";
 
 const schema = (s: z.ZodType) => z.toJSONSchema(s, { target: "openapi-3.0", io: "input" }) as Record<string, unknown>;
@@ -64,12 +64,12 @@ export function openApiDocument() {
       "/api/stats": { get: op("Registered names (from the registry)", { tag: "public" }) },
       "/api/rates/earn": { get: op("Today's variable lending rates (supplyApr is a percent string)", { tag: "public" }) },
       "/api/intents/tokens": { get: op("Stablecoins you can pay from, grouped by chain", { tag: "intents" }) },
-      "/api/intents/deposit-address": { post: op("Quote + deposit address for paying an Oiko name", { tag: "intents", body: DepositAddressBody }) },
+      "/api/intents/deposit-address": { post: op("Quote + deposit address for paying an Oiko name. With invoiceId, the server fixes the amount (what is left to pay) and records the deposit on the invoice.", { tag: "intents", body: DepositAddressBody }) },
       "/api/intents/withdraw-quote": { post: op("Quote for withdrawing to another chain", { tag: "intents", body: WithdrawQuoteBody }) },
       "/api/intents/status/{depositAddress}": { get: { ...op("Deposit status; on SUCCESS the vault is synced", { tag: "intents" }), parameters: [p("depositAddress"), q("memo")] } },
       "/api/intents/simulate-deposit": { post: op("Test modes only: mark a mock deposit as sent", { tag: "intents", body: SimulateDepositBody }) },
-      ...Object.fromEntries(["me", "overview", "pots", "activity", "goals", "splits", "bills", "insights", "earn-rates", "rosca", "ajo"].map((t) => [
-        `/api/agent/${t}`, { get: op(t === "ajo" ? "Agent read: ROSCA savings groups (legacy path, same as /api/agent/rosca)" : t === "rosca" ? "Agent read: ROSCA savings groups" : `Agent read: ${t}`, { tag: "agent", auth: true, params: t === "activity" ? [q("limit")] : t === "insights" ? [q("month", false, "yyyymm")] : undefined }) },
+      ...Object.fromEntries(["me", "overview", "pots", "activity", "goals", "splits", "bills", "insights", "earn-rates", "rosca", "ajo", "invoices"].map((t) => [
+        `/api/agent/${t}`, { get: op(t === "ajo" ? "Agent read: ROSCA savings groups (legacy path, same as /api/agent/rosca)" : t === "rosca" ? "Agent read: ROSCA savings groups" : t === "invoices" ? "Agent read: the owner's invoices with status, amount received and transaction links (read only; agents cannot create or change invoices)" : `Agent read: ${t}`, { tag: "agent", auth: true, params: t === "activity" ? [q("limit")] : t === "insights" ? [q("month", false, "yyyymm")] : undefined }) },
       ])),
       "/api/agent/counterparty": { get: op("Agent: check a recipient before paying (verdict allow | warn | block, reasons, decision for act/propose)", { tag: "agent", auth: true, params: [q("to", false, "recipient NEAR account"), q("amount", false, "base units"), q("token", false, "usdc|usdt"), q("bill_id", false, "check a bill's payee instead")], response: CounterpartySchema }) },
       "/api/agent/report": { post: op("Agent: report a scam recipient to the shared blocklist (scope read; one report per account per receiver)", { tag: "agent", auth: true, body: ReportBody, response: { type: "object", properties: { ok: { type: "boolean" }, receiver: { type: "string" }, stored: { type: "boolean" }, note: { type: "string" } } } }) },
@@ -78,6 +78,17 @@ export function openApiDocument() {
       "/api/agent/submit": { post: op("Submit the signed transaction", { tag: "agent", auth: true, body: SubmitBody, response: { type: "object", properties: { txHash: { type: "string" }, ok: { type: "boolean" }, error: ErrorSchema.properties.error } } }) },
       "/api/agent/log": { get: op("Owner: the agent access log", { tag: "agent", auth: true, params: [q("vaultId"), q("publicKey")] }) },
       "/api/mcp": { post: op("MCP over streamable HTTP (stateless, JSON responses). NEP-413 auth per request.", { tag: "agent", auth: true }) },
+      "/api/invoices": {
+        get: op("Owner: list invoices with live status (NEP-413 by a key on the owner's name account)", { tag: "invoices", auth: true }),
+        post: op("Owner: create an invoice. Returns the invoice with its public id (share /i/<id>).", { tag: "invoices", auth: true, body: InvoiceBody }),
+      },
+      "/api/invoices/{id}": {
+        get: { ...op("Public invoice view (no client email). With the owner's NEP-413 header: the owner view.", { tag: "invoices" }), parameters: [p("id")] },
+        patch: { ...op("Owner: edit (until money starts moving), open or cancel an invoice", { tag: "invoices", auth: true, body: InvoicePatchBody }), parameters: [p("id")] },
+      },
+      "/api/invoices/export.csv": {
+        get: { ...op("Owner: CSV of all invoices, one row per line item (UTF-8, ISO dates, plain decimals)", { tag: "invoices", auth: true }), responses: { "200": { description: "CSV", content: { "text/csv": { schema: { type: "string" } } } } } },
+      },
       "/api/push/subscribe": { post: op("Owner: save a Web Push subscription (NEP-413 by the owner's key)", { tag: "public", auth: true, body: PushSubscribeBody }) },
       "/api/cron": { post: op("Run due schedules and settle due ROSCA rounds (Bearer CRON_SECRET)", { tag: "ops" }) },
     },
@@ -110,7 +121,7 @@ export function agentManifest() {
     },
     endpoints: {
       openapi: `${base}/openapi.json`, llms: `${base}/llms.txt`, mcp_http: `${base}/api/mcp`, rest_base: `${base}/api/agent`,
-      read: ["me", "overview", "pots", "activity", "goals", "splits", "bills", "insights", "earn-rates", "rosca"].map((t) => `GET ${base}/api/agent/${t}`),
+      read: ["me", "overview", "pots", "activity", "goals", "splits", "bills", "insights", "earn-rates", "rosca", "invoices"].map((t) => `GET ${base}/api/agent/${t}`),
       write: [`POST ${base}/api/agent/prepare`, `POST ${base}/api/agent/submit`],
       counterparty: [`GET ${base}/api/agent/counterparty?to=<account>&amount=<units>&token=usdc|usdt`, `GET ${base}/api/agent/counterparty?bill_id=<id>`, `POST ${base}/api/agent/report`, `GET ${base}/api/counterparty/<accountId> (public)`],
     },
@@ -176,8 +187,9 @@ Authorization: NEP413 <base64(JSON {accountId, publicKey, signature, nonce, mess
 - Rejected if: bad signature, timestamp more than 5 minutes off, nonce reused, key removed from the vault, agent revoked or expired, missing permission.
 
 ## Tools
-get_overview, get_pots, get_activity(limit), get_goals, get_splits, get_bills, get_insights(month yyyymm), get_earn_rates, get_rosca_groups, check_counterparty(to|bill_id, amount?, token?), report_counterparty(receiver, reason, evidence), propose(action, reason), act(action, reason?)
-REST read paths: /api/agent/me (your own limits and what is left), overview, pots, activity?limit=, goals, splits, bills, insights?month=, earn-rates, rosca.
+get_overview, get_pots, get_activity(limit), get_goals, get_splits, get_bills, get_insights(month yyyymm), get_earn_rates, get_rosca_groups, get_invoices, check_counterparty(to|bill_id, amount?, token?), report_counterparty(receiver, reason, evidence), propose(action, reason), act(action, reason?)
+REST read paths: /api/agent/me (your own limits and what is left), overview, pots, activity?limit=, goals, splits, bills, insights?month=, earn-rates, rosca, invoices.
+Invoices are read only for agents (get_invoices / GET /api/agent/invoices): status, amount received, transaction links. Only the owner creates, edits or cancels invoices in the app.
 
 Actions: {type:"pay", token, amount, to, memo} · {type:"pay_bill", bill_id} · {type:"move", from_pot, to_pot, token, amount} · {type:"save", to_pot, token, amount}
 Amounts are integer strings in base units with 6 decimals: "1500000" = 1.50.

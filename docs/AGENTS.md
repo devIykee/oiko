@@ -114,6 +114,7 @@ MCP tool names (stdio and HTTP) and the matching REST paths. All reads need the 
 | `get_insights` | `GET /api/agent/insights?month=yyyymm` | `month` (optional, UTC) | `month, money_in, money_out, saved, savings_rate_bps, top_payees[], trend[]` |
 | `get_earn_rates` | `GET /api/agent/earn-rates` | — | `source, fetchedAt, assets[]: { token, supplyApr (percent string), utilizationBps, paused }` |
 | `get_rosca_groups` | `GET /api/agent/rosca` (`/api/agent/ajo` is an old alias) | — | `groups[]` (and the same list as `circles[]`): ROSCA savings groups with members, payout order, round, paid, defaults, bonds |
+| `get_invoices` | `GET /api/agent/invoices` | — | `invoices[]`: the owner's invoices (number, client, items, total, due date, status draft/open/pending/paid/refunded/cancelled/overdue, received after fees, transaction links). Read only: agents cannot create, edit or cancel invoices |
 | `propose` | prepare + submit with `kind: "propose"` | `action`, `reason` (1–280 chars), `signed_tx` (HTTP only) | stdio: `{ ok, txHash, proposalId, note }` |
 | `act` | prepare + submit with `kind: "act"` | `action`, `reason` (optional, not stored on-chain), `signed_tx` (HTTP only) | stdio: `{ ok, txHash, result }` |
 

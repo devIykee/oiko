@@ -56,6 +56,8 @@ export function useMoney() {
       if (!res.ok && res.errorCode === "E_NO_GAS") {
         lastTopup = 0;
         await topup(session.accountId);
+        // NotEnoughAllowance is usually the previous call's gas reservation, which is refunded to the key a few blocks later.
+        if (/NotEnoughAllowance/.test(res.errorMessage ?? "")) await new Promise((r) => setTimeout(r, 4000));
         res = await fn.apply(client, args);
       }
     }

@@ -41,5 +41,7 @@ export const pay = {
   "pay.simulate": "Simulate payment (test mode)",
   "pay.doneTitle": "{name} has been paid",
   "pay.doneBody": "{amount} arrived. You can close this page.",
+  "pay.fixedOnly": "This invoice is {amount}. Pick where your {symbol} is.",
+  "pay.youPay": "You pay",
   "pay.footer": "Oiko never holds your money. Payments are delivered by an independent service.",
 } as const;

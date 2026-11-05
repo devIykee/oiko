@@ -60,6 +60,16 @@ export const counterpartyCodeHashes = pgTable("counterparty_code_hashes", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Invoices (owner-created, paid through a public link). The whole invoice is one JSON document; owner/number for listing. */
+export const invoices = pgTable("invoices", {
+  id: text("id").primaryKey(),
+  owner: text("owner").notNull(),
+  number: text("number").notNull(),
+  data: jsonb("data").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("invoices_owner_idx").on(t.owner, t.createdAt)]);
+
 export const CREATE_SQL = `
 CREATE TABLE IF NOT EXISTS agent_access_log (id BIGSERIAL PRIMARY KEY, at TIMESTAMPTZ NOT NULL DEFAULT now(), vault_id TEXT NOT NULL,
   public_key TEXT NOT NULL, method TEXT NOT NULL, path TEXT NOT NULL, status INTEGER NOT NULL, code TEXT, tool TEXT, tx_hash TEXT);
@@ -76,4 +86,7 @@ CREATE TABLE IF NOT EXISTS counterparty_reports (id BIGSERIAL PRIMARY KEY, recei
 CREATE INDEX IF NOT EXISTS counterparty_reports_receiver_idx ON counterparty_reports (receiver);
 CREATE TABLE IF NOT EXISTS counterparty_code_hashes (account_id TEXT PRIMARY KEY, code_hash TEXT NOT NULL, changed_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS invoices (id TEXT PRIMARY KEY, owner TEXT NOT NULL, number TEXT NOT NULL, data JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS invoices_owner_idx ON invoices (owner, created_at);
 `;

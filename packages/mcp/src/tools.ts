@@ -20,7 +20,7 @@ export const AgentActionSchema = z.discriminatedUnion("type", [
 ]);
 export type AgentActionInput = z.infer<typeof AgentActionSchema>;
 
-export type ReadTool = "overview" | "pots" | "activity" | "goals" | "splits" | "bills" | "insights" | "earn-rates" | "rosca" | "counterparty";
+export type ReadTool = "overview" | "pots" | "activity" | "goals" | "splits" | "bills" | "insights" | "earn-rates" | "rosca" | "counterparty" | "invoices";
 
 /** What a tool host needs: read endpoints and a way to run propose/act. */
 export interface OikoBackend {
@@ -59,6 +59,7 @@ export function registerOikoTools(server: McpServer, backend: OikoBackend): void
   read("get_splits", "Plan", "The owner's plan: rules that split every incoming payment into pots, plus a preview of how 100 would be split.", "splits");
   read("get_bills", "Bills", "Recurring bills with amount, due day, payee and status (upcoming, due, paid, missed). Pay one with act {type:'pay_bill'} if allowed.", "bills");
   read("get_earn_rates", "Earn rates", "Today's variable lending rates and pool utilization. Rates change and can go to zero; never promise a return.", "earn-rates");
+  read("get_invoices", "Invoices", "The owner's invoices to their clients, read only: number, client, line items, total, due date, status (draft, open, pending, paid, refunded, cancelled, overdue), amount received after fees and transaction links. You cannot create, change or cancel invoices.", "invoices");
   read("get_rosca_groups", "ROSCA savings groups", "ROSCA savings groups the account is in: rotating savings where members contribute each round and one member receives the pot. Shows members, payout order, current round and who has paid.", "rosca");
 
   server.registerTool("get_activity", {
@@ -116,4 +117,4 @@ export function registerOikoTools(server: McpServer, backend: OikoBackend): void
   }, (args) => wrap(() => backend.run("act", args.action as AgentActionInput, args.reason, args.signed_tx)));
 }
 
-export const TOOL_NAMES = ["get_overview", "get_pots", "get_activity", "get_goals", "get_splits", "get_bills", "get_insights", "get_earn_rates", "get_rosca_groups", "check_counterparty", "report_counterparty", "propose", "act"] as const;
+export const TOOL_NAMES = ["get_overview", "get_pots", "get_activity", "get_goals", "get_splits", "get_bills", "get_insights", "get_earn_rates", "get_rosca_groups", "get_invoices", "check_counterparty", "report_counterparty", "propose", "act"] as const;

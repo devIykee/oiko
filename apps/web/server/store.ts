@@ -3,7 +3,8 @@
 // instances, so nonce replay protection and the access log are best-effort there. Set DATABASE_URL for production.
 import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
 import { serverConfig } from "./config";
-import { agentAccessLog, counterpartyCodeHashes, counterpartyReports, CREATE_SQL, mockOneclickSwaps, pushSubscriptions, usedNonces } from "./db/schema";
+import type { Invoice } from "./invoices";
+import { agentAccessLog, counterpartyCodeHashes, counterpartyReports, CREATE_SQL, invoices, mockOneclickSwaps, pushSubscriptions, usedNonces } from "./db/schema";
 
 export interface AccessLogRow {
   at: string; vaultId: string; publicKey: string; method: string; path: string; status: number; code: string | null; tool: string | null; txHash: string | null;
@@ -34,6 +35,11 @@ export interface Store {
   setCodeHash(accountId: string, seen: CodeHashSeen): Promise<void>;
   /** Successful agent payments from this vault to this receiver recorded in the gateway access log. */
   countPaymentsTo(vaultId: string, receiver: string): Promise<number>;
+  getInvoice(id: string): Promise<Invoice | null>;
+  /** Insert or replace. */
+  putInvoice(inv: Invoice): Promise<void>;
+  /** Newest first. */
+  listInvoices(owner: string): Promise<Invoice[]>;
 }
 
 export class MemoryStore implements Store {
@@ -44,6 +50,7 @@ export class MemoryStore implements Store {
   private swaps = new Map<string, unknown>();
   private reports: CounterpartyReport[] = [];
   private codeHashes = new Map<string, CodeHashSeen>();
+  private invoices = new Map<string, Invoice>();
   async useNonce(nonce: string, _pk: string, expiresAt: number) {
     const now = Date.now();
     if (this.nonces.size > 10_000) for (const [k, exp] of this.nonces) if (exp < now) this.nonces.delete(k);
@@ -73,6 +80,11 @@ export class MemoryStore implements Store {
   async setCodeHash(a: string, seen: CodeHashSeen) { this.codeHashes.set(a, { ...seen }); }
   async countPaymentsTo(vaultId: string, receiver: string) {
     return this.log.filter((r) => r.vaultId === vaultId && r.receiver === receiver && r.status === 200 && !r.code).length;
+  }
+  async getInvoice(id: string) { const i = this.invoices.get(id); return i ? structuredClone(i) : null; }
+  async putInvoice(inv: Invoice) { this.invoices.set(inv.id, structuredClone(inv)); }
+  async listInvoices(owner: string) {
+    return [...this.invoices.values()].filter((i) => i.owner === owner).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((i) => structuredClone(i));
   }
 }
 
@@ -164,13 +176,28 @@ class PgStore implements Store {
       .where(and(eq(agentAccessLog.vaultId, vaultId), eq(agentAccessLog.receiver, receiver), eq(agentAccessLog.status, 200), isNull(agentAccessLog.code)));
     return Number(rows[0]?.n ?? 0);
   }
+  async getInvoice(id: string) {
+    const db = await this.db();
+    const rows = await db.select().from(invoices).where(eq(invoices.id, id)).limit(1);
+    return (rows[0]?.data as Invoice | undefined) ?? null;
+  }
+  async putInvoice(inv: Invoice) {
+    const db = await this.db();
+    const v = { owner: inv.owner, number: inv.number, data: inv, updatedAt: new Date() };
+    await db.insert(invoices).values({ id: inv.id, ...v, createdAt: new Date(inv.createdAt) }).onConflictDoUpdate({ target: invoices.id, set: v });
+  }
+  async listInvoices(owner: string) {
+    const db = await this.db();
+    const rows = await db.select().from(invoices).where(eq(invoices.owner, owner)).orderBy(desc(invoices.createdAt)).limit(500);
+    return rows.map((r: typeof invoices.$inferSelect) => r.data as Invoice);
+  }
 }
 
 const g = globalThis as unknown as { __oikoStore?: Store };
 export function store(): Store {
   if (g.__oikoStore) return g.__oikoStore;
   const url = serverConfig().databaseUrl;
-  if (!url) console.warn("[oiko] DATABASE_URL not set: using the in-memory store (access log, nonces, push, mock 1Click reset on restart).");
+  if (!url) console.warn("[oiko] DATABASE_URL not set: using the in-memory store (access log, nonces, push, invoices, mock 1Click reset on restart).");
   return (g.__oikoStore = url ? new PgStore(url) : new MemoryStore());
 }
 export function setStore(s: Store | undefined): void {

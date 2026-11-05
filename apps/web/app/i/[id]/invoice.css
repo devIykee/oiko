@@ -1,0 +1,40 @@
+/* Public invoice page (/i/[id]). Plain global CSS with an inv- prefix: this app runs every .css through the Tailwind loader, so CSS modules are not used. */
+.inv-col { max-width: 760px; margin: 0 auto; padding: 16px var(--gutter) 48px; display: flex; flex-direction: column; gap: 20px; }
+.inv-doc { background: var(--surface); border-radius: var(--r-card); padding: 20px; display: flex; flex-direction: column; gap: 24px; }
+.inv-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.inv-title { font-family: var(--font-display); font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0; line-height: 1.1; }
+.inv-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.inv-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.inv-k { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 4px; }
+.inv-v { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.inv-sub { margin: 2px 0 0; font-size: var(--fs-small); color: var(--ink-2); overflow-wrap: anywhere; }
+.inv-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.inv-table th { text-align: left; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); padding: 0 0 8px; border-bottom: 1px solid var(--line); }
+.inv-table td { padding: 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.inv-table .inv-num { text-align: right; white-space: nowrap; padding-left: 12px; }
+.inv-table tbody tr:last-child td { border-bottom: 0; }
+.inv-desc { overflow-wrap: anywhere; }
+.inv-mobile-qty { display: none; font-size: var(--fs-small); color: var(--ink-2); margin-top: 2px; }
+.inv-totals { display: flex; flex-direction: column; gap: 6px; margin-left: auto; width: 100%; max-width: 320px; font-variant-numeric: tabular-nums; }
+.inv-totals > div { display: flex; justify-content: space-between; gap: 12px; }
+.inv-grand { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; padding-top: 8px; border-top: 1px solid var(--line); }
+.inv-note { white-space: pre-wrap; margin: 0; overflow-wrap: anywhere; }
+.inv-txs { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-small); }
+.inv-txs a { color: var(--accent); overflow-wrap: anywhere; }
+.inv-toolbar { display: flex; justify-content: space-between; align-items: center; min-height: 44px; gap: 12px; }
+.inv-pay { display: flex; flex-direction: column; gap: 20px; }
+
+@media (max-width: 560px) {
+  .inv-doc { padding: 16px; }
+  .inv-parties { grid-template-columns: 1fr; }
+  .inv-meta { grid-template-columns: 1fr 1fr; }
+  .inv-hide-sm { display: none; }
+  .inv-mobile-qty { display: block; }
+  .inv-totals { max-width: none; }
+}
+
+@media print {
+  .inv-no-print { display: none !important; }
+  .inv-col { max-width: none; padding: 0; }
+  .inv-doc { padding: 0; border-radius: 0; background: #fff; color: #000; }
+}

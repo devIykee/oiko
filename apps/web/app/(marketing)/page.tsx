@@ -204,7 +204,7 @@ function TrustCompare() {
 /* 9. Use cases */
 function UseCases() {
   const cases: Array<{ title: string; body: string; color: TileColor; d?: string; glyph?: ReactNode }> = [
-    { title: "Paid from abroad", body: "Clients pay your link from wherever their money is. No waiting days for a transfer to clear.", color: "blue", d: I.briefcaseFill },
+    { title: "Freelancer invoices, paid from anywhere", body: "Send a client an invoice link. They pay from wherever their money is, you see it marked Paid, and your accountant gets a clean CSV.", color: "blue", d: I.briefcaseFill },
     { title: "Monthly bills", body: "Your Bills pot fills every payday. Pay on the due day yourself, or let your bill payer agent do it.", color: "sun", d: I.docTextFill },
     { title: "Saving for a laptop", body: "A goal with a target and a date. Oiko shows when you will get there at your current pace.", color: "violet", d: I.deviceLaptop },
     { title: "A rainy-day fund", body: "Locked until the date you choose. On a bad day, nobody can open it early, not even you.", color: "stone", glyph: <LockedPotGlyph size={20} /> },

@@ -22,6 +22,7 @@ Balances are USDC and USDT. USDC and USDT are stablecoins designed to track the 
 3. Try to withdraw from the locked pot → refused ("locked until …").
 4. Withdraw 1 USDT from Spend → it leaves the account.
 5. Agents → connect an agent with a cap → run it (see `examples/agents`) → payments within the cap pass, the next one is refused, Disconnect deletes its key.
+6. Invoices → New invoice (client, a line or two, USDC or USDT, due date) → Create and get link → copy the link → open it in a private window → Pay this invoice → choose where the money is, give a refund address → "Simulate payment (test mode)" → back in Invoices the status goes Pending → Paid, with the amount received, the fee and a transaction link → Export CSV (one row per line item, ISO dates, plain decimals; also under Settings → Export invoices).
 
 Note: the hosted demo pays for signups from a testnet relayer account. If signup says the account needs a top-up, the relayer is out of testnet NEAR (see `docs/STATUS.md`).
 

@@ -25,10 +25,10 @@ Wraps 1Click (`ONECLICK_BASE_URL`, default real `https://1click.chaindefuser.com
 | Method | Path | Body | Response |
 |---|---|---|---|
 | GET | `/api/intents/tokens` | | `{ groups: [{ id, label: "USDT on TRON", chain, symbol, assetId, decimals }] }` |
-| POST | `/api/intents/deposit-address` | `{ name, originAsset, amount, refundTo }` | `{ depositAddress, depositMemo?, amountIn, amountOut, fee, deadline, quoteId, destinationToken }` |
+| POST | `/api/intents/deposit-address` | `{ name, originAsset, amount, refundTo, invoiceId? }` | `{ depositAddress, depositMemo?, amountIn, amountOut, fee, deadline, quoteId, destinationToken }` — with `invoiceId` the server ignores `amount`, quotes what is left to pay on the invoice (origin must be the invoice's stablecoin), records the deposit (and its test-mode ticket) on the invoice, and adds `invoiceId` to the response |
 | POST | `/api/intents/withdraw-quote` | `{ vaultId, potId, token, amount, destinationAsset, destinationAddress }` | `{ depositAddress, amountIn, amountOut, fee, deadline, timeEstimate }` |
 | GET | `/api/intents/status/:depositAddress` | | `{ status: "PENDING_DEPOSIT" \| "KNOWN_DEPOSIT_TX" \| "PROCESSING" \| "SUCCESS" \| "INCOMPLETE_DEPOSIT" \| "REFUNDED" \| "FAILED", updatedAt }` — on SUCCESS the server calls `sync()` on the vault |
-| POST | `/api/intents/simulate-deposit` | `{ depositAddress }` | testnet/local only: the mock marks the deposit as sent |
+| POST | `/api/intents/simulate-deposit` | `{ depositAddress, memo?, ticket?, invoiceId? }` | testnet/local only: the mock marks the deposit as sent; with `invoiceId` the newer ticket is stored on the invoice |
 
 ## Agent gateway (`/api/agent/*`)
 
@@ -46,6 +46,7 @@ Auth: header `Authorization: NEP413 <base64(json)>` where json = `{ accountId (v
 | GET | `/api/agent/insights?month=yyyymm` | read | |
 | GET | `/api/agent/earn-rates` | read | |
 | GET | `/api/agent/ajo` | read | |
+| GET | `/api/agent/invoices` | read | the owner's invoices: `{ invoices: [{ id, number, client, status, issue_date, due_date, items, total, paid, received, fee, remaining, paid_at, note, transactions }] }` (read only; no agent write access to invoices) |
 | POST | `/api/agent/prepare` | propose/act | `{ kind: "propose" \| "act", action, reason? }` → `{ unsignedTx: base64, hash: base64 }` (signer = vault, key = agent key, method `agent_propose` / `agent_execute`) |
 | POST | `/api/agent/submit` | propose/act | `{ signedTx: base64 }` → `{ txHash, ok, error? }` |
 | GET | `/api/agent/counterparty?to=&amount=&token=` or `?bill_id=` | read | counterparty check for a payment: `{ receiver, verdict: "allow"\|"warn"\|"block", score, reasons: [{code, severity, message, evidence?}], checkedAt, sources, on_allowlist, decision: {act, propose, message} }` |
@@ -55,6 +56,27 @@ Auth: header `Authorization: NEP413 <base64(json)>` where json = `{ accountId (v
 `/api/agent/prepare` runs the counterparty check for `pay` and `pay_bill` (docs/COUNTERPARTY.md): `block` → 403 `E_COUNTERPARTY_BLOCKED` (act and propose), `warn` on `act` → 409 `E_COUNTERPARTY_WARN` with `error.next = "propose"`. Both errors carry `error.counterparty` (the full result). A successful prepare for a payment includes `counterparty` in the response.
 
 Public: `GET /api/counterparty/:accountId?vault=&amount=&token=` (no auth, 30/min per IP) returns the same result shape without `decision`; `vault` adds the prior-payment signal.
+
+## Invoices (`/api/invoices/*`)
+
+Owner auth = the same NEP-413 header as `/api/agent/log`, signed by a key on the owner's **name account** (`accountId` = `ada.oiko.near`, normally the app key). Amounts are base-unit strings (6 decimals) plus `token`. Dates are `yyyy-mm-dd` (UTC). Line total = quantity (up to 4 decimals) × unit price, rounded half up to a base unit; totals are summed with bigint.
+
+| Method | Path | Auth | Body | Response |
+|---|---|---|---|---|
+| GET | `/api/invoices` | owner | | `{ storage, invoices: [OwnerInvoice] }`, newest first; unfinished deposits are refreshed from 1Click |
+| POST | `/api/invoices` | owner | `{ fromName, client: {name, email?}, items: [{description, quantity, unitPrice}], token: "usdc"\|"usdt", dueDate, note?, state?: "draft"\|"open" }` | `OwnerInvoice` (201). `id` = 16 random bytes, base58; the public page is `/i/<id>`; `number` = `INV-0001`… per owner |
+| GET | `/api/invoices/:id` | none (or owner) | | `PublicInvoice` (no client email, no tickets; drafts are 404). With the owner header: `OwnerInvoice` |
+| PATCH | `/api/invoices/:id` | owner | any of the POST fields, `state: "open"\|"cancelled"` | `OwnerInvoice`. Content can change only until money starts moving (`E_NOT_EDITABLE` 409); paid or in-flight invoices can't be cancelled |
+| GET | `/api/invoices/export.csv` | owner | | `text/csv; charset=utf-8` (BOM, CRLF), one row per line item: Invoice number, Issue date, Due date, Client, Description, Quantity, Unit price, Line total, Currency (USDC/USDT), Invoice total, Status, Paid date, Amount received, Fee, Transaction link. ISO dates, plain decimals, RFC 4180 quoting; text cells starting with `= + - @` get a leading `'` |
+
+`PublicInvoice` = `{ id, number, owner, ownerName, fromName, client: {name}, token, items: [{description, quantity, unitPrice, lineTotal}], total, paid, received, fee, remaining, issueDate, dueDate, note, status, payable, inFlight, paidAt, transactions: [{hash, url}] }`. `OwnerInvoice` adds `client.email, state, editable, createdAt, updatedAt, payments: [{originLabel, status, amountIn, originDecimals, amountOut, fee, createdAt, updatedAt, completedAt, transactions}]`.
+
+Status (derived on every read from the 1Click status of the invoice's deposits; the deposit ticket is stored with the invoice so any instance can refresh it):
+- `draft` (stored), `cancelled` (stored, unless already paid)
+- `paid`: successful deposits add up to the total (counted as what the payer sent; `received` is what arrived after the fee; on SUCCESS the account's `sync()` runs, and its NEAR tx hashes are the transaction links)
+- `pending`: a deposit is received / processing / incomplete, or part of the total is paid (`received` shows how much)
+- `refunded`: the last started deposit was refunded and nothing is paid (the client can pay again)
+- `overdue`: open and past `dueDate`; otherwise `open`
 
 ## Agent discovery
 
