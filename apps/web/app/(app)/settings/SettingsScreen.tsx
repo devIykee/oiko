@@ -62,7 +62,7 @@ export function SettingsScreen() {
         <SectionTitle id="prefs">{t("settings.prefs")}</SectionTitle>
         <GroupedList label={t("settings.prefs")}>
           <ListRow icon="dark" color="violet" title={t("settings.theme")}
-            trailing={<div style={{ width: 172, flex: "none" }}><SegmentedControl label={t("settings.theme")} value={settings.theme} onChange={(v: Theme) => set({ theme: v })}
+            trailing={<div className="oi-seg--compact" style={{ width: 150, flex: "none" }}><SegmentedControl label={t("settings.theme")} value={settings.theme} onChange={(v: Theme) => set({ theme: v })}
               items={[{ value: "auto", label: t("settings.auto") }, { value: "light", label: t("settings.light") }, { value: "dark", label: t("settings.dark") }]} /></div>} />
           <ListRow icon="internet" color="sun" title={t("settings.lowData")} subtitle={t("settings.lowDataSub")}
             trailing={<Toggle checked={settings.lowData} onChange={(v) => set({ lowData: v })} label={t("settings.lowData")} data-testid="toggle-lowdata" />} />
