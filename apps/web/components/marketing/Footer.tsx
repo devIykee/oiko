@@ -10,7 +10,7 @@ const cols: Array<{ title: string; links: Array<[string, string]> }> = [
   { title: "Product", links: [["Open app", "/home"], ["Get your name", "/start"], ["How it works", "/how-it-works"], ["Plan", "/#plan"], ["Savings and locks", "/#savings"]] },
   { title: "Agents and developers", links: [["Agent docs", "/docs/agents"], ["Connect your agent", "/agents"], ["oiko-agent.json", "/.well-known/oiko-agent.json"], ["llms.txt", "/llms.txt"], ["GitHub", REPO]] },
   { title: "Security", links: [["Trust and security", "/security"], ["Locks", "/security#locks"], ["Agent limits", "/security#agents"], ["Risks", "/security#risks"]] },
-  { title: "Legal", links: [["Licence (MIT)", `${REPO}/blob/main/LICENSE`], ["Risks in plain words", "/security#risks"], ["Contact", "mailto:okorieemanuel04012008@gmail.com"]] },
+  { title: "Legal", links: [["Licence (MIT)", `${REPO}/blob/main/LICENSE`], ["Risks in plain words", "/security#risks"], ["Contact", "mailto:eokorie1944@gmail.com"]] },
 ];
 
 export function Footer() {
@@ -22,7 +22,7 @@ export function Footer() {
             <Logo variant="wordmark" height={34} />
             <p className="mt-5 max-w-[320px] text-[20px] font-semibold leading-snug tracking-[-0.02em] font-display">Personal finance meets personal intelligence.</p>
             <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-[14px] text-ink-2">
-              <a href="mailto:okorieemanuel04012008@gmail.com" className="hover:text-ink">okorieemanuel04012008@gmail.com</a>
+              <a href="mailto:eokorie1944@gmail.com" className="hover:text-ink">eokorie1944@gmail.com</a>
               <a href={REPO} className="hover:text-ink" target="_blank" rel="noreferrer">GitHub</a>
             </div>
           </div>
