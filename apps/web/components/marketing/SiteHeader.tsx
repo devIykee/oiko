@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/brand/Logo";
-import { Glyph, lineHorizontal3, xmark, arrowRight } from "./f7";
+import { Glyph, lineHorizontal3, xmark } from "./f7";
 import { cx, pillClass } from "./ui";
 
 const links = [
