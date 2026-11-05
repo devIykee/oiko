@@ -1,7 +1,7 @@
 "use client";
 import { Avatar, Button, GroupedList, Input, ListRow, SectionTitle, SegmentedControl, Toggle, useToast } from "@oiko/ui";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/app/PageHeader";
 import { describeActivity } from "@/components/app/describe";
 import { useConfig } from "@/lib/config";
@@ -22,6 +22,8 @@ export function SettingsScreen() {
   const ov = useOverview();
   const act = useActivity(200);
   const [name, setName] = useState(session?.displayName ?? "");
+  const loadedName = session?.displayName;
+  useEffect(() => { if (loadedName) setName((n) => n || loadedName); }, [loadedName]);
   if (!session) return null;
 
   const exportCsv = () => {
@@ -49,7 +51,7 @@ export function SettingsScreen() {
             <div className="oi-small oi-muted">{session.accountId}</div>
           </div>
         </div>
-        <Input label={t("settings.displayName")} value={name} onChange={(e) => setName(e.target.value.slice(0, 40))}
+        <Input label={t("settings.displayName")} value={name} placeholder={session.displayName} onChange={(e) => setName(e.target.value.slice(0, 40))}
           suffix={name !== session.displayName && name.trim() ? <Button size="sm" onClick={() => { update({ displayName: name.trim() }); toast.show({ message: t("toast.saved") }); }}>{t("common.save")}</Button> : undefined} />
         <p className="oi-micro oi-muted" style={{ margin: 0 }}>{t("settings.displayNameHint")}</p>
       </section>
@@ -58,7 +60,7 @@ export function SettingsScreen() {
         <SectionTitle id="prefs">{t("settings.prefs")}</SectionTitle>
         <GroupedList label={t("settings.prefs")}>
           <ListRow icon="dark" color="violet" title={t("settings.theme")}
-            trailing={<div style={{ width: 190 }}><SegmentedControl label={t("settings.theme")} value={settings.theme} onChange={(v: Theme) => set({ theme: v })}
+            trailing={<div style={{ width: 172, flex: "none" }}><SegmentedControl label={t("settings.theme")} value={settings.theme} onChange={(v: Theme) => set({ theme: v })}
               items={[{ value: "auto", label: t("settings.auto") }, { value: "light", label: t("settings.light") }, { value: "dark", label: t("settings.dark") }]} /></div>} />
           <ListRow icon="internet" color="sun" title={t("settings.lowData")} subtitle={t("settings.lowDataSub")}
             trailing={<Toggle checked={settings.lowData} onChange={(v) => set({ lowData: v })} label={t("settings.lowData")} data-testid="toggle-lowdata" />} />

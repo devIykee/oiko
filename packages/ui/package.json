@@ -12,7 +12,8 @@
     "./icons": "./icons.ts",
     "./motion": "./motion.ts",
     "./*": "./src/*",
-    "./custom-icons": "./src/icons/custom.tsx"
+    "./custom-icons": "./src/icons/custom.tsx",
+    "./logos": "./src/components/logos.tsx"
   },
   "peerDependencies": {
     "react": "^19",

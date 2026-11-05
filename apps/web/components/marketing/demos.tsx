@@ -1,6 +1,7 @@
 "use client";
 // The three "Try it right here" tools. Self-contained, local state only. Simulation, no real money.
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AssetLogo } from "@oiko/ui/logos";
 import { AgentBudgetGlyph, PayLinkGlyph } from "@/components/icons/custom";
 import { Glyph, checkmarkCircleFill, xmarkCircleFill, chartPieFill, checkmarkAlt, docOnDoc } from "./f7";
 import { cx, IconTile, pillClass, SimLabel, Slider } from "./ui";
@@ -22,12 +23,12 @@ function DemoCard({ icon, title, lead, children }: { icon: ReactNode; title: str
   );
 }
 
-function Chips<T extends string | number>({ options, value, onChange, label, render }: { options: readonly T[]; value: T; onChange: (v: T) => void; label: string; render?: (v: T) => string }) {
+function Chips<T extends string | number>({ options, value, onChange, label, render }: { options: readonly T[]; value: T; onChange: (v: T) => void; label: string; render?: (v: T) => ReactNode }) {
   return (
     <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2">
       {options.map((o) => (
         <button key={String(o)} type="button" role="radio" aria-checked={o === value} onClick={() => onChange(o)}
-          className={cx("mk-press h-9 rounded-full px-3.5 text-[14px] font-semibold transition-colors", o === value ? "bg-pill text-pill-ink" : "bg-surface-2 text-ink hover:bg-line")}>
+          className={cx("mk-press inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-[14px] font-semibold transition-colors", o === value ? "bg-pill text-pill-ink" : "bg-surface-2 text-ink hover:bg-line")}>
           {render ? render(o) : String(o)}
         </button>
       ))}
@@ -46,6 +47,7 @@ const useTimers = () => {
 
 /* ---------------- 1. Get paid by name ---------------- */
 const SOURCES = ["USDT on TRON", "USDC on Base", "USDT on BNB Chain"] as const;
+const SOURCE_CHAIN: Record<(typeof SOURCES)[number], string> = { "USDT on TRON": "tron", "USDC on Base": "base", "USDT on BNB Chain": "bsc" };
 const STEPS = ["Waiting for your payment", "Received", "Delivering", "Done"] as const;
 
 export function PayByNameDemo() {
@@ -81,7 +83,8 @@ export function PayByNameDemo() {
         </button>
       </div>
       <p className="mt-5 text-[13px] font-semibold text-ink-2">A friend pays with</p>
-      <div className="mt-2"><Chips label="Where the money comes from" options={SOURCES} value={source} onChange={(v) => { setSource(v); setStep(-1); }} /></div>
+      <div className="mt-2"><Chips label="Where the money comes from" options={SOURCES} value={source} onChange={(v) => { setSource(v); setStep(-1); }}
+        render={(v) => <><span className="-ml-2 inline-flex"><AssetLogo chain={SOURCE_CHAIN[v]} token={v.split(" ")[0]} size={24} /></span>{v}</>} /></div>
       <div className="mt-3"><Chips label="Amount" options={[20, 50, 100] as const} value={amount} onChange={(v) => { setAmount(v); setStep(-1); }} render={(v) => `${v} ${token}`} /></div>
       <ol className="mt-5 space-y-2.5" aria-live="polite">
         {STEPS.map((s, i) => (
@@ -181,7 +184,7 @@ export function PlanDemo() {
 
 /* ---------------- 3. Give an agent a budget ---------------- */
 const PAYEES = [
-  { id: "power", label: "Ikeja Electric", note: "Electricity" },
+  { id: "power", label: "City Power", note: "Electricity" },
   { id: "rent", label: "Landlord", note: "Rent" },
   { id: "gadgets", label: "gadgets.shop", note: "Unknown shop" },
 ] as const;

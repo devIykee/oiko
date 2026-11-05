@@ -14,10 +14,11 @@ import { REPO } from "@/components/marketing/Footer";
 import { NameClaim } from "@/components/marketing/NameClaim";
 import { ActivityScreen, CapsScreen, ConsentScreen, HomeScreen, Phone, ProposalScreen } from "@/components/marketing/phone";
 import { ProofRow } from "@/components/marketing/ProofRow";
+import { AssetLogo } from "@oiko/ui/logos";
 import { Container, IconTile, PillLink, Section, SectionHeading, type TileColor } from "@/components/marketing/ui";
 
 export const metadata: Metadata = {
-  title: { absolute: "Oiko: Personal finance, with your name on it" },
+  title: { absolute: "Oiko: Personal finance meets personal intelligence" },
   alternates: { canonical: "/" },
 };
 
@@ -52,8 +53,8 @@ function Hero() {
     <section aria-labelledby="hero-title" className="relative -mt-16 overflow-hidden bg-bg pt-32 md:pt-40">
       <Container className="text-center">
         <h1 id="hero-title" className="mk-display mk-hero mx-auto max-w-[1000px]">
-          <span className="mk-line" style={{ ["--i" as string]: 0 }}>Personal finance,</span>
-          <span className="mk-line" style={{ ["--i" as string]: 1 }}>with your name on it.</span>
+          <span className="mk-line" style={{ ["--i" as string]: 0 }}>Personal finance</span>
+          <span className="mk-line" style={{ ["--i" as string]: 1 }}>meets personal intelligence.</span>
         </h1>
         <p className="mk-line mx-auto mt-7 max-w-[620px] text-[18px] leading-[1.55] text-ink-2 md:text-[21px]" style={{ ["--i" as string]: 2 }}>
           Get paid from anywhere. Plan every bit, pay your bills, save for what matters. Let your own AI agent help, on limits you set.
@@ -107,7 +108,7 @@ function WhatItIs() {
           <p className="text-[12px] text-ink-2">Your pay link</p>
           <p className="mt-1 font-semibold">/pay/ada</p>
           <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-medium text-ink-2">
-            {["USDT on TRON", "USDC on Base", "USDT on BNB"].map((s) => <span key={s} className="whitespace-nowrap rounded-full bg-surface-2 px-2 py-1">{s}</span>)}
+            {([["USDT on TRON", "tron"], ["USDC on Base", "base"], ["USDT on BNB", "bsc"]] as const).map(([s, c]) => <span key={s} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-surface-2 py-1 pl-1.5 pr-2.5"><AssetLogo chain={c} token={s.slice(0, 4)} size={20} />{s}</span>)}
           </div>
         </div>
       ),

@@ -30,7 +30,7 @@ export function VaultCard({ id, name, icon, color, amount, ticker, meta, badge, 
       <div className="oi-potcard__name">{name}</div>
       <div className="oi-potcard__bal">{amount}{ticker && <small>{ticker}</small>}</div>
       {progress && <ProgressBar thin value={progress.value} max={progress.max} label={progress.label} tone="accent" />}
-      {meta && <div className="oi-potcard__meta">{meta}</div>}
+      <div className="oi-potcard__meta">{meta}</div>
     </C>
   );
 }

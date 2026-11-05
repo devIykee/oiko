@@ -77,11 +77,11 @@ const og = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" vi
 <rect x="800" width="400" height="630" fill="${BLUE}"/>
 <path fill="#FFF" fill-rule="evenodd" transform="translate(880 195) scale(10)" d="${MARK_D}"/>
 <g transform="translate(80 72) scale(${f(lkScale)})">${lkInner}</g>
-<path fill="${INK}" d="${line(acorn, 'Personal finance,', 76, 80, 318, -0.02)}${line(acorn, 'with your name', 76, 80, 404, -0.02)}${line(acorn, 'on it.', 76, 80, 490, -0.02)}"/>
-<path fill="#5E636E" d="${line(inter, 'Get paid from anywhere. Plan every bit.', 26, 80, 556, -0.005)}"/>
+<path fill="${INK}" d="${line(acorn, 'Personal finance', 72, 80, 318, -0.02)}${line(acorn, 'meets personal', 72, 80, 400, -0.02)}${line(acorn, 'intelligence.', 72, 80, 482, -0.02)}"/>
+<path fill="#5E636E" d="${line(inter, 'Plan every bit. Your own AI agent helps,', 26, 80, 548, -0.005)}${line(inter, 'on limits you set.', 26, 80, 584, -0.005)}"/>
 </svg>`;
 writeFileSync(WEB + 'app/opengraph-image.png', png(og, 1200));
-writeFileSync(WEB + 'app/opengraph-image.alt.txt', 'Oiko: Personal finance, with your name on it.');
+writeFileSync(WEB + 'app/opengraph-image.alt.txt', 'Oiko: Personal finance meets personal intelligence. Plan every bit. Your own AI agent helps, on limits you set.');
 writeFileSync(B + 'renders/og.png', png(og, 1200));
 
 // ---- React component data

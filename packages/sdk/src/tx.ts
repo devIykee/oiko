@@ -166,7 +166,7 @@ export class Signer {
       } catch (e) {
         const msg = (e as Error).message;
         if (/InvalidNonce/i.test(msg)) this.nextNonce = null;
-        const code = /\b(E_[A-Z0-9_]+)\b/.exec(msg)?.[1] ?? (/NotEnoughBalance|LackBalanceForState/i.test(msg) ? "E_NO_GAS" : /InvalidNonce/.test(msg) ? "E_NONCE" : /Expired/.test(msg) ? "E_EXPIRED_TX" : "E_RPC");
+        const code = /\b(E_[A-Z0-9_]+)\b/.exec(msg)?.[1] ?? (/NotEnoughBalance|LackBalanceForState|NotEnoughAllowance/i.test(msg) ? "E_NO_GAS" : /InvalidNonce/.test(msg) ? "E_NONCE" : /Expired/.test(msg) ? "E_EXPIRED_TX" : "E_RPC");
         return { txHash, ok: false, errorCode: code, errorMessage: msg, logs: [] };
       }
     };

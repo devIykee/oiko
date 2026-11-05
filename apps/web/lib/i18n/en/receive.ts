@@ -6,6 +6,7 @@ export const receive = {
   "receive.yourLink": "Your pay link",
   "receive.shareText": "Pay me with Oiko: {link}",
   "receive.shareShort": "Pay me with Oiko",
+  "receive.shareWith": "Share your pay link",
   "receive.howTitle": "What happens when someone pays",
   "receive.howBody": "They pick where their USDC or USDT is now and how much to send. It arrives in your account and your plan splits it into your pots straight away.",
   "receive.permanent": "Permanent address",

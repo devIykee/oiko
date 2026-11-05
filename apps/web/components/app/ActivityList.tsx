@@ -21,7 +21,7 @@ export function ActivityList({ items, pots, agents, explorerTx, limit }: { items
       {rows.map((a) => {
         const d = describeActivity(a, pots, agents, t);
         return (
-          <ActivityRow key={a.seq} icon={d.icon} color={d.color} title={d.title} direction={d.direction} amount={d.amount}
+          <ActivityRow key={a.seq} token={d.amount ? a.token : null} icon={d.icon} color={d.color} title={d.title} direction={d.direction} amount={d.amount}
             subtitle={[d.subtitle, fmtDateTime(d.atMs)].filter(Boolean).join(" · ")}
             flash={firstSeen !== null && a.seq > firstSeen && d.direction === "in"} testId={`activity-${a.seq}`} />
         );

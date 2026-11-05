@@ -2,6 +2,7 @@
 import { Children, type ElementType, type ReactNode } from "react";
 import { Icon, type IconConcept, type TileColor } from "../icons";
 import { Tile, cx } from "./primitives";
+import { TokenLogo } from "./logos";
 
 /* ---------------- GroupedList ---------------- */
 export function GroupedList({ children, label, className, ...rest }: { children: ReactNode; label?: string; className?: string } & React.HTMLAttributes<HTMLUListElement>) {
@@ -120,18 +121,22 @@ export function SelectList<V extends string | number>({ options, value, onChange
 }
 
 /* ---------------- ActivityRow ---------------- */
-export function ActivityRow({ title, subtitle, amount, direction, icon, color, by, href, flash, testId }: {
+export function ActivityRow({ title, subtitle, amount, direction, icon, color, by, href, flash, testId, token }: {
   title: ReactNode; subtitle?: ReactNode; amount?: string; direction?: "in" | "out" | "internal"; icon: IconConcept; color?: TileColor;
   by?: ReactNode; href?: string; flash?: boolean; testId?: string;
+  /** Coin ticker (usdc/usdt): shows the coin mark beside the amount. */
+  token?: string | null;
 }) {
+  const signed = amount ? `${direction === "in" ? "+" : direction === "out" ? "−" : ""}${amount}` : undefined;
   return (
     <ListRow
       icon={icon}
       color={color ?? (direction === "in" ? "mint" : direction === "out" ? "stone" : "blue")}
       title={title}
       subtitle={subtitle}
-      amount={amount ? `${direction === "in" ? "+" : direction === "out" ? "−" : ""}${amount}` : undefined}
+      amount={signed && token ? <span className="oi-lr__coinamt"><TokenLogo token={token} size={14} className="oi-lr__coin" />{signed}</span> : signed}
       amountTone={direction === "in" ? "in" : "default"}
+      className="oi-lr--activity"
       meta={by}
       href={href}
       flash={flash}

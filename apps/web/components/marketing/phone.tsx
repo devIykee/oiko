@@ -141,7 +141,7 @@ export function CapsScreen() {
       </div>
       <div className="mt-2 rounded-[18px] bg-surface p-4 text-[12px]">
         <p className="font-semibold text-[13px]">Allowed payees</p>
-        {["Ikeja Electric", "Landlord · rent", "Fibre internet"].map((n) => (
+        {["City Power", "Landlord · rent", "Fibre internet"].map((n) => (
           <div key={n} className="mt-2 flex items-center gap-2 text-ink-2"><Glyph d={I.checkmarkCircleFill} size={14} className="text-success" />{n}</div>
         ))}
       </div>
@@ -175,7 +175,7 @@ export function ProposalScreen() {
 
 export function ActivityScreen() {
   const rows: Array<[string, string, string, TileColor, string]> = [
-    ["Paid Ikeja Electric", "Bill payer · agent", "−25.00", "violet", I.boltFill],
+    ["Paid City Power", "Bill payer · agent", "−25.00", "violet", I.boltFill],
     ["From Sam", "Your plan ran: 4 pots", "+300.00", "mint", I.arrowDown],
     ["Moved to Laptop", "You approved Money coach", "40.00", "blue", I.arrowRightArrowLeft],
     ["Refused: gadgets.shop", "Not on the allowed list", "0.00", "rose", I.xmarkShieldFill],

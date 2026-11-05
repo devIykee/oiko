@@ -1,5 +1,5 @@
 "use client";
-import { AmountInput, Avatar, Badge, Button, CopyField, EmptyState, Input, Note, QRCodeCard, SelectList, StatusTimeline, SuccessCheck, Skeleton, Loading } from "@oiko/ui";
+import { AmountInput, AssetLogo, Avatar, Badge, Button, CopyField, EmptyState, Input, Note, QRCodeCard, SelectList, StatusTimeline, SuccessCheck, Skeleton, Loading } from "@oiko/ui";
 import { fromUnits, toUnits } from "@oiko/sdk";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -116,8 +116,8 @@ export function PayScreen() {
                 setDirect(false); setGroup(groups.data!.groups.find((g) => g.id === id) ?? null); setStep(2);
               }}
               options={[
-                ...groups.data.groups.map((g) => ({ value: g.id, title: g.label, testId: `pay-origin-${g.id}`, leading: <span className="oi-monogram" aria-hidden>{g.chain.slice(0, 3).toUpperCase()}</span> })),
-                { value: DIRECT, title: t("pay.direct"), subtitle: t("pay.directSub"), testId: "pay-origin-direct", leading: <span className="oi-monogram" aria-hidden>N</span> },
+                ...groups.data.groups.map((g) => ({ value: g.id, title: g.label, testId: `pay-origin-${g.id}`, leading: <AssetLogo chain={g.chain} token={g.symbol} /> })),
+                { value: DIRECT, title: t("pay.direct"), subtitle: t("pay.directSub"), testId: "pay-origin-direct", leading: <AssetLogo chain="near" /> },
               ]} />
           )}
         </section>

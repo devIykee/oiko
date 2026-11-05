@@ -20,7 +20,7 @@ export function MoreScreen() {
         <ListRow as={Link} href="/bills" icon="bills" color="sun" title={t("nav.bills")} subtitle={t("more.billsSub")} chevron />
         <ListRow as={Link} href="/insights" icon="insights" color="violet" title={t("nav.insights")} subtitle={t("more.insightsSub")} chevron />
         <ListRow as={Link} href="/activity" icon="activity" color="stone" title={t("nav.activity")} subtitle={t("more.activitySub")} chevron />
-        {config?.features.earn !== false && <ListRow as={Link} href="/pots/earn" icon="earn" color="mint" title={t("pot.earnTitle")} chevron />}
+        {config?.features.earn !== false && <ListRow as={Link} href="/pots/earn" icon="earn" color="mint" title={t("pot.earnTitle")} subtitle={t("more.earnSub")} chevron />}
         {config?.features.ajo !== false && <ListRow as={Link} href="/rosca" icon="ajo" color="rose" title={t("nav.rosca")} subtitle={t("more.roscaSub")} chevron />}
         {config?.features.invest && <ListRow as={Link} href="/invest" icon="invest" color="sun" title={t("nav.invest")} chevron />}
       </GroupedList>

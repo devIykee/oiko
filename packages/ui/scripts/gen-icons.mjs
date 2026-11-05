@@ -10,7 +10,7 @@ const require = createRequire(join(here, "..", "package.json"));
 const svgDir = join(dirname(require.resolve("framework7-icons/package.json")), "svg");
 
 const names = [
-  "house_fill", "chart_pie_fill", "doc_text_fill", "square_grid_2x2_fill", "chart_bar_fill", "chart_bar_alt_fill",
+  "house_fill", "chart_pie_fill", "doc_text_fill", "square_grid_2x2_fill", "chart_bar_fill", "chart_bar_alt_fill", "graph_square_fill",
   "clock_fill", "gear_alt_fill", "ellipsis", "ellipsis_circle_fill", "arrow_down", "arrow_up", "arrow_right_arrow_left",
   "plus", "minus", "creditcard_fill", "tray_fill", "flag_fill", "star_fill", "lock_fill", "lock_open_fill",
   "umbrella_fill", "airplane", "car_fill", "book_fill", "gift_fill", "heart_fill", "bag_fill", "cart_fill",

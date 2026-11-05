@@ -51,9 +51,9 @@ export function ConnectScreen() {
   return (
     <div className="oi-public__col" data-testid="connect">
       <header className="oi-row" style={{ minHeight: 44 }}><Link href="/" aria-label="Oiko" style={{ color: "var(--ink)" }}><Logo variant="wordmark" height={22} /></Link></header>
-      <h1 className="oi-h1">{t("connect.title", { name: draft.name })}</h1>
-      <Note tone="warning" title={t("agents.verifyTitle")}>{t("connect.warn", { url: draft.url || t("connect.noUrl") })}</Note>
-      {!validPk ? <EmptyState icon="warning" title={t("connect.badLink")} body={t("connect.badLinkBody")} />
+      {validPk && <h1 className="oi-h1">{t("connect.title", { name: draft.name })}</h1>}
+      {validPk && <Note tone="warning" title={t("agents.verifyTitle")}>{t("connect.warn", { url: draft.url || t("connect.noUrl") })}</Note>}
+      {!validPk ? <div className="oi-card"><EmptyState icon="warning" title={t("connect.badLink")} body={t("connect.badLinkBody")} /></div>
         : status === "signed-out" ? (
           <EmptyState icon="person" title={t("common.signedOutTitle")} body={t("connect.signIn")} action={<Button onClick={() => router.push("/start")}>{t("common.signIn")}</Button>} />
         ) : done ? (

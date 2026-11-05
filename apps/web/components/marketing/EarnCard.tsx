@@ -1,7 +1,7 @@
 "use client";
 // Earn appears only if the feature is on. The rate is shown only when /api/rates/earn returns one; never hardcoded.
 import { useJson, useSiteConfig } from "./live";
-import { chartBarAltFill } from "./f7";
+import { graphSquareFill } from "./f7";
 import { IconTile } from "./ui";
 
 type Rates = { source?: string; fetchedAt?: string; assets?: Array<{ token: string; supplyApr: string; utilizationBps: number; paused: boolean }> };
@@ -13,7 +13,7 @@ export function EarnCard() {
   const live = (data && data.source !== "fixture" ? data.assets ?? [] : []).filter((a) => !a.paused && a.supplyApr && Number.isFinite(Number(a.supplyApr)));
   return (
     <li className="flex flex-col rounded-card bg-surface p-6 md:p-8" style={{ ["--i" as string]: 2 }}>
-      <IconTile color="mint" size={44} solid d={chartBarAltFill} />
+      <IconTile color="mint" size={44} solid d={graphSquareFill} />
       <h3 className="mt-5 text-[22px] font-bold tracking-[-0.02em] font-display">Earn (variable rate)</h3>
       <p className="mt-2 text-[15px] text-ink-2">Switch on Earn for a pot and it is lent out to earn a variable rate. You can switch it off any time the lending pool has room.</p>
       {live.length ? (

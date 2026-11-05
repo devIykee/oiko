@@ -44,7 +44,7 @@ export function PotsScreen() {
                   name={potName(p, t)} icon={potGlyph(p)} color={potColor(p)} amount={fmt(have)} ticker={t("common.usdcUsdt")}
                   badge={locked ? <Badge icon="lock">{t("common.locked")}</Badge> : p.earn ? <Badge tone="success">{t("common.earning")}</Badge> : undefined}
                   progress={p.target ? { value: Number(have), max: Number(p.target), label: t("pots.goalProgress") } : undefined}
-                  meta={locked ? t("common.lockedUntil", { date: fmtDate(nsToMs(p.unlock_at)) }) : p.target ? t("pots.ofTarget", { target: fmt(p.target) }) : t(`pot.kind.${p.kind}`)} />
+                  meta={locked ? t("common.lockedUntil", { date: fmtDate(nsToMs(p.unlock_at)) }) : p.target ? t("pots.ofTarget", { target: fmt(p.target) }) : t(`pot.kind.${p.kind}`) !== potName(p, t) ? t(`pot.kind.${p.kind}`) : undefined} />
               );
             })}
             <button type="button" className="oi-potcard oi-potcard--add" onClick={() => setCreating(true)}>

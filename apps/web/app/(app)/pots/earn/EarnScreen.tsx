@@ -1,5 +1,5 @@
 "use client";
-import { Badge, EmptyState, GroupedList, ListRow, Note, ProgressBar, RiskNote, SectionTitle } from "@oiko/ui";
+import { Badge, EmptyState, GroupedList, ListRow, Note, ProgressBar, RiskNote, SectionTitle, TokenLogo } from "@oiko/ui";
 import Link from "next/link";
 import { PageHeader } from "@/components/app/PageHeader";
 import { LoadError, PageSkeleton } from "@/components/app/States";
@@ -32,6 +32,7 @@ export function EarnScreen() {
                   return (
                     <div key={a.token} className="oi-card oi-stack-sm" data-testid={`earn-rate-${a.token}`}>
                       <div className="oi-row">
+                        <TokenLogo token={a.token} size={28} />
                         <span style={{ fontWeight: 600, flex: 1 }}>{a.token.toUpperCase()}</span>
                         {paused ? <Badge tone="warning" icon="warning">{t("earn.paused")}</Badge> : <Badge tone="success">{t("earn.open")}</Badge>}
                       </div>

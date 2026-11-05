@@ -2,6 +2,7 @@
 import { Button, CopyField, Icon, Note, QRCodeCard } from "@oiko/ui";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/app/PageHeader";
+import { TelegramGlyph, WhatsAppGlyph, XGlyph } from "@/components/icons/brands";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 
@@ -28,11 +29,11 @@ export function ReceiveScreen() {
         {origin && <QRCodeCard value={link} label={t("receive.qrLabel")} size={220} caption={t("receive.qrCaption")} />}
       </div>
       <CopyField label={t("receive.yourLink")} value={link} display={display} mono={false} copyLabel={t("common.copy")} copiedLabel={t("common.copied")} testId="pay-link" />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8 }}>
-        {canShare && <Button variant="accent" icon="share" onClick={() => navigator.share({ title: "Oiko", text: msg, url: link }).catch(() => undefined)}>{t("common.share")}</Button>}
-        <a className="oi-btn oi-btn--secondary" href={`https://wa.me/?text=${enc}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
-        <a className="oi-btn oi-btn--secondary" href={`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(t("receive.shareShort"))}`} target="_blank" rel="noopener noreferrer">Telegram</a>
-        <a className="oi-btn oi-btn--secondary" href={`https://x.com/intent/post?text=${enc}`} target="_blank" rel="noopener noreferrer">X</a>
+      {canShare && <Button block size="lg" variant="accent" icon="share" onClick={() => navigator.share({ title: "Oiko", text: msg, url: link }).catch(() => undefined)} data-testid="receive-share">{t("common.share")}</Button>}
+      <div className="oi-share" role="group" aria-label={t("receive.shareWith")}>
+        <a className="oi-share__btn" href={`https://wa.me/?text=${enc}`} target="_blank" rel="noopener noreferrer"><WhatsAppGlyph size={24} style={{ color: "#25D366" }} />WhatsApp</a>
+        <a className="oi-share__btn" href={`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(t("receive.shareShort"))}`} target="_blank" rel="noopener noreferrer"><TelegramGlyph size={24} style={{ color: "#26A5E4" }} />Telegram</a>
+        <a className="oi-share__btn" href={`https://x.com/intent/post?text=${enc}`} target="_blank" rel="noopener noreferrer"><XGlyph size={22} />X</a>
       </div>
       <Note tone="info" title={t("receive.howTitle")}>{t("receive.howBody")}</Note>
       <details className="oi-card">

@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Oiko",
     short_name: "Oiko",
-    description: "Personal finance, with your name on it.",
+    description: "Personal finance meets personal intelligence. Get paid from anywhere, plan every bit, and let your own AI agent help, on limits you set.",
     start_url: "/home",
     scope: "/",
     display: "standalone",

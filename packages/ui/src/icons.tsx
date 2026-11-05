@@ -52,7 +52,7 @@ export const icons = {
   tv: "tv_fill",
   rent: "house_alt_fill",
   star: "star_fill",
-  earn: "chart_bar_alt_fill",
+  earn: "graph_square_fill",
   ajo: "ajo",
   invest: "cube_fill",
   // people & identity

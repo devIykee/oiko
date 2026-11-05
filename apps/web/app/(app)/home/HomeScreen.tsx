@@ -1,5 +1,5 @@
 "use client";
-import { Avatar, Badge, BalanceHeader, IconButton, ProposalCard, RoundAction, SectionTitle, VaultCard } from "@oiko/ui";
+import { Avatar, Badge, BalanceHeader, IconButton, ProposalCard, RoundAction, SectionTitle, TokenLogo, VaultCard } from "@oiko/ui";
 import type { Proposal } from "@oiko/sdk";
 import Link from "next/link";
 import { useState } from "react";
@@ -53,8 +53,8 @@ export function HomeScreen() {
         label={t("home.balanceLabel")}
         breakdown={!hidden && (
           <>
-            <Badge data-testid="balance-usdc">{fmt(o.totals.usdc)} USDC</Badge>
-            <Badge data-testid="balance-usdt">{fmt(o.totals.usdt)} USDT</Badge>
+            <Badge className="oi-badge--coin" data-testid="balance-usdc"><TokenLogo token="usdc" size={16} />{fmt(o.totals.usdc)} USDC</Badge>
+            <Badge className="oi-badge--coin" data-testid="balance-usdt"><TokenLogo token="usdt" size={16} />{fmt(o.totals.usdt)} USDT</Badge>
           </>
         )}
       />

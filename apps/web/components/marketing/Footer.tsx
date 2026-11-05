@@ -20,7 +20,7 @@ export function Footer() {
         <div className="grid gap-12 lg:grid-cols-[1.2fr_2fr]">
           <div>
             <Logo variant="wordmark" height={34} />
-            <p className="mt-5 max-w-[320px] text-[20px] font-semibold leading-snug tracking-[-0.02em] font-display">Personal finance, with your name on it.</p>
+            <p className="mt-5 max-w-[320px] text-[20px] font-semibold leading-snug tracking-[-0.02em] font-display">Personal finance meets personal intelligence.</p>
             <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-[14px] text-ink-2">
               <a href="mailto:hello@oiko.example" className="hover:text-ink">hello@oiko.example</a>
               <a href={REPO} className="hover:text-ink" target="_blank" rel="noreferrer">GitHub</a>

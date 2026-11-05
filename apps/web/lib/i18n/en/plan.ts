@@ -6,7 +6,7 @@ export const plan = {
   "plan.leftToSpend": "Left to spend this month",
   "plan.leftAssumption": "Spend balance now, plus the Spend share of money we expect this month. We assume you'll receive as much as last month; if you don't, this number will be lower.",
   "plan.leftDetail": "{spend} in Spend now + {planned} expected from your plan",
-  "plan.yourPlan": "Split rules",
+  "plan.yourPlan": "How each payment is split",
   "plan.ruleSub": "{pct} of every payment",
   "plan.shareFor": "Share for {pot}",
   "plan.spendRest": "Gets whatever is left",

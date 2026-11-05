@@ -24,17 +24,17 @@ const acorn = localFont({
 });
 
 const DESCRIPTION =
-  "Oiko is a personal finance app with your name on it. Get paid from anywhere, plan every bit, and let your own AI agent help, on limits you set.";
+  "Oiko: personal finance meets personal intelligence. Get paid from anywhere, plan every bit, and let your own AI agent help, on limits you set.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
-  title: { default: "Oiko: Personal finance, with your name on it", template: "%s · Oiko" },
+  title: { default: "Oiko: Personal finance meets personal intelligence", template: "%s · Oiko" },
   description: DESCRIPTION,
   applicationName: "Oiko",
   openGraph: {
     type: "website",
     siteName: "Oiko",
-    title: "Oiko: Personal finance, with your name on it",
+    title: "Oiko: Personal finance meets personal intelligence",
     description: DESCRIPTION,
   },
   twitter: { card: "summary_large_image", title: "Oiko", description: DESCRIPTION },

@@ -11,6 +11,7 @@ export const misc = {
   "more.insightsSub": "Where your money went each month",
   "more.activitySub": "Everything, in plain words",
   "more.roscaSub": "Rotating savings with friends and family",
+  "more.earnSub": "Today's rates and which pots earn",
   "more.security": "How Oiko keeps your money safe",
   "more.securitySub": "Who can and can't touch it",
 } as const;

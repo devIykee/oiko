@@ -1,7 +1,7 @@
 "use client";
 import {
   AmountInput, Badge, Button, EmptyState, GroupedList, HoldToConfirm, Input, ListRow, Note, ProgressBar, RiskNote, SectionTitle,
-  SegmentedControl, Sheet, Tile, Toggle, useToast, type IconConcept, type TileColor,
+  SegmentedControl, Sheet, Tile, Toggle, TokenLogo, useToast, type IconConcept, type TileColor,
 } from "@oiko/ui";
 import { fromUnits, goalEta, type Overview, type Pot, type Token } from "@oiko/sdk";
 import { useParams, useRouter } from "next/navigation";
@@ -51,8 +51,8 @@ export function PotDetail() {
           {fmt(have).split(".")[0]}<span className="oi-balance__dec">.{fmt(have).split(".")[1]}</span>
         </div>
         <div className="oi-row" style={{ gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
-          <Badge>{fmt(pot.balances.usdc)} USDC</Badge>
-          <Badge>{fmt(pot.balances.usdt)} USDT</Badge>
+          <Badge className="oi-badge--coin"><TokenLogo token="usdc" size={16} />{fmt(pot.balances.usdc)} USDC</Badge>
+          <Badge className="oi-badge--coin"><TokenLogo token="usdt" size={16} />{fmt(pot.balances.usdt)} USDT</Badge>
           {total(pot.earn_supplied) > 0n && <Badge tone="success">{t("pot.earningAmount", { amount: fmt(total(pot.earn_supplied)) })}</Badge>}
         </div>
         {locked && <Badge tone="accent" icon="lock" data-testid="pot-locked">{t("common.lockedUntil", { date: fmtDate(nsToMs(pot.unlock_at)) })}</Badge>}
@@ -75,10 +75,14 @@ export function PotDetail() {
             <span>{pct(Number((have * 10000n) / (BigInt(pot.target) || 1n)))}</span>
           </div>
           <ProgressBar value={Number(have)} max={Number(pot.target)} label={t("pots.goalProgress")} tone="accent" />
-          <p className="oi-small" style={{ margin: 0 }}>
-            {eta.etaMs === 0 ? t("pot.goalReached") : eta.etaMs ? t("pot.eta", { date: fmtDate(eta.etaMs) }) : t("pot.noEta")}
-          </p>
-          <p className="oi-micro oi-muted" style={{ margin: 0 }}>{eta.assumption}</p>
+          {eta.etaMs == null && eta.assumption ? <p className="oi-small oi-muted" style={{ margin: 0 }}>{eta.assumption}</p> : (
+            <>
+              <p className="oi-small" style={{ margin: 0 }}>
+                {eta.etaMs === 0 ? t("pot.goalReached") : eta.etaMs ? t("pot.eta", { date: fmtDate(eta.etaMs) }) : t("pot.noEta")}
+              </p>
+              {eta.assumption && <p className="oi-micro oi-muted" style={{ margin: 0 }}>{eta.assumption}</p>}
+            </>
+          )}
         </section>
       )}
 

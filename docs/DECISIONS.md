@@ -281,6 +281,10 @@ All decimals are 6 unless marked.
 - Effective Node floor is **22.22.2**, because of near-api-js 7.
 - **Decision**: Node 22 LTS (≥22.22.2) with Next 16 App Router, Tailwind 4 and motion 14.
 
+### 13. Coin, chain and share logos (2026-11-04)
+- Coin and chain marks: `@web3icons/core@4.0.58`, licence **MIT** (© 0xa3k5). We inline only the ten SVGs we use (USDC, USDT; TRON, Base, BNB Chain, Ethereum, Solana, Arbitrum, Polygon, NEAR), copied verbatim by `packages/ui/scripts/gen-logos.mjs` into `packages/ui/src/components/logoData.ts`; not redrawn, no runtime dependency. Unknown chains fall back to a neutral monogram tile.
+- Share glyphs (WhatsApp, Telegram, X) on `/receive`: `simple-icons@16.36.0`, licence **CC0-1.0**, paths copied into `apps/web/components/icons/brands.tsx`. Trademarks stay with their owners; used only to label the share target.
+
 ## Product change: global, English only (2026-10-31)
 
 Source: the human, in chat. Removed Pidgin and the language toggle, removed the naira reference line and `/api/rates/ngn`, removed all country-specific wording. "Ajo" is renamed "ROSCA savings" in user-facing copy; the contract (`ajo.<root>`) and method names keep `ajo` so the frozen interface does not change.

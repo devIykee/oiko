@@ -1,5 +1,5 @@
 "use client";
-import { AmountInput, Button, Input, Note, SegmentedControl, SelectList, StatusTimeline, SuccessCheck, Tile } from "@oiko/ui";
+import { AmountInput, AssetLogo, Button, Input, Note, SegmentedControl, SelectList, StatusTimeline, SuccessCheck, Tile } from "@oiko/ui";
 import { fromUnits, type Token } from "@oiko/sdk";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -78,7 +78,7 @@ export function WithdrawScreen() {
       try {
         const n = await fetchName(name);
         if (!n.exists) { setAddrErr(t("withdraw.noSuchName")); return; }
-        setAddress(n.accountId);
+        setAddress(n.vaultId); // their savings account: registered on both tokens and credited on sync (a bare name account is not, so a transfer would bounce)
         setStep("amount");
       } catch { setAddrErr(t("withdraw.noSuchName")); }
       return;
@@ -152,7 +152,7 @@ export function WithdrawScreen() {
           <h2 className="oi-h2">{t("withdraw.destQ")}</h2>
           {groups.error && !groups.data ? <LoadError error={groups.error} onRetry={groups.refresh} /> : !groups.data ? <PageSkeleton rows={4} /> : (
             <SelectList label={t("withdraw.destQ")} value={dest?.id ?? null} onChange={(id) => { const g = groups.data!.groups.find((x) => x.id === id)!; setDest(g); setCoin(g.symbol.toLowerCase() === "usdc" ? "usdc" : "usdt"); setStep("address"); }}
-              options={groups.data.groups.map((g) => ({ value: g.id, title: g.label, leading: <span className="oi-monogram" aria-hidden>{g.chain.slice(0, 3).toUpperCase()}</span> }))} />
+              options={groups.data.groups.map((g) => ({ value: g.id, title: g.label, leading: <AssetLogo chain={g.chain} token={g.symbol} /> }))} />
           )}
         </>
       )}
