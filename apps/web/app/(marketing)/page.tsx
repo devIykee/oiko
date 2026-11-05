@@ -350,7 +350,7 @@ const FAQ: Array<[string, ReactNode]> = [
   ["Can Oiko freeze my money?", "No. Oiko has no admin key to your account and its code cannot be upgraded. Locked pots open on their date and not before, for anyone, including you and us."],
   ["What if an issuer freezes funds?", "Circle (USDC) and Tether (USDT) can freeze their own stablecoins at any address. Oiko cannot prevent or undo that. It is a real risk of holding stablecoins."],
   ["Do you hold local currency?", "No. Oiko only holds USDC and USDT. There is no bank account and no local-currency balance."],
-  ["What about regulation?", "Oiko is a hackathon project, not a licensed financial service, and does not hold your money for you. Rules differ by country, so check what applies where you live before using it with real money. Nothing here is investment, legal or tax advice."],
+  ["What about regulation?", "Oiko is not a licensed financial service and does not hold your money for you. Rules differ by country, so check what applies where you live before using it with real money. Nothing here is investment, legal or tax advice."],
 ];
 function Faq() {
   return (

@@ -37,7 +37,6 @@ export function ProofRow() {
       {names !== null ? (
         <span><b className="tabular font-semibold text-ink">{names.toLocaleString("en")}</b> names claimed</span>
       ) : null}
-      <span className="inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1 text-[13px] font-semibold text-ink">Built at NEAR HACKATHON</span>
     </div>
   );
 }

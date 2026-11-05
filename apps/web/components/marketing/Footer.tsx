@@ -53,7 +53,7 @@ export function Footer() {
           Oiko is not a bank. Balances are not insured. Yields are variable and can go to zero. Stablecoins carry issuer risk. Not investment, legal or tax advice.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-[13px] text-ink-2">
-          <span>Built at NEAR HACKATHON 2026</span>
+          <span>© 2026 Oiko</span>
           <span>Open source under MIT</span>
         </div>
       </Container>
