@@ -3,7 +3,7 @@
 import {
   Badge, Button, CircleTimeline, CopyField, EmptyState, GroupedList, Input, ListRow, Note, QRCodeCard, SectionTitle, SegmentedControl, Toggle,
 } from "@oiko/ui";
-import type { Circle, Token } from "@oiko/sdk";
+import { AjoClient, type Circle, type Token } from "@oiko/sdk";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -72,7 +72,7 @@ export function RoscaNewScreen() {
   const t = useT();
   const router = useRouter();
   const { exec } = useMoney();
-  const { isTestMode } = useConfig();
+  const { isTestMode, oiko, rpc } = useConfig();
   const [name, setName] = useState("");
   const [coin, setCoin] = useState<Token>("usdt");
   const [amount, setAmount] = useState("");
@@ -104,13 +104,17 @@ export function RoscaNewScreen() {
           sentence={t("rosca.createSentence", { name, amount: fmtToken(units, coin), period: period === "minute" ? t("rosca.everyMinutes", { n: 1 }) : period === "week" ? t("rosca.weekly") : t("rosca.monthly"), n })}
           confirmLabel={t("rosca.create")} successText={t("rosca.created")}
           onConfirm={async () => {
-            const code = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => (b % 36).toString(36)).join("");
+            // Invite codes are 12 characters and hashed together with the group id ("<id>:<code>") so they can't be guessed offline.
+            const code = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => (b % 36).toString(36)).join("");
+            const predicted = oiko?.contracts.ajo && rpc ? await new AjoClient(rpc, oiko.contracts.ajo).nextCircleId() : 0;
             const periodNs = period === "minute" ? 60_000_000_000n : BigInt(period === "week" ? 7 : 30) * DAY_NS;
             const r = await exec("ajoCreate", {
               name, token: coin, amount_per_round: units, period_ns: periodNs.toString(),
-              max_members: n, bond_amount: bond ? units : null, shuffle, invite_code_hash: await sha256Hex(code),
+              max_members: n, bond_amount: bond ? units : null, shuffle, invite_code_hash: await sha256Hex(`${predicted}:${code}`),
             });
             const id = Number(r.value);
+            // Someone else created a group at the same moment: re-salt the invite with the real id.
+            if (Number.isFinite(id) && id > 0 && id !== predicted) await exec("ajoSetInvite", id, await sha256Hex(`${id}:${code}`));
             if (Number.isFinite(id) && id > 0) {
               try { localStorage.setItem(INVITE_KEY(id), code); } catch { /* invite link still shown this session */ }
               router.push(`/rosca/${id}`);
