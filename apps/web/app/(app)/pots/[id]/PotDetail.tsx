@@ -238,7 +238,7 @@ function EditPotSheet({ pot, onClose }: { pot: Pot; onClose: () => void }) {
     <Sheet open onOpenChange={(v) => !v && onClose()} title={t("pot.editTitle")} closeLabel={t("common.close")} dismissible={!busy}
       footer={<Button block size="lg" loading={busy} disabled={!name.trim()} onClick={save}>{t("common.save")}</Button>}>
       <Input label={t("common.name")} value={name} onChange={(e) => setName(e.target.value.slice(0, 32))} />
-      {pot.kind === "goal" && <Input label={t("pots.target")} value={target} onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" suffix="USDC + USDT" />}
+      {pot.kind === "goal" && <Input label={t("pots.target")} value={target} onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" suffix="stablecoins" />}
       <IconColorPicker icon={icon} color={color} onIcon={setIcon} onColor={setColor} />
       {err && <p role="alert" className="oi-error-text" style={{ margin: 0 }}>{err}</p>}
     </Sheet>

@@ -10,6 +10,19 @@ export function AgentStory({ steps }: { steps: StoryStep[] }) {
   const root = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(0);
   const [css, setCss] = useState(false);
+  // Fit the pinned phone between the sticky nav and the bottom edge on any desktop height (it is 620px tall).
+  const [fit, setFit] = useState({ scale: 1, top: 140 });
+  useEffect(() => {
+    const NAV = 64, PAD = 28, PHONE = 620;
+    const read = () => {
+      const avail = window.innerHeight - NAV - PAD * 2;
+      const scale = Math.max(0.6, Math.min(1, avail / PHONE));
+      setFit({ scale, top: Math.round(NAV + (window.innerHeight - NAV - PHONE * scale) / 2) });
+    };
+    read();
+    window.addEventListener("resize", read);
+    return () => window.removeEventListener("resize", read);
+  }, []);
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -28,7 +41,7 @@ export function AgentStory({ steps }: { steps: StoryStep[] }) {
   return (
     <>
       {/* desktop: sticky story */}
-      <div ref={root} className="mk-story relative hidden lg:grid lg:grid-cols-2 lg:gap-16" data-step={step} data-css={css ? "true" : undefined}>
+      <div ref={root} className="mk-story relative hidden overflow-clip lg:grid lg:grid-cols-2 lg:gap-16" data-step={step} data-css={css ? "true" : undefined}>
         <ol className="py-[10vh]">
           {steps.map((s, i) => (
             <li key={s.title} data-s={i} className="mk-story-step flex min-h-[64vh] flex-col justify-center">
@@ -39,8 +52,9 @@ export function AgentStory({ steps }: { steps: StoryStep[] }) {
           ))}
         </ol>
         <div className="relative">
-          <div className="sticky top-[calc(50vh-310px)]">
+          <div className="sticky" style={{ top: fit.top, height: 620 * fit.scale }}>
             <div className="mk-story-phone">
+              <div className="origin-top" style={{ transform: fit.scale < 1 ? `scale(${fit.scale})` : undefined }}>
               <Phone label="Oiko agent screens: consent, limits, a proposal, and the activity log">
                 <div className="relative h-[556px]">
                   {steps.map((s, i) => (
@@ -48,6 +62,7 @@ export function AgentStory({ steps }: { steps: StoryStep[] }) {
                   ))}
                 </div>
               </Phone>
+              </div>
             </div>
           </div>
         </div>

@@ -82,7 +82,7 @@ Original SVG logo. Name from Greek *oikos* "home". Primary concept: bold lowerca
 
 Positioning line (README first line, meta description, OG): "Oiko is a personal finance app with your name on it. Get paid from anywhere, plan every bit, and let your own AI agent help, on limits you set." Tagline: "Personal finance, with your name on it."
 
-Language: talk about money jobs (get paid, plan, bills, spend, save, goals, lock, budget, agent). Above the fold on the landing page and on the app's main screens these words are banned: crypto, web3, blockchain, on-chain, DeFi, token (as a noun for money), wallet (say "account"), NEAR (allowed only in proof row, /security, /how-it-works, footer, docs). Balances keep "USDC + USDT" and tickers. FAQ, /security and /how-it-works explain plainly that Oiko runs on stablecoins on NEAR, with risks.
+Language: talk about money jobs (get paid, plan, bills, spend, save, goals, lock, budget, agent). Above the fold on the landing page and on the app's main screens these words are banned: crypto, web3, blockchain, on-chain, DeFi, token (as a noun for money), wallet (say "account"), NEAR (allowed only in proof row, /security, /how-it-works, footer, docs). Balances keep "USDC + USDT" and tickers. Founder override 2026-11-05: label combined balances 'stablecoins' / 'Total stables' (per-token chips and single-token tickers stay USDC / USDT). FAQ, /security and /how-it-works explain plainly that Oiko runs on stablecoins on NEAR, with risks.
 Renames (UI only; contract identifiers unchanged): Flex → **Spend**; Autosave → **Savings**; Earn → "Earn (variable rate)"; "Vault" never in UI ("your account"/"your money"); split rules → **Your plan**; "Your pay link".
 
 Additions:

@@ -1,5 +1,5 @@
 "use client";
-import { Avatar, Badge, BalanceHeader, IconButton, ProposalCard, RoundAction, SectionTitle, TokenLogo, VaultCard } from "@oiko/ui";
+import { Avatar, Badge, BalanceHeader, IconButton, ProposalCard, RoundAction, SectionTitle, TokenLogo, WalletStack } from "@oiko/ui";
 import type { Proposal } from "@oiko/sdk";
 import Link from "next/link";
 import { useState } from "react";
@@ -46,34 +46,36 @@ export function HomeScreen() {
         <IconButton icon={hidden ? "show" : "hide"} label={hidden ? t("home.showBalance") : t("home.hideBalance")} onClick={() => set({ hideBalance: !hidden })} />
       </div>
 
-      <BalanceHeader
-        testId="balance"
-        value={fmtTotal(o.totals)}
-        hidden={hidden}
-        label={t("home.balanceLabel")}
-        breakdown={!hidden && (
-          <>
-            <Badge className="oi-badge--coin" data-testid="balance-usdc"><TokenLogo token="usdc" size={16} />{fmt(o.totals.usdc)} USDC</Badge>
-            <Badge className="oi-badge--coin" data-testid="balance-usdt"><TokenLogo token="usdt" size={16} />{fmt(o.totals.usdt)} USDT</Badge>
-          </>
-        )}
-      />
+      {/* 1. Money block: balance, coin breakdown, actions and the three summary numbers, nested in one card. */}
+      <section className="oi-home-hero" aria-label={t("home.balanceLabel")}>
+        <BalanceHeader
+          testId="balance"
+          value={fmtTotal(o.totals)}
+          hidden={hidden}
+          label={t("home.balanceLabel")}
+          breakdown={!hidden && (
+            <>
+              <Badge className="oi-badge--coin" data-testid="balance-usdc"><TokenLogo token="usdc" size={16} />{fmt(o.totals.usdc)} USDC</Badge>
+              <Badge className="oi-badge--coin" data-testid="balance-usdt"><TokenLogo token="usdt" size={16} />{fmt(o.totals.usdt)} USDT</Badge>
+            </>
+          )}
+        />
+        <div className="oi-actions" role="group" aria-label={t("home.actions")}>
+          <RoundAction icon="receive" label={t("home.receive")} href="/receive" as={Link} primary data-testid="action-receive" />
+          <RoundAction icon="withdraw" label={t("home.withdraw")} href="/withdraw" as={Link} data-testid="action-withdraw" />
+          <RoundAction icon="move" label={t("home.move")} onClick={() => setMoveOpen(true)} data-testid="action-move" />
+          <RoundAction icon="moreAction" label={t("nav.more")} href="/more" as={Link} />
+        </div>
+        <div className="oi-summary-chips oi-summary-chips--inset" aria-label={t("home.summary")}>
+          <div className="oi-summary-chip" data-testid="chip-spend"><span>{t("home.spendNow")}</span><span>{hidden ? "••" : fmtTotal(o.flex)}</span></div>
+          <div className="oi-summary-chip" data-testid="chip-locked"><span>{t("common.locked")}</span><span>{hidden ? "••" : fmtTotal(o.locked)}</span></div>
+          <div className="oi-summary-chip" data-testid="chip-earning"><span>{t("common.earning")}</span><span>{hidden ? "••" : fmtTotal(o.earning)}</span></div>
+        </div>
+      </section>
 
-      <div className="oi-actions" role="group" aria-label={t("home.actions")}>
-        <RoundAction icon="receive" label={t("home.receive")} href="/receive" as={Link} primary data-testid="action-receive" />
-        <RoundAction icon="withdraw" label={t("home.withdraw")} href="/withdraw" as={Link} data-testid="action-withdraw" />
-        <RoundAction icon="move" label={t("home.move")} onClick={() => setMoveOpen(true)} data-testid="action-move" />
-        <RoundAction icon="moreAction" label={t("nav.more")} href="/more" as={Link} />
-      </div>
-
-      <div className="oi-summary-chips" aria-label={t("home.summary")}>
-        <div className="oi-summary-chip" data-testid="chip-spend"><span>{t("home.spendNow")}</span><span>{hidden ? "••" : fmtTotal(o.flex)}</span></div>
-        <div className="oi-summary-chip" data-testid="chip-locked"><span>{t("common.locked")}</span><span>{hidden ? "••" : fmtTotal(o.locked)}</span></div>
-        <div className="oi-summary-chip" data-testid="chip-earning"><span>{t("common.earning")}</span><span>{hidden ? "••" : fmtTotal(o.earning)}</span></div>
-      </div>
-
+      {/* 2. Things that need you. */}
       {o.proposals.length > 0 && (
-        <section aria-labelledby="waiting">
+        <section aria-labelledby="waiting" className="oi-home-sec">
           <SectionTitle id="waiting">{t("home.waiting")}</SectionTitle>
           <div className="oi-stack-sm">
             {o.proposals.map((p) => (
@@ -86,28 +88,30 @@ export function HomeScreen() {
         </section>
       )}
 
-      <section aria-labelledby="pots-title">
+      {/* 3. Pots as a wallet stack. */}
+      <section aria-labelledby="pots-title" className="oi-home-sec">
         <SectionTitle id="pots-title" action={<Link href="/pots">{t("common.seeAll")}</Link>}>{t("nav.pots")}</SectionTitle>
-        <div className="oi-pots oi-pots--3">
-          {o.pots.map((p) => {
+        <WalletStack testId="pot-stack" linkAs={Link} label={t("nav.pots")} expandLabel={t("home.stackExpand", { n: o.pots.length })} collapseLabel={t("home.stackCollapse")}
+          items={o.pots.map((p) => {
             const locked = isLocked(p);
             const target = p.target ? BigInt(p.target) : null;
             const have = total(p.balances) + total(p.earn_supplied);
-            return (
-              <VaultCard key={p.id} id={p.id} href={`/pots/${p.id}`} as={Link} testId={`pot-card-${p.id}`}
-                name={potName(p, t)} icon={potGlyph(p)} color={potColor(p)}
-                amount={hidden ? "••" : fmt(have)} ticker={hidden ? undefined : t("common.usdcUsdt")}
-                badge={locked ? <Badge icon="lock">{t("common.locked")}</Badge> : p.earn ? <Badge tone="success">{t("common.earning")}</Badge> : undefined}
-                progress={target ? { value: Number(have), max: Number(target), label: t("pots.goalProgress") } : undefined}
-                meta={locked ? t("common.lockedUntil", { date: fmtDate(nsToMs(p.unlock_at)) }) : target ? t("pots.ofTarget", { target: fmt(target) }) : undefined} />
-            );
-          })}
-        </div>
+            return {
+              id: p.id, href: `/pots/${p.id}`, testId: `pot-card-${p.id}`,
+              name: potName(p, t), icon: potGlyph(p), color: potColor(p),
+              amount: hidden ? "••" : fmt(have), ticker: hidden ? undefined : t("common.usdcUsdt"),
+              badge: locked ? <Badge icon="lock">{t("common.locked")}</Badge> : p.earn ? <Badge tone="success">{t("common.earning")}</Badge> : undefined,
+              progress: target ? { value: Number(have), max: Number(target), label: t("pots.goalProgress") } : undefined,
+              meta: locked ? t("common.lockedUntil", { date: fmtDate(nsToMs(p.unlock_at)) }) : target ? t("pots.ofTarget", { target: fmt(target) }) : t(`pot.blurb.${p.kind}`),
+            };
+          })} />
       </section>
 
-      <section aria-labelledby="recent">
+      {/* 4. Money in and out only; /activity keeps every kind. */}
+      <section aria-labelledby="recent" className="oi-home-sec">
         <SectionTitle id="recent" action={<Link href="/activity">{t("common.seeAll")}</Link>}>{t("home.recent")}</SectionTitle>
-        {act.data ? <ActivityList items={act.data} pots={o.pots} agents={o.agents} limit={5} explorerTx={oiko?.explorerTx} /> : <PageSkeleton rows={2} />}
+        {act.data ? <ActivityList items={act.data} pots={o.pots} agents={o.agents} limit={5} moneyOnly explorerTx={oiko?.explorerTx}
+          emptyTitle={t("home.recentEmptyTitle")} emptyBody={t("home.recentEmptyBody")} /> : <PageSkeleton rows={2} />}
       </section>
 
       <MoveSheet open={moveOpen} onOpenChange={setMoveOpen} overview={o} />

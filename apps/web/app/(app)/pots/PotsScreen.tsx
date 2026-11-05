@@ -121,7 +121,7 @@ function CreatePotSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (
         items={[{ value: "goal", label: t("pot.kind.goal") }, { value: "autosave", label: t("pot.kind.autosave") }, { value: "bills", label: t("pot.kind.bills") }, { value: "locked", label: t("pot.kind.locked") }]} />
       <p className="oi-small oi-muted" style={{ margin: 0 }}>{t(`pots.kindHelp.${kind}`)}</p>
       <Input label={t("common.name")} value={name} onChange={(e) => setName(e.target.value.slice(0, 32))} placeholder={t("pots.namePlaceholder")} maxLength={32} data-testid="pot-name" />
-      {kind === "goal" && <Input label={t("pots.target")} value={target} onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" suffix="USDC + USDT" placeholder="800" />}
+      {kind === "goal" && <Input label={t("pots.target")} value={target} onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" suffix="stablecoins" placeholder="800" />}
       <IconColorPicker icon={icon} color={color} onIcon={setIcon} onColor={setColor} />
       {err && <p role="alert" className="oi-error-text" style={{ margin: 0 }}>{err}</p>}
     </Sheet>

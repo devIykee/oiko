@@ -9,7 +9,23 @@ export interface SiteConfig {
   vaultCodeHash: string | null;
   explorer: string | null;
   features: Partial<Record<"earn" | "ajo" | "mcp" | "rescue" | "invest" | "ajoDao", boolean>>;
+  /** Presentation only (set from /admin). "mainnet" changes wording on the website; the real network stays as above. */
+  framing: "testnet" | "mainnet";
   source: "api" | "env";
+}
+
+/** Name suffix as the website shows it: ".oiko.near" under mainnet framing, otherwise the real root. Display only. */
+export function displayRoot(c: Pick<SiteConfig, "root" | "framing">): string {
+  return c.framing === "mainnet" ? c.root.replace(/\.testnet$/, ".near") : c.root;
+}
+/** An account id as the website shows it (never use the result for lookups, links or signing). */
+export function displayAccount(c: Pick<SiteConfig, "root" | "framing">, id: string): string {
+  return c.framing === "mainnet" && id.endsWith(`.${c.root}`) ? `${id.slice(0, -c.root.length)}${displayRoot(c)}` : id;
+}
+/** Network label for website copy; null hides it (mainnet framing, or mainnet for real). */
+export function networkLabel(c: Pick<SiteConfig, "network" | "framing">): string | null {
+  if (c.framing === "mainnet" || c.network === "mainnet") return null;
+  return c.network;
 }
 
 const env = (v: string | undefined) => (v && v.trim() ? v.trim() : null);
@@ -30,6 +46,7 @@ export function envConfig(): SiteConfig {
     vaultCodeHash: env(process.env.NEXT_PUBLIC_OIKO_VAULT_CODE_HASH),
     explorer: env(process.env.NEXT_PUBLIC_OIKO_EXPLORER),
     features: {},
+    framing: env(process.env.NEXT_PUBLIC_OIKO_FRAMING) === "mainnet" ? "mainnet" : "testnet",
     source: "env",
   };
 }
@@ -50,7 +67,7 @@ export function getJson<T>(url: string, timeoutMs = 6000): Promise<T | null> {
   return cache.get(url) as Promise<T | null>;
 }
 
-type ApiConfig = { network?: string; root?: string; contracts?: Partial<SiteConfig["contracts"]>; vaultCodeHash?: string | null; explorer?: string | null; features?: SiteConfig["features"] };
+type ApiConfig = { network?: string; root?: string; contracts?: Partial<SiteConfig["contracts"]>; vaultCodeHash?: string | null; explorer?: string | null; features?: SiteConfig["features"]; framing?: string };
 
 export function useSiteConfig(): { config: SiteConfig; loaded: boolean } {
   const [state, set] = useState<{ config: SiteConfig; loaded: boolean }>(() => ({ config: envConfig(), loaded: false }));
@@ -69,6 +86,7 @@ export function useSiteConfig(): { config: SiteConfig; loaded: boolean } {
           vaultCodeHash: c.vaultCodeHash ?? base.vaultCodeHash,
           explorer: c.explorer ?? base.explorer,
           features: c.features ?? {},
+          framing: c.framing === "mainnet" ? "mainnet" : c.framing === "testnet" ? "testnet" : base.framing,
           source: "api",
         },
       });

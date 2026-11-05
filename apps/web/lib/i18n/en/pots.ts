@@ -20,7 +20,7 @@ export const pots = {
   "pot.moveOut": "Move out",
   "pot.lock": "Lock",
   "pot.extend": "Extend lock",
-  "pot.goal": "Goal: {target} USDC + USDT",
+  "pot.goal": "Goal: {target} in stablecoins",
   "pot.goalReached": "You've reached this goal.",
   "pot.eta": "At this pace you'll get there around {date}.",
   "pot.noEta": "No estimate yet.",

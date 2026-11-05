@@ -12,3 +12,4 @@ export * from "./components/status";
 export * from "./components/cards";
 export * from "./components/nav";
 export * from "./components/logos";
+export * from "./components/stack";

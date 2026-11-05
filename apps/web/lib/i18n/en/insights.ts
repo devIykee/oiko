@@ -6,7 +6,7 @@ export const insights = {
   "insights.out": "Money out",
   "insights.saved": "Saved",
   "insights.rate": "Savings rate",
-  "insights.unit": "All amounts in USDC + USDT.",
+  "insights.unit": "All amounts in stablecoins.",
   "insights.trend": "Last 6 months",
   "insights.barLabel": "{month}: in {in}, out {out}",
   "insights.topPayees": "Top payees",

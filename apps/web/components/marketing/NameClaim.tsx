@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { Glyph, checkmarkCircleFill, xmarkCircleFill } from "./f7";
-import { getJson, useSiteConfig } from "./live";
+import { displayAccount, displayRoot, getJson, useSiteConfig } from "./live";
 import { pillClass } from "./ui";
 
 const NAME_RE = /^[a-z0-9_-]{2,32}$/;
@@ -29,7 +29,7 @@ export function NameClaim() {
   }, [name]);
 
   const go = (n = name) => router.push(n ? `/start?name=${encodeURIComponent(n)}` : "/start");
-  const full = `${name || "yourname"}.${config.root}`;
+  const full = `${name || "yourname"}.${displayRoot(config)}`;
 
   return (
     <form
@@ -55,7 +55,7 @@ export function NameClaim() {
             className="w-0 min-w-[2ch] flex-1 bg-transparent font-semibold outline-none placeholder:text-ink-3"
             style={{ maxWidth: `${Math.max(3, name.length + 1)}ch` }}
           />
-          <span className="truncate text-ink-3">.{config.root}</span>
+          <span className="truncate text-ink-3">.{displayRoot(config)}</span>
         </div>
         <button type="submit" className={pillClass("black", "md", "h-12 shrink-0 px-5 md:px-6")}>
           Get your name
@@ -63,10 +63,10 @@ export function NameClaim() {
       </div>
       <p id={hintId} aria-live="polite" className="mt-3 flex min-h-6 items-center justify-center gap-1.5 text-[14px]">
         {status.kind === "available" ? (
-          <span className="inline-flex items-center gap-1.5 font-medium text-success-ink"><Glyph d={checkmarkCircleFill} size={16} />{status.id} is available</span>
+          <span className="inline-flex items-center gap-1.5 font-medium text-success-ink"><Glyph d={checkmarkCircleFill} size={16} />{displayAccount(config, status.id)} is available</span>
         ) : status.kind === "taken" ? (
           <span className="inline-flex flex-wrap items-center justify-center gap-1.5 text-ink-2">
-            <Glyph d={xmarkCircleFill} size={16} className="text-danger" />{status.id} is taken.
+            <Glyph d={xmarkCircleFill} size={16} className="text-danger" />{displayAccount(config, status.id)} is taken.
             {status.suggestions.slice(0, 3).map((s) => (
               <button key={s} type="button" onClick={() => setName(s)} className="rounded-full bg-surface-2 px-2.5 py-0.5 font-medium text-ink hover:bg-line">{s}</button>
             ))}

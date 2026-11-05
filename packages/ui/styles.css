@@ -3,8 +3,10 @@
 .oi-root, .oi-root * { box-sizing: border-box; }
 .oi-app {
   background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: var(--fs-body);
-  line-height: 1.45; -webkit-font-smoothing: antialiased; min-height: 100dvh;
+  line-height: 1.45; -webkit-font-smoothing: antialiased; min-height: 100dvh; word-spacing: 0.08em; letter-spacing: 0.005em;
 }
+/* Acorn at 11-14px: a touch more tracking and weight so small labels stay crisp. */
+.oi-app :where(.oi-small, .oi-micro, .oi-lr__sub, .oi-badge, .oi-summary-chip span:first-child, .oi-tab, .oi-potcard__meta, .oi-potcard__bal small) { letter-spacing: 0.015em; }
 .oi-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
 .oi-balance-text, .oi-amount { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
 .oi-display { font-family: var(--font-display); letter-spacing: -0.02em; text-wrap: balance; }
@@ -405,3 +407,42 @@ textarea.oi-input { height: auto; min-height: 88px; padding: 12px 0; resize: ver
 .oi-share__btn:active { transform: scale(0.97); background: var(--pressed); }
 @media (hover: hover) { .oi-share__btn:hover { background: var(--pressed); } }
 .oi-share__btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ---------- Wallet stack (Home pots) ---------- */
+.oi-wstack-wrap { display: flex; flex-direction: column; gap: 10px; }
+.oi-wstack { display: grid; gap: 12px; align-items: start; }
+.oi-wstack__col { position: relative; }
+.oi-wstack__slot { position: absolute; left: 0; right: 0; top: 0; }
+.oi-wcard {
+  position: relative; display: flex; flex-direction: column; height: 124px; padding: 0 16px 14px; border-radius: 22px;
+  background: var(--tile-soft); color: var(--ink); text-decoration: none; overflow: hidden;
+  box-shadow: inset 0 0 0 var(--hairline) color-mix(in srgb, var(--tile-deep) 22%, transparent);
+  transition: transform var(--dur-instant) var(--ease-out), filter var(--dur-instant);
+  -webkit-tap-highlight-color: transparent;
+}
+.oi-wcard:active { transform: scale(0.985); }
+@media (hover: hover) { .oi-wcard:hover { filter: brightness(0.985); } }
+.oi-wcard:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.oi-wcard--behind { cursor: pointer; }
+.oi-wcard__head { display: flex; align-items: center; gap: 10px; height: 58px; flex: none; }
+.oi-wcard__icon { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--tile-deep); color: var(--tile-soft); }
+.oi-wcard__name { flex: 1; min-width: 0; font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oi-wcard__amtwrap { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
+.oi-wcard__amt { font-weight: 700; font-size: 18px; letter-spacing: -0.01em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.oi-wcard__body { display: flex; flex-direction: column; gap: 8px; flex: 1; justify-content: flex-end; min-height: 0; }
+.oi-wcard__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 22px; }
+.oi-wcard__ticker { font-size: 11px; font-weight: 600; color: var(--ink-2); letter-spacing: 0.02em; margin-top: 2px; }
+.oi-wcard__meta { font-size: 13px; color: var(--ink-2); min-height: 16px; letter-spacing: 0.015em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oi-wcard .oi-badge { background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.oi-wstack__toggle {
+  align-self: center; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border: 0; border-radius: 999px;
+  background: var(--surface); color: var(--ink-2); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+@media (hover: hover) { .oi-wstack__toggle:hover { color: var(--ink); } }
+
+/* ---------- Home nesting ---------- */
+.oi-home-hero { background: var(--surface); border-radius: 28px; padding: 20px 16px 16px; display: flex; flex-direction: column; gap: 18px; }
+.oi-home-hero .oi-balance { padding: 0; }
+.oi-summary-chips--inset .oi-summary-chip { background: var(--surface-2); }
+.oi-home-sec { display: flex; flex-direction: column; gap: 2px; }
+@media (min-width: 900px) { .oi-home-hero { padding: 28px 28px 20px; } }

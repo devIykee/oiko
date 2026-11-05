@@ -18,6 +18,16 @@ export function whoDidIt(by: string, agents: AgentView[], t: TFn): string {
 
 const amt = (a: Activity) => (a.amount && a.token ? fmtToken(a.amount, a.token) : undefined);
 
+/** Money that actually entered or left the account (Home "Recent transactions"). Moves between pots, locks, plan
+ *  runs, Earn changes and agent housekeeping are not transactions; /activity still lists every kind. */
+const MONEY_KINDS = new Set(["deposit_received", "withdrawn", "bill_paid", "invoice_paid", "rosca_payout", "rosca_contributed"]);
+export function isMoneyActivity(a: Activity): boolean {
+  if (!a.amount || BigInt(a.amount) === 0n) return false;
+  if (MONEY_KINDS.has(a.kind)) return true;
+  // An agent payment to someone outside the account (not a move/save between pots).
+  return a.kind === "agent_action" && !!a.counterparty && !a.counterparty.startsWith("pot:") && a.note !== "move" && a.note !== "save";
+}
+
 export interface Described { title: string; subtitle: string; icon: IconConcept; color: TileColor; direction: "in" | "out" | "internal"; amount?: string; atMs: number }
 
 export function describeActivity(a: Activity, pots: Pot[], agents: AgentView[], t: TFn): Described {

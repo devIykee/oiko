@@ -85,6 +85,7 @@ export const icons = {
   chevronRight: "chevron_right",
   chevronLeft: "chevron_left",
   chevronDown: "chevron_down",
+  chevronUp: "chevron_up",
   edit: "pencil",
   delete: "trash_fill",
   language: "globe",

@@ -1,26 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Inter_Tight } from "next/font/google";
 import localFont from "next/font/local";
 import type { ReactNode } from "react";
 import { THEME_SCRIPT } from "@/components/marketing/theme-script";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const interTight = Inter_Tight({
-  subsets: ["latin"],
-  weight: ["600", "700"],
-  variable: "--font-inter-tight",
-  display: "swap",
-});
-// Licensed Acorn display face (supplied by the team, /fonts). Used for the wordmark and website headlines only.
+// One family everywhere (founder, 2026-11-05): licensed Acorn (/fonts) for headlines, body, app UI, labels and numbers.
+// Acorn has no tabular figures, so money columns stay right-aligned in fixed containers instead of switching fonts.
 const acorn = localFont({
   src: [
+    { path: "../fonts/Acorn-Regular.woff2", weight: "400", style: "normal" },
+    { path: "../fonts/Acorn-Medium.woff2", weight: "500", style: "normal" },
     { path: "../fonts/Acorn-SemiBold.woff2", weight: "600", style: "normal" },
     { path: "../fonts/Acorn-Bold.woff2", weight: "700", style: "normal" },
   ],
   variable: "--font-acorn",
   display: "swap",
-  fallback: ["Inter Tight", "ui-sans-serif", "system-ui", "sans-serif"],
+  fallback: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
 });
 
 const DESCRIPTION =
@@ -55,13 +50,22 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${interTight.variable} ${acorn.variable}`}
+      className={acorn.variable}
     >
       <head>
         {/* Applies the saved Light/Dark/Auto choice before first paint (no flash). */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {/* Night sky (dark mode only; hidden in light via CSS). Decorative, behind everything. */}
+        <div className="oi-night" aria-hidden>
+          <div className="oi-night__sky" />
+          <div className="oi-night__tw oi-night__tw--a" />
+          <div className="oi-night__tw oi-night__tw--b" />
+          <div className="oi-night__shoot" />
+        </div>
+        {children}
+      </body>
     </html>
   );
 }

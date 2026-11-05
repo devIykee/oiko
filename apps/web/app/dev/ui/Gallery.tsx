@@ -55,7 +55,7 @@ export function Gallery() {
 
       <Block title="Balance + round actions">
         <div className="oi-card">
-          <BalanceHeader value={bal} label="Total · USDC + USDT" breakdown={<><Badge>520.40 USDC</Badge><Badge>720.10 USDT</Badge></>} />
+          <BalanceHeader value={bal} label="Total stables" breakdown={<><Badge>520.40 USDC</Badge><Badge>720.10 USDT</Badge></>} />
           <div className="oi-actions" style={{ marginTop: 12 }}>
             <RoundAction icon="receive" label="Receive" primary /><RoundAction icon="withdraw" label="Withdraw" /><RoundAction icon="move" label="Move" /><RoundAction icon="moreAction" label="More" />
           </div>
@@ -67,9 +67,9 @@ export function Gallery() {
 
       <Block title="Pot cards (VaultCard) + progress">
         <div className="oi-pots oi-pots--3">
-          <VaultCard id="g1" name="Spend" icon="spend" color="blue" amount="522.55" ticker="USDC + USDT" meta="Spend" />
-          <VaultCard id="g2" name="Rainy day" icon="locked" color="violet" amount="150.00" ticker="USDC + USDT" badge={<Badge icon="lock">Locked</Badge>} meta="Locked until 1 Jan 2027" />
-          <VaultCard id="g3" name="Laptop" icon="goal" color="rose" amount="212.00" ticker="USDC + USDT" progress={{ value: 212, max: 800, label: "Goal" }} meta="of 800.00" />
+          <VaultCard id="g1" name="Spend" icon="spend" color="blue" amount="522.55" ticker="stablecoins" meta="Spend" />
+          <VaultCard id="g2" name="Rainy day" icon="locked" color="violet" amount="150.00" ticker="stablecoins" badge={<Badge icon="lock">Locked</Badge>} meta="Locked until 1 Jan 2027" />
+          <VaultCard id="g3" name="Laptop" icon="goal" color="rose" amount="212.00" ticker="stablecoins" progress={{ value: 212, max: 800, label: "Goal" }} meta="of 800.00" />
         </div>
         <ProgressBar value={0.5} label="50%" /><ProgressBar value={0.85} label="85%" /><ProgressBar value={1} label="100%" />
       </Block>

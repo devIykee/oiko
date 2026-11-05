@@ -156,6 +156,10 @@ export function parseOutcome(o: FinalOutcome, fallbackHash = ""): TxResult {
       value = text;
     }
   }
+  // Some vault calls refuse inside a callback and return false with an "E_CODE: …" log instead of panicking
+  // (e.g. earn_on when the lending pool is too busy). That is a refusal, not a success.
+  const refusal = value === false ? logs.find((l) => /^E_[A-Z0-9_]+:/.test(l)) : undefined;
+  if (refusal) return { txHash, ok: false, value, errorMessage: refusal, errorCode: CODE_RE.exec(refusal)?.[1] ?? "E_TX_FAILED", logs };
   return { txHash, ok: true, value, logs };
 }
 

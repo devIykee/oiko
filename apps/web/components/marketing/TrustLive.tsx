@@ -1,6 +1,6 @@
 "use client";
 // Contract ids and the vault code hash, read at runtime from /api/config (fallback NEXT_PUBLIC_OIKO_*). "n/a" when unknown.
-import { explorerAccountUrl, useSiteConfig } from "./live";
+import { explorerAccountUrl, useSiteConfig, networkLabel } from "./live";
 import { Glyph, arrowUpRight } from "./f7";
 
 export function TrustLive() {
@@ -23,7 +23,7 @@ export function TrustLive() {
       <div className="overflow-hidden rounded-card bg-surface">
         <div className="flex items-center justify-between border-b border-line px-6 py-4 text-[13px] font-semibold text-ink-2">
           <span>Contract accounts</span>
-          <span>{config.network ?? "n/a"}</span>
+          <span>{networkLabel(config) ?? (config.framing === "mainnet" ? "" : "n/a")}</span>
         </div>
         <ul className="divide-y divide-line">
           {rows.map(([label, id, note]) => {

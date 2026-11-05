@@ -17,7 +17,7 @@ const names = [
   "briefcase_fill", "bolt_fill", "drop_fill", "phone_fill", "wifi", "tv_fill", "person_2_fill", "person_fill",
   "person_crop_circle_fill", "checkmark_alt", "checkmark_circle_fill", "xmark", "xmark_circle_fill",
   "doc_on_doc_fill", "doc_on_doc", "square_arrow_up", "square_arrow_up_fill", "qrcode", "link", "chevron_right", "chevron_left",
-  "chevron_down", "exclamationmark_triangle_fill", "info_circle_fill", "info_circle", "pencil", "trash_fill", "globe",
+  "chevron_down", "chevron_up", "exclamationmark_triangle_fill", "info_circle_fill", "info_circle", "pencil", "trash_fill", "globe",
   "moon_fill", "sun_max_fill", "arrow_2_circlepath", "bell_fill", "sparkles", "calendar", "hourglass", "eye_fill",
   "eye_slash_fill", "paperplane_fill", "shield_fill", "checkmark_shield_fill", "hand_raised_fill", "power",
   "arrow_up_right", "arrow_up_right_square", "graph_square_fill", "percent", "timer_fill", "list_bullet", "search",

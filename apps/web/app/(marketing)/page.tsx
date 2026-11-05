@@ -46,7 +46,7 @@ export default function Landing() {
 /* 3. Hero */
 function Hero() {
   return (
-    <section aria-labelledby="hero-title" className="relative -mt-16 overflow-hidden bg-bg pt-32 md:pt-40">
+    <section aria-labelledby="hero-title" className="relative -mt-16 overflow-hidden bg-bg oi-sky pt-32 md:pt-40">
       <Container className="text-center">
         <h1 id="hero-title" className="mk-display mk-hero mx-auto max-w-[1000px]">
           <span className="mk-line" style={{ ["--i" as string]: 0 }}>Personal finance</span>
@@ -372,7 +372,7 @@ function Faq() {
 /* 16. Closing illustration */
 function Closing() {
   return (
-    <section aria-labelledby="close-title" className="bg-bg pt-24 md:pt-36">
+    <section aria-labelledby="close-title" className="bg-bg oi-sky pt-24 md:pt-36">
       <Container className="text-center">
         <h2 id="close-title" className="mk-display mk-section-title mk-reveal mx-auto max-w-[760px]">Bring your money home.</h2>
         <div className="mk-reveal mt-8 flex flex-wrap justify-center gap-3">

@@ -63,7 +63,7 @@ export function HomeScreen() {
         <span className="flex size-8 items-center justify-center rounded-full bg-surface text-ink-2"><Glyph d={I.bellFill} size={14} /></span>
       </div>
       <div className="pt-7 text-center">
-        <p className="text-[12px] text-ink-2">Total · USDC + USDT</p>
+        <p className="text-[12px] text-ink-2">Total stables</p>
         <p className="mt-1 text-[40px] font-bold tracking-[-0.03em] font-display leading-none"><Money value="1,240.50" /></p>
         <div className="mt-3 flex justify-center gap-1.5 text-[11px]">
           <span className="rounded-full bg-surface px-2.5 py-1">Spend <b className="tabular">312.40</b></span>

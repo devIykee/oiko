@@ -1,6 +1,6 @@
 "use client";
 import { Glyph, arrowUpRight } from "./f7";
-import { explorerAccountUrl, useJson, useSiteConfig } from "./live";
+import { explorerAccountUrl, useJson, useSiteConfig, networkLabel } from "./live";
 
 /** First place NEAR appears. Real contract accounts and live counts only; nothing invented, nothing shown when unknown. */
 export function ProofRow() {
@@ -19,7 +19,7 @@ export function ProofRow() {
       {live ? (
         <span className="inline-flex items-center gap-2 font-semibold text-ink">
           <span className="size-2 rounded-full bg-success" aria-hidden />
-          {config.network === "local" ? "NEAR, local development network" : `Live on NEAR${config.network && config.network !== "mainnet" ? ` ${config.network}` : ""}`}
+          {config.network === "local" && config.framing !== "mainnet" ? "NEAR, local development network" : `Live on NEAR${networkLabel(config) ? ` ${networkLabel(config)}` : ""}`}
         </span>
       ) : null}
       {live

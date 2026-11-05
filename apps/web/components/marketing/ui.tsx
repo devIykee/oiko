@@ -12,8 +12,8 @@ export function Container({ className, children }: { className?: string; childre
 type Tone = "white" | "grey" | "ink";
 const tones: Record<Tone, string> = {
   white: "bg-surface text-ink",
-  grey: "bg-bg text-ink",
-  ink: "bg-[var(--mk-ink-bg)] text-[var(--mk-ink-text)]",
+  grey: "bg-bg text-ink oi-sky",
+  ink: "bg-[var(--mk-ink-bg)] text-[var(--mk-ink-text)] oi-sky-always",
 };
 export function Section({ tone = "white", id, className, children, labelledBy }: { tone?: Tone; id?: string; className?: string; children: ReactNode; labelledBy?: string }) {
   return (
@@ -87,10 +87,7 @@ export function IconTile({ color = "blue", d, size = 36, solid, round, children,
 /** "Simulation, no real money" label for the demo tools. */
 export function SimLabel() {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-2.5 py-1 text-[12px] font-semibold text-warning-ink">
-      <span className="size-1.5 rounded-full bg-warning" aria-hidden />
-      Simulation, no real money
-    </span>
+    <span className="block text-[12px] text-ink-3">Simulation, no real money</span>
   );
 }
 

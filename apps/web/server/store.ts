@@ -4,7 +4,7 @@
 import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
 import { serverConfig } from "./config";
 import type { Invoice } from "./invoices";
-import { agentAccessLog, counterpartyCodeHashes, counterpartyReports, CREATE_SQL, invoices, mockOneclickSwaps, pushSubscriptions, usedNonces } from "./db/schema";
+import { agentAccessLog, appSettings, counterpartyCodeHashes, counterpartyReports, CREATE_SQL, invoices, mockOneclickSwaps, pushSubscriptions, usedNonces } from "./db/schema";
 
 export interface AccessLogRow {
   at: string; vaultId: string; publicKey: string; method: string; path: string; status: number; code: string | null; tool: string | null; txHash: string | null;
@@ -40,6 +40,9 @@ export interface Store {
   putInvoice(inv: Invoice): Promise<void>;
   /** Newest first. */
   listInvoices(owner: string): Promise<Invoice[]>;
+  /** Operator settings (app_settings). null when unset. */
+  getSetting<T>(key: string): Promise<T | null>;
+  setSetting<T>(key: string, value: T): Promise<void>;
 }
 
 export class MemoryStore implements Store {
@@ -51,6 +54,9 @@ export class MemoryStore implements Store {
   private reports: CounterpartyReport[] = [];
   private codeHashes = new Map<string, CodeHashSeen>();
   private invoices = new Map<string, Invoice>();
+  private settings = new Map<string, unknown>();
+  async getSetting<T>(key: string) { return (this.settings.has(key) ? structuredClone(this.settings.get(key)) : null) as T | null; }
+  async setSetting<T>(key: string, value: T) { this.settings.set(key, structuredClone(value)); }
   async useNonce(nonce: string, _pk: string, expiresAt: number) {
     const now = Date.now();
     if (this.nonces.size > 10_000) for (const [k, exp] of this.nonces) if (exp < now) this.nonces.delete(k);
@@ -185,6 +191,15 @@ class PgStore implements Store {
     const db = await this.db();
     const v = { owner: inv.owner, number: inv.number, data: inv, updatedAt: new Date() };
     await db.insert(invoices).values({ id: inv.id, ...v, createdAt: new Date(inv.createdAt) }).onConflictDoUpdate({ target: invoices.id, set: v });
+  }
+  async getSetting<T>(key: string) {
+    const db = await this.db();
+    const rows = await db.select().from(appSettings).where(eq(appSettings.key, key)).limit(1);
+    return (rows[0]?.value as T | undefined) ?? null;
+  }
+  async setSetting<T>(key: string, value: T) {
+    const db = await this.db();
+    await db.insert(appSettings).values({ key, value, updatedAt: new Date() }).onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: new Date() } });
   }
   async listInvoices(owner: string) {
     const db = await this.db();

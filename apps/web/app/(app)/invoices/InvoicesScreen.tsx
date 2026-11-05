@@ -49,8 +49,8 @@ export function InvoicesScreen() {
         action={<Link href="/invoices/new" className="oi-btn oi-btn--sm" data-testid="invoice-new"><span className="oi-btn__label">{t("inv.new")}</span></Link>} />
       {list.length > 0 && (
         <div className="oi-summary-chips">
-          <div className="oi-summary-chip"><span>{t("inv.outstanding")}</span><span data-testid="invoices-outstanding">{fmt(outstanding)} <small className="oi-muted" style={{ fontWeight: 500 }}>USDC + USDT</small></span></div>
-          <div className="oi-summary-chip"><span>{t("inv.received")}</span><span>{fmt(received)} <small className="oi-muted" style={{ fontWeight: 500 }}>USDC + USDT</small></span></div>
+          <div className="oi-summary-chip"><span>{t("inv.outstanding")}</span><span data-testid="invoices-outstanding">{fmt(outstanding)} <small className="oi-muted" style={{ fontWeight: 500 }}>stablecoins</small></span></div>
+          <div className="oi-summary-chip"><span>{t("inv.received")}</span><span>{fmt(received)} <small className="oi-muted" style={{ fontWeight: 500 }}>stablecoins</small></span></div>
         </div>
       )}
       {list.length === 0 ? (

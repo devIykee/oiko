@@ -1,6 +1,7 @@
 @import "tailwindcss";
 /* Design tokens are owned by @oiko/ui (light, dark via prefers-color-scheme and [data-theme], motion). */
 @import "@oiko/ui/tokens.css";
+@import "./stars.css"; /* night sky (dark) */
 
 /* Class-based dark variant that matches the token rules: forced [data-theme=dark], or system dark unless forced light. */
 @custom-variant dark {
@@ -53,7 +54,7 @@
 
   --font-sans: var(--font-ui);
   --font-display: var(--font-display);
-  --font-brand: var(--font-acorn), var(--font-display);
+  --font-brand: var(--font-display);
 
   --radius-card: var(--r-card);
   --radius-sheet: var(--r-sheet);
@@ -77,6 +78,9 @@
     font-family: var(--font-ui);
     font-size: 16px;
     line-height: 1.5;
+    /* Acorn sets a narrow word space and tight small sizes; open both slightly for legibility. */
+    word-spacing: 0.08em;
+    letter-spacing: 0.005em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
