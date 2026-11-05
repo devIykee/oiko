@@ -36,3 +36,10 @@
 OIKO_API=https://oikodotnear.vercel.app pnpm smoke   # after funding the relayer
 pnpm test:unit && pnpm test:contracts
 ```
+
+
+## Testnet lock (2026-11-05)
+
+`oiko.testnet` (registry) and `ajo.oiko.testnet` (ROSCA) have **zero access keys** since 2026-11-05: nobody can change, upgrade or redeploy them. Spare NEAR was moved to the relayer first. User vaults were already keyless. Verify: `view_access_key_list` on both accounts returns no keys.
+
+Demo billers created for videos and the counterparty check: `brightline-fibre.testnet` (Brightline Fibre) and `metro-power-co.testnet` (Metro Power), registered on the test USDC/USDT tokens.
