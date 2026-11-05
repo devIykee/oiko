@@ -2,7 +2,7 @@
 
 ## X post (under 280 characters)
 
-Built at NEAR HACKATHON: Oiko, personal finance with your name on it. Get paid to ada.oiko from anywhere, your plan splits every payment, locks no one can break, and your own AI agent helps on budgets the account enforces. Try it: https://oikodotnear.vercel.app
+Built at NEAR HACKATHON: Oiko. Personal finance meets personal intelligence. Get paid by name from anywhere, your plan splits every payment, and your own AI agent helps on budgets the account enforces, with scam checks before it pays. https://oikodotnear.vercel.app
 
 ## 2-minute demo script
 

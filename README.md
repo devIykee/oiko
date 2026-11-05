@@ -1,6 +1,6 @@
 # Oiko
 
-Oiko: personal finance meets personal intelligence. Get paid from anywhere, plan every bit, and let your own AI agent help, on limits you set.
+Oiko: **Personal finance meets personal intelligence.** Get paid from anywhere, plan every bit, and let your own AI agent help, on limits you set.
 
 - Live demo (NEAR testnet): **https://oikodotnear.vercel.app**
 - Built at NEAR HACKATHON 2026 (tracks: 08 Real-World Money `RWM` primary, 06 AI Security & Defense `SEC`, 07 Agent Economy `AGT`, 01 Unstoppable DeFi `DFI`)
