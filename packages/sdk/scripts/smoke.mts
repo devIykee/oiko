@@ -101,5 +101,6 @@ log(`ALL OK  account=${accountId}`);
 if (process.env.SMOKE_KEEP !== "1") {
   const beneficiary = cfgApi.relayer ?? "oiko-relayer.testnet";
   const d = await ownerSigner.signAndSend(accountId, [act.deleteAccount(beneficiary)]).catch((e: Error) => ({ ok: false, errorMessage: e.message }));
-  log(d.ok ? `cleanup: ${accountId} deleted, NEAR returned to ${beneficiary}` : `cleanup skipped: ${(d as { errorMessage?: string }).errorMessage}`);
+  const gone = d.ok || /AccountDoesNotExist/.test((d as { errorMessage?: string }).errorMessage ?? "");
+  log(gone ? `cleanup: ${accountId} deleted, NEAR returned to ${beneficiary}` : `cleanup skipped: ${(d as { errorMessage?: string }).errorMessage}`);
 }

@@ -12,13 +12,11 @@ const NAME_RE = /^[a-z0-9_-]{2,32}$/;
 function DemoCard({ icon, title, lead, children }: { icon: ReactNode; title: string; lead: string; children: ReactNode }) {
   return (
     <div className="flex flex-col rounded-card bg-surface p-5 md:p-7">
-      <div className="flex items-start justify-between gap-3">
-        {icon}
-        <SimLabel />
-      </div>
+      <div className="flex items-start gap-3">{icon}</div>
       <h3 className="mt-5 text-[22px] font-bold tracking-[-0.02em] font-display">{title}</h3>
       <p className="mt-1.5 text-[15px] text-ink-2">{lead}</p>
       <div className="mt-6 flex flex-1 flex-col">{children}</div>
+      <div className="mt-6 border-t border-line pt-3"><SimLabel /></div>
     </div>
   );
 }

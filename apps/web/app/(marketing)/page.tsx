@@ -13,7 +13,6 @@ import { Glyph } from "@/components/marketing/f7";
 import { REPO } from "@/components/marketing/Footer";
 import { NameClaim } from "@/components/marketing/NameClaim";
 import { ActivityScreen, CapsScreen, ConsentScreen, HomeScreen, Phone, ProposalScreen } from "@/components/marketing/phone";
-import { ProofRow } from "@/components/marketing/ProofRow";
 import { AssetLogo } from "@oiko/ui/logos";
 import { Container, IconTile, PillLink, Section, SectionHeading, type TileColor } from "@/components/marketing/ui";
 
@@ -26,9 +25,6 @@ export default function Landing() {
   return (
     <>
       <Hero />
-      <section id="proof" aria-label="Proof" className="border-y border-line bg-surface py-7">
-        <Container><ProofRow /></Container>
-      </section>
       <WhatItIs />
       <Section tone="grey" id="bills" labelledBy="ba-title">
         <SectionHeading id="ba-title" center title={<>Most money apps make you do the managing. Oiko does it the moment you get paid.</>} />
@@ -76,7 +72,7 @@ function Hero() {
         </div>
         <FloatCard className="left-0 top-16 hidden md:flex xl:left-10" tile="mint" d={I.arrowDown} title="From Sam, 300.00 USDT" sub="Your plan ran: Bills, Savings, Laptop, Spend" />
         <FloatCard className="right-0 top-40 hidden md:flex xl:right-10" tile="stone" glyph={<LockedPotGlyph size={18} />} title="Rainy day, locked" sub="Opens 1 Jan 2027. Not before." />
-        <a href="#proof" className="absolute bottom-6 left-1/2 hidden -translate-x-1/2 translate-y-[calc(100%+40px)] items-center gap-1 text-[13px] text-ink-2 md:flex" aria-label="Scroll to the next section">
+        <a href="#what" className="absolute bottom-6 left-1/2 hidden -translate-x-1/2 translate-y-[calc(100%+40px)] items-center gap-1 text-[13px] text-ink-2 md:flex" aria-label="Scroll to the next section">
           <Glyph d={I.chevronDown} size={14} />
         </a>
       </div>
@@ -140,7 +136,7 @@ function WhatItIs() {
     },
   ];
   return (
-    <Section tone="white" labelledBy="what-title">
+    <Section tone="white" id="what" labelledBy="what-title">
       <SectionHeading id="what-title" title="One account that runs your money for you." lead="Oiko is a personal finance app. You get paid, Oiko sorts it, and the AI agent you trust can help, only inside the lines you draw." />
       <ul className="mk-stagger mt-14 grid gap-4 md:grid-cols-3">
         {cards.map((c, i) => (
