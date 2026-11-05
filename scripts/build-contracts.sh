@@ -8,11 +8,22 @@ RES="$C/res"
 mkdir -p "$RES"
 cd "$C"
 
+# wasm-opt (binaryen) -Oz shrinks the vault ~20% more than cargo-near's built-in `-O` pass.
+# Install once with `cargo install wasm-opt --locked`; without it we fall back to cargo-near's pass.
+WASM_OPT="${WASM_OPT:-$(command -v wasm-opt || echo "$HOME/.cargo/bin/wasm-opt")}"
+
 build() { # <crate dir> <output name> [extra cargo-near args...]
   local dir="$1" out="$2"; shift 2
   local tmp; tmp="$(mktemp -d)"
-  cargo near build non-reproducible-wasm --no-abi --manifest-path "$dir/Cargo.toml" --out-dir "$tmp" "$@" >&2
-  mv "$tmp"/*.wasm "$RES/$out.wasm"
+  if [ -x "$WASM_OPT" ]; then
+    cargo near build non-reproducible-wasm --no-abi --no-wasmopt --manifest-path "$dir/Cargo.toml" --out-dir "$tmp" "$@" >&2
+    "$WASM_OPT" -Oz --enable-bulk-memory --enable-nontrapping-float-to-int --strip-debug --strip-producers \
+      "$tmp"/*.wasm -o "$RES/$out.wasm"
+  else
+    echo "warning: wasm-opt not found; using cargo-near's -O pass (larger wasm)" >&2
+    cargo near build non-reproducible-wasm --no-abi --manifest-path "$dir/Cargo.toml" --out-dir "$tmp" "$@" >&2
+    mv "$tmp"/*.wasm "$RES/$out.wasm"
+  fi
   rm -rf "$tmp"
 }
 

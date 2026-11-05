@@ -7,12 +7,14 @@ import type {
 const G = (t: number) => (BigInt(t) * TGAS).toString();
 const GAS = { small: G(30), std: G(100), xcc: G(200), max: G(300) };
 
-/** Every owner method the app's function-call key may call (all except withdraw_large and rescue_sign). */
+/** Methods the app's function-call key may call: every owner method except withdraw_large, rescue_sign,
+ *  approve_proposal_large and add_agent_large, plus the permissionless sync/run_schedules. */
 // Informational: the registry's config().app_key_methods is the source of truth.
 export const APP_KEY_METHODS = [
   "create_pot", "update_pot", "delete_pot", "set_splits", "move_funds", "lock", "extend_lock", "withdraw", "earn_on", "earn_off",
   "add_agent", "revoke_agent", "approve_proposal", "reject_proposal", "add_schedule", "remove_schedule", "add_bill", "remove_bill",
   "pay_bill", "ajo_contribute", "ajo_post_bond", "ajo_join", "ajo_create", "ajo_start",
+  "ajo_cancel", "ajo_leave", "ajo_remove_member", "ajo_set_invite", "sync", "run_schedules",
 ] as const;
 export const AGENT_KEY_METHODS = ["agent_execute", "agent_propose"] as const;
 
@@ -64,11 +66,17 @@ export class VaultClient {
   withdrawLarge(potId: number, token: Token, amount: string, to: string, memo?: string) {
     return this.call("withdraw_large", { pot_id: potId, token, amount, to, memo: memo ?? null }, GAS.xcc);
   }
-  earnOn(potId: number, token: Token, amount: string) { return this.call("earn_on", { pot_id: potId, token, amount }, GAS.max); }
-  earnOff(potId: number, token: Token, amount: string) { return this.call("earn_off", { pot_id: potId, token, amount }, GAS.max); }
+  // 200 Tgas, not 300: the app key's allowance is 0.25 NEAR and NEAR reserves prepaid gas at >= 1e9 yocto/gas
+  // (min_gas_purchase_price), so a 300 Tgas call can never be signed with it. 200 Tgas covers the lending round trip.
+  earnOn(potId: number, token: Token, amount: string) { return this.call("earn_on", { pot_id: potId, token, amount }, GAS.xcc); }
+  earnOff(potId: number, token: Token, amount: string) { return this.call("earn_off", { pot_id: potId, token, amount }, GAS.xcc); }
   addAgent(publicKey: string, policy: AgentPolicyInput) { return this.call("add_agent", { public_key: publicKey, policy }); }
   revokeAgent(publicKey: string) { return this.call("revoke_agent", { public_key: publicKey }); }
   approveProposal(id: number) { return this.call("approve_proposal", { id }, GAS.xcc); }
+  /** Pay/pay_bill proposals above large_withdrawal_threshold. Login (full-access) key only. */
+  approveProposalLarge(id: number) { return this.call("approve_proposal_large", { id }, GAS.xcc); }
+  /** Agents whose weekly cap is above large_withdrawal_threshold. Login (full-access) key only. */
+  addAgentLarge(publicKey: string, policy: AgentPolicyInput) { return this.call("add_agent_large", { public_key: publicKey, policy }); }
   rejectProposal(id: number) { return this.call("reject_proposal", { id }); }
   addSchedule(toPot: number, token: Token, amount: string, periodNs: string, firstRunNs: string) {
     return this.call("add_schedule", { to_pot: toPot, token, amount, period_ns: periodNs, first_run: firstRunNs });
@@ -80,11 +88,16 @@ export class VaultClient {
   ajoContribute(circleId: number, token: Token, amount: string) { return this.call("ajo_contribute", { circle_id: circleId, token, amount }, GAS.xcc); }
   ajoPostBond(circleId: number, token: Token, amount: string) { return this.call("ajo_post_bond", { circle_id: circleId, token, amount }, GAS.xcc); }
   ajoJoin(circleId: number, inviteCode: string) { return this.call("ajo_join", { circle_id: circleId, invite_code: inviteCode }, GAS.xcc); }
-  /** inviteCodeHash = hex sha256 of the invite code. */
+  /** invite_code_hash = hex sha256("<circle_id>:<code>") with circle_id = ajo.next_circle_id(); code >= 10 chars. */
   ajoCreate(c: { name: string; token: Token; amount_per_round: string; period_ns: string; max_members: number; bond_amount: string | null; shuffle: boolean; invite_code_hash: string }) {
     return this.call("ajo_create", c, GAS.xcc);
   }
   ajoStart(circleId: number) { return this.call("ajo_start", { circle_id: circleId }, GAS.xcc); }
+  ajoCancel(circleId: number) { return this.call("ajo_cancel", { circle_id: circleId }, GAS.xcc); }
+  ajoLeave(circleId: number) { return this.call("ajo_leave", { circle_id: circleId }, GAS.xcc); }
+  ajoRemoveMember(circleId: number, member: string) { return this.call("ajo_remove_member", { circle_id: circleId, member }, GAS.xcc); }
+  /** Rotate the invite: hash = hex sha256("<circle_id>:<code>"). */
+  ajoSetInvite(circleId: number, inviteCodeHash: string) { return this.call("ajo_set_invite", { circle_id: circleId, invite_code_hash: inviteCodeHash }, GAS.xcc); }
 
   // agent (signed by the agent key on the vault itself)
   agentExecute(action: AgentAction) { return this.call("agent_execute", { action }, GAS.xcc); }
@@ -115,4 +128,7 @@ export class AjoClient {
   circle(id: number): Promise<Circle | null> { return this.rpc.view(this.ajoId, "get_circle", { id }); }
   circlesFor(member: string): Promise<Circle[]> { return this.rpc.view(this.ajoId, "get_circles_for", { member }); }
   circles(from: number, limit: number): Promise<Circle[]> { return this.rpc.view(this.ajoId, "get_circles", { from, limit }); }
+  /** The id the next create_circle will get; the invite hash is sha256("<id>:<code>"). */
+  nextCircleId(): Promise<number> { return this.rpc.view(this.ajoId, "next_circle_id"); }
+  withheld(circleId: number): Promise<string> { return this.rpc.view(this.ajoId, "get_withheld", { circle_id: circleId }); }
 }

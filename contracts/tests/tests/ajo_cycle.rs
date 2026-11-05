@@ -18,7 +18,10 @@ async fn ajo_three_member_cycle_with_default() -> anyhow::Result<()> {
         assert_eq!(env.worker.view_access_keys(&u.vault_id).await?.len(), 0);
     }
 
-    let code_hash = hex(&sha2::Sha256::digest(b"join-me"));
+    // invite hash is sha256("<circle_id>:<code>"), code >= 10 chars (A-2)
+    let next: u64 = env.ajo.view("next_circle_id").await?.json()?;
+    let code = "join-me-please";
+    let code_hash = hex(&sha2::Sha256::digest(format!("{next}:{code}").as_bytes()));
     let period: u64 = 60_000_000_000;
     // period below the minimum is refused
     let r = owner_call(&ada, "ajo_create", json!({"name": "Friends", "token": "usdt", "amount_per_round": (10 * USDT).to_string(),
@@ -29,8 +32,8 @@ async fn ajo_three_member_cycle_with_default() -> anyhow::Result<()> {
     assert_ok(&r);
     let id: u64 = r.json()?;
     assert_fails_with(&owner_call(&bola, "ajo_join", json!({"circle_id": id, "invite_code": "wrong"})).await?, "E_BAD_INVITE");
-    assert_ok(&owner_call(&bola, "ajo_join", json!({"circle_id": id, "invite_code": "join-me"})).await?);
-    assert_ok(&owner_call(&chi, "ajo_join", json!({"circle_id": id, "invite_code": "join-me"})).await?);
+    assert_ok(&owner_call(&bola, "ajo_join", json!({"circle_id": id, "invite_code": code})).await?);
+    assert_ok(&owner_call(&chi, "ajo_join", json!({"circle_id": id, "invite_code": code})).await?);
     // start refuses before the early collectors post bonds
     assert!(!owner_call(&ada, "ajo_start", json!({"circle_id": id})).await?.is_success());
     for u in [&ada, &bola, &chi] {
@@ -89,6 +92,32 @@ async fn ajo_three_member_cycle_with_default() -> anyhow::Result<()> {
         assert_eq!(pot_bal(&o, 0, "usdt"), 100 * USDT, "{}", u.name);
         assert_eq!(env.token_balance(&env.usdt, &u.vault_id).await?, 100 * USDT);
     }
+    assert_eq!(c["payouts"][0][1], ada.vault_id.as_str());
+
+    // A-1: a second circle that never starts — a member leaves (bond back), the organiser cancels
+    let next: u64 = env.ajo.view("next_circle_id").await?.json()?;
+    let h2 = hex(&sha2::Sha256::digest(format!("{next}:{code}").as_bytes()));
+    let r = owner_call(&ada, "ajo_create", json!({"name": "Later", "token": "usdt", "amount_per_round": (10 * USDT).to_string(),
+        "period_ns": period.to_string(), "max_members": 3, "bond_amount": (5 * USDT).to_string(), "shuffle": true, "invite_code_hash": h2})).await?;
+    let id2: u64 = r.json()?;
+    assert_eq!(id2, next);
+    for u in [&bola, &chi] {
+        assert_ok(&owner_call(u, "ajo_join", json!({"circle_id": id2, "invite_code": code})).await?);
+        assert_ok(&owner_call(u, "ajo_post_bond", json!({"circle_id": id2, "token": "usdt", "amount": (5 * USDT).to_string()})).await?);
+    }
+    assert_ok(&owner_call(&bola, "ajo_leave", json!({"circle_id": id2})).await?);
+    assert_ok(&owner_call(&ada, "ajo_remove_member", json!({"circle_id": id2, "member": chi.vault_id})).await?);
+    assert_ok(&owner_call(&ada, "ajo_cancel", json!({"circle_id": id2})).await?);
+    let c2: Value = env.ajo.view("get_circle").args_json(json!({"id": id2})).await?.json()?;
+    assert_eq!(c2["status"], "cancelled");
+    assert_eq!(env.token_balance(&env.usdt, env.ajo.id()).await?, 0, "all bonds refunded");
+    for u in [&bola, &chi] {
+        assert_ok(&owner_call(u, "sync", json!({})).await?);
+        assert_eq!(env.token_balance(&env.usdt, &u.vault_id).await?, 100 * USDT);
+        let o = env.overview(&u.vault_id).await?;
+        assert_eq!(o["accounted"]["usdt"], (100 * USDT).to_string());
+    }
+
     let mine: Value = env.ajo.view("get_circles_for").args_json(json!({"member": bola.vault_id})).await?.json()?;
     assert_eq!(mine.as_array().unwrap().len(), 1);
     Ok(())

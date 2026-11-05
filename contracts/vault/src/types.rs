@@ -23,6 +23,9 @@ pub struct Pot {
     pub kind: PotKind,
     pub balances: Balances,
     pub earn_supplied: Balances,
+    /// internal lending shares (not part of the JSON interface)
+    #[serde(skip)]
+    pub earn_shares: Balances,
     pub unlock_at: Option<U64>,
     pub target: Option<U128>,
     pub target_date: Option<U64>,
@@ -49,7 +52,7 @@ pub struct SplitRule {
 
 #[near(serializers = [json, borsh])]
 #[derive(Clone, Debug, PartialEq)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case", try_from = "RawRecipient")]
 pub enum Recipient {
     Near { account_id: AccountId },
     Intents { chain: String, address: String, token: Token },
@@ -75,7 +78,7 @@ pub enum AgentKind {
 
 #[near(serializers = [json, borsh])]
 #[derive(Clone, Debug, PartialEq)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case", try_from = "RawAction")]
 pub enum AgentAction {
     Pay { token: Token, amount: U128, to: AccountId, memo: Option<String> },
     PayBill { bill_id: u32 },
@@ -250,4 +253,94 @@ pub struct Overview {
     pub config: Config,
     pub accounted: Balances,
     pub now: U64,
+}
+
+// Internally tagged enums are deserialized through flat structs: serde's tagged-enum path
+// buffers into `Content` (with float support), which costs a lot of wasm. JSON shape unchanged.
+#[near(serializers = [json])]
+pub struct RawRecipient {
+    #[serde(rename = "type")]
+    pub ty: String,
+    pub account_id: Option<AccountId>,
+    pub chain: Option<String>,
+    pub address: Option<String>,
+    pub token: Option<Token>,
+}
+
+impl TryFrom<RawRecipient> for Recipient {
+    type Error = String;
+    fn try_from(r: RawRecipient) -> Result<Self, String> {
+        let miss = |f: &str| format!("missing field `{}`", f);
+        match r.ty.as_str() {
+            "near" => Ok(Recipient::Near { account_id: r.account_id.ok_or_else(|| miss("account_id"))? }),
+            "intents" => Ok(Recipient::Intents {
+                chain: r.chain.ok_or_else(|| miss("chain"))?,
+                address: r.address.ok_or_else(|| miss("address"))?,
+                token: r.token.ok_or_else(|| miss("token"))?,
+            }),
+            _ => Err("unknown recipient type".into()),
+        }
+    }
+}
+
+#[near(serializers = [json])]
+pub struct RawAction {
+    #[serde(rename = "type")]
+    pub ty: String,
+    pub token: Option<Token>,
+    pub amount: Option<U128>,
+    pub to: Option<AccountId>,
+    pub memo: Option<String>,
+    pub bill_id: Option<u32>,
+    pub from_pot: Option<u32>,
+    pub to_pot: Option<u32>,
+}
+
+impl TryFrom<RawAction> for AgentAction {
+    type Error = String;
+    fn try_from(r: RawAction) -> Result<Self, String> {
+        let miss = |f: &str| format!("missing field `{}`", f);
+        match r.ty.as_str() {
+            "pay" => Ok(AgentAction::Pay {
+                token: r.token.ok_or_else(|| miss("token"))?,
+                amount: r.amount.ok_or_else(|| miss("amount"))?,
+                to: r.to.ok_or_else(|| miss("to"))?,
+                memo: r.memo,
+            }),
+            "pay_bill" => Ok(AgentAction::PayBill { bill_id: r.bill_id.ok_or_else(|| miss("bill_id"))? }),
+            "move" => Ok(AgentAction::Move {
+                from_pot: r.from_pot.ok_or_else(|| miss("from_pot"))?,
+                to_pot: r.to_pot.ok_or_else(|| miss("to_pot"))?,
+                token: r.token.ok_or_else(|| miss("token"))?,
+                amount: r.amount.ok_or_else(|| miss("amount"))?,
+            }),
+            "save" => Ok(AgentAction::Save {
+                to_pot: r.to_pot.ok_or_else(|| miss("to_pot"))?,
+                token: r.token.ok_or_else(|| miss("token"))?,
+                amount: r.amount.ok_or_else(|| miss("amount"))?,
+            }),
+            _ => Err("unknown action type".into()),
+        }
+    }
+}
+
+impl PotKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PotKind::Flex => "flex",
+            PotKind::Autosave => "autosave",
+            PotKind::Locked => "locked",
+            PotKind::Goal => "goal",
+            PotKind::Bills => "bills",
+        }
+    }
+}
+
+impl SplitMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SplitMode::Percent => "percent",
+            SplitMode::Fixed => "fixed",
+        }
+    }
 }

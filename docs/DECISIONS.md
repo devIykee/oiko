@@ -391,3 +391,68 @@ Contracts agent, 2026-10-31. Toolchain: Rust 1.93.0 (`contracts/rust-toolchain.t
   - About 0.24 is buffer for the vault-creation transaction's gas and later storage.
 - The name account had 0.48 NEAR left after the test.
 - The sandbox gas price is 1e9 yocto/gas (10× testnet/mainnet). The fixed 0.25 NEAR app-key allowance therefore runs out after a few dozen heavy calls in sandbox, so integration tests use the full-access key for most owner calls.
+
+### Security + size pass (2026-11-05)
+Vault code hash is now **`72sdtZyfMEdLh2RSqSjBAPt73PpsHCr24irGCi9yahex`** (298,917 bytes, down from 464,720). It replaces testnet `3G9G…`; existing testnet vaults keep the old hash.
+
+**Size.**
+- Method arguments are read from `env::input()` by a tiny JSON reader (`oiko_common::args`) instead of a serde input struct per method. Each `#[near]` method is a thin wrapper around a typed `*_t` method. The JSON accepted is unchanged; bad input fails with `E_BAD_ARGS`.
+- Events and cross-contract arguments are written with `oiko_common::J`, so there is no `serde_json::Value`.
+- Private callbacks take borsh arguments.
+- `scripts/build-contracts.sh` builds with `--no-wasmopt` and then runs `wasm-opt -Oz` (binaryen 116; install with `cargo install wasm-opt --locked`). It falls back to cargo-near's `-O` when wasm-opt is missing.
+- The release profile is unchanged.
+
+**Interface additions.** None of these are on the app key except the four `ajo_*` wrappers, which are added to `APP_KEY_METHODS`.
+- Vault:
+  - `approve_proposal_large(id)` and `add_agent_large(public_key, policy)`: login key only.
+  - `ajo_cancel(circle_id)`, `ajo_leave(circle_id)`, `ajo_remove_member(circle_id, member)` and `ajo_set_invite(circle_id, invite_code_hash)`.
+- Ajo:
+  - `cancel(circle_id)`, `leave(circle_id)`, `remove_member(circle_id, member)` and `set_invite(circle_id, invite_code_hash)`.
+  - New views `next_circle_id()` and `get_withheld(circle_id)`.
+  - `Circle.status` can now be `"cancelled"`.
+- New error codes: `E_EARN_BUSY` and `E_BAD_ARGS`.
+
+**Security fixes.**
+- **V-1: one earn operation per token, with share accounting.**
+  - `earn_on`/`earn_off` refuse with `E_EARN_BUSY` while another earn operation, or an unsettled lending return, exists for that token.
+  - Callbacks never panic after taking the lock; failures release it. A refused `earn_on` (utilization) also releases it.
+  - Each pot holds internal lending *shares*: `Pot.earn_shares`, which is `#[serde(skip)]` so the JSON is unchanged. `earn_supplied` stays the principal.
+  - Supplies mint shares against the real lending balance read just before (`get_asset` + `get_account(vault)`).
+  - Withdrawals value a pot as `shares × real / total_shares` and burn shares, rounding up.
+  - Proptest `locked_earn_claim_is_never_diluted`: another pot's supplies and withdrawals never reduce a locked pot's claim.
+- **V-2: lending returns.** There is at most one pending return per token.
+  - After `execute` succeeds, the token enters "awaiting" with a new `earn_seq`. Only a balance read *started after that point* settles it: `min(delta, requested)` goes to the pot, the rest of `delta` goes through the plan, and the record is cleared.
+  - Ordinary reads (sync or `ft_on_transfer`) credit nothing while a return is unsettled.
+  - A read with `delta == 0` keeps waiting. After **1 hour** with nothing arrived, the withdrawal is rolled back (shares and principal restored), which covers Rhea's failed-transfer case.
+  - Plan inflows are never routed to a pending pot. Known window: a deposit landing in the ~2 blocks between `execute` and the settle read is counted toward the return, capped at the requested amount.
+  - Tests: `short_lending_return_is_settled_and_cleared` and `abort_restores_shares`.
+- **V-3: app-key bypass of `withdraw_large` closed.**
+  - `approve_proposal` refuses pay or pay_bill above `large_withdrawal_threshold` with `E_LARGE`.
+  - `add_agent` refuses `weekly > large_withdrawal_threshold` with `E_LARGE`.
+  - The `*_large` variants exist for the login key.
+  - The sandbox test checks that the app key can't reach them.
+- **A-1: unstarted circles.**
+  - The organiser can `cancel` while forming. Anyone can cancel after `FORMING_EXPIRY_NS`: 7 days, or 10 min with `short-periods`.
+  - A member can `leave` (the organiser can't), and the organiser can `remove_member`.
+  - Bonds are refunded by plain `ft_transfer`; vaults credit them on `sync`.
+- **A-2: invites.**
+  - The hash is `hex(sha256("<circle_id>:<code>"))` with `circle_id = next_circle_id()` at creation. `set_invite` covers a race or a rotation.
+  - `join` requires a code of at least 10 characters.
+  - **The app must compute the new hash** (the SDK doc comment is updated).
+- **A-3: defaulting before your turn.**
+  - Missed contributions of a member who has not yet collected (including their own round) accrue as `owed`.
+  - They are withheld from that member's payout (`ajo_withheld` event).
+  - At completion, withheld money is split equally among members with no defaults, or among everyone if all defaulted; the remainder goes to the first of them (`ajo_withheld_returned`).
+  - The bond still covers defaults *after* collecting.
+- **R-1:** `valid_name` also requires a valid NEAR account label, and `vault.<name>.<root>` must fit 64 characters. Otherwise `E_BAD_NAME`, instead of a panic.
+- **R-2:** `suggest` no longer adds country suffixes; it uses `_pay`, `_money`, `hq` and numbers.
+- **V-9:**
+  - `on_balance` now gets 40 TGas, and the balance read 45 TGas.
+  - `ft_on_transfer` schedules its read only when at least 50 TGas remain; otherwise the deposit waits for `sync`.
+  - Ajo payouts attach 120 TGas, so the receiving vault's `ft_on_transfer` gets 90.
+  - Sandbox test `splits_gas.rs`: 20 rules over 19 pots, then `sync` and `ft_transfer_call`. The largest receipt burned about 5 TGas.
+
+**Superseded text above.** Earlier in this section:
+- "fills pending returns FIFO" and "`ft_on_transfer` needs ≥25 TGas" are replaced by the V-2 and V-9 rules above.
+- `earn_off`'s "pro-rata share by principal" is replaced by shares.
+- Global publish cost at the new size ≈ 298.9 KB × 1e20 yocto/byte ≈ **29.9 NEAR**. The DeployContract fallback ≈ **3.0 NEAR** of code storage per vault.

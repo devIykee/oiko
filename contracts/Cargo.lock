@@ -2620,6 +2620,7 @@ dependencies = [
  "near-jsonrpc-client",
  "near-jsonrpc-primitives",
  "near-primitives",
+ "near-sandbox",
  "near-workspaces",
  "serde_json",
  "sha2 0.10.9",

@@ -33,6 +33,7 @@ const M: Record<string, [string, string]> = {
   E_TRANSFER_FAILED: ["The transfer didn't go through.", "Your money is back in the pot. Check the details and try again."],
   // earn
   E_UTILIZATION: ["Earn is paused right now.", "The lending pool is too busy to take new money safely. Try again later."],
+  E_BAD_ARGS: ["The request was malformed.", "Refresh the app and try again."],
   E_EARN_BUSY: ["Earn is still finishing your last move.", "Wait a few seconds for it to settle, then try again."],
   E_EARN_PAUSED: ["Earn is paused right now.", "The lending pool isn't accepting money. Try again later."],
   E_NO_LENDING: ["Earn isn't available.", "This account wasn't set up with Earn."],

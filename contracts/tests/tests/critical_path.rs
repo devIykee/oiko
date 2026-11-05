@@ -50,6 +50,8 @@ async fn critical_path() -> anyhow::Result<()> {
     assert!(fc.method_names.contains(&"withdraw".to_string()));
     assert!(!fc.method_names.contains(&"withdraw_large".to_string()));
     assert!(!fc.method_names.contains(&"rescue_sign".to_string()));
+    assert!(!fc.method_names.contains(&"approve_proposal_large".to_string()));
+    assert!(!fc.method_names.contains(&"add_agent_large".to_string()));
 
     // ---------------------------------------------------------------- vault via global contract
     env.publish_global(&env.root).await?;
@@ -280,6 +282,29 @@ async fn critical_path() -> anyhow::Result<()> {
         .await?;
     let pid2: u64 = r.json()?;
     assert_ok(&owner_call(&ada, "reject_proposal", json!({"id": pid2})).await?);
+
+    // V-3: the app key can't approve a pay above the quick-withdraw limit or add an agent with
+    // big caps; the login key can, through the *_large methods (not on the app key)
+    let r = agent
+        .call(&ada.vault_id, "agent_propose")
+        .args_json(json!({"action": {"type": "pay", "token": "usdt", "amount": (1_001 * USDT).to_string(), "to": shop.id(), "memo": null}, "reason": "big"}))
+        .transact()
+        .await?;
+    let big: u64 = r.json()?;
+    assert_fails_with(&app_call(&ada, "approve_proposal", json!({"id": big})).await?, "E_LARGE");
+    let r = ada.app.call(&ada.vault_id, "approve_proposal_large").args_json(json!({"id": big})).gas(Gas::from_tgas(30)).transact().await;
+    assert!(r.is_err() || !r.unwrap().is_success(), "app key must not reach approve_proposal_large");
+    // the vault lacks 1001 USDT, so the owner's large approval fails on balance, not on E_LARGE
+    assert_fails_with(&owner_call(&ada, "approve_proposal_large", json!({"id": big})).await?, "E_INSUFFICIENT");
+    assert_ok(&owner_call(&ada, "reject_proposal", json!({"id": big})).await?);
+    let big_pk = SecretKey::from_random(KeyType::ED25519).public_key();
+    let big_policy = json!({
+        "label": "", "agent_name": "big", "agent_url": "", "scopes": ["act"], "allowed_actions": ["pay"],
+        "allowlist": [], "per_tx": "1", "daily": "1", "weekly": (2_000 * USDT).to_string(), "expires_at": expires.to_string()
+    });
+    assert_fails_with(&owner_call(&ada, "add_agent", json!({"public_key": big_pk, "policy": big_policy})).await?, "E_LARGE");
+    assert_ok(&owner_call(&ada, "add_agent_large", json!({"public_key": big_pk, "policy": big_policy})).await?);
+    assert_ok(&owner_call(&ada, "revoke_agent", json!({"public_key": big_pk})).await?);
 
     // revoke deletes the key
     let r = owner_call(&ada, "revoke_agent", json!({"public_key": agent_pk})).await?;

@@ -3,25 +3,137 @@
 
 use near_sdk::json_types::U128;
 use near_sdk::near;
-use near_sdk::serde_json::{self, Value};
+
+pub mod args;
 
 pub const EVENT_STANDARD: &str = "oiko";
 pub const EVENT_VERSION: &str = "1.0.0";
 
-/// Formats a NEP-297 log line. Kept separate from `emit` so it can be unit tested.
-pub fn event_line(event: &str, data: &Value) -> String {
-    format!(
-        "EVENT_JSON:{{\"standard\":\"{}\",\"version\":\"{}\",\"event\":{},\"data\":[{}]}}",
-        EVENT_STANDARD,
-        EVENT_VERSION,
-        serde_json::to_string(event).unwrap(),
-        serde_json::to_string(data).unwrap()
-    )
+/// Minimal JSON object writer used for events and cross-contract arguments. It keeps
+/// `serde_json::Value` (and its map/float machinery) out of the contracts' wasm.
+pub struct J {
+    s: String,
+    first: bool,
+}
+
+impl Default for J {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Appends `v` as a JSON string literal.
+pub fn json_str(out: &mut String, v: &str) {
+    out.push('"');
+    for c in v.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => {
+                const H: &[u8; 16] = b"0123456789abcdef";
+                out.push_str("\\u00");
+                out.push(H[(c as usize) >> 4] as char);
+                out.push(H[(c as usize) & 15] as char);
+            }
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+}
+
+impl J {
+    pub fn new() -> Self {
+        J { s: String::from("{"), first: true }
+    }
+    fn key(&mut self, k: &str) {
+        if !self.first {
+            self.s.push(',');
+        }
+        self.first = false;
+        self.s.push('"');
+        self.s.push_str(k);
+        self.s.push_str("\":");
+    }
+    /// string value
+    pub fn s(mut self, k: &str, v: &str) -> Self {
+        self.key(k);
+        json_str(&mut self.s, v);
+        self
+    }
+    /// optional string value (`null` when None)
+    pub fn os(self, k: &str, v: Option<&str>) -> Self {
+        match v {
+            Some(v) => self.s(k, v),
+            None => self.raw(k, "null"),
+        }
+    }
+    /// plain JSON number
+    pub fn n(mut self, k: &str, v: u64) -> Self {
+        self.key(k);
+        self.s.push_str(&v.to_string());
+        self
+    }
+    /// optional JSON number
+    pub fn on(self, k: &str, v: Option<u64>) -> Self {
+        match v {
+            Some(v) => self.n(k, v),
+            None => self.raw(k, "null"),
+        }
+    }
+    /// decimal string (`U128` / `U64` JSON encoding)
+    pub fn u(mut self, k: &str, v: u128) -> Self {
+        self.key(k);
+        self.s.push('"');
+        self.s.push_str(&v.to_string());
+        self.s.push('"');
+        self
+    }
+    /// optional decimal string
+    pub fn ou(self, k: &str, v: Option<u128>) -> Self {
+        match v {
+            Some(v) => self.u(k, v),
+            None => self.raw(k, "null"),
+        }
+    }
+    pub fn b(self, k: &str, v: bool) -> Self {
+        self.raw(k, if v { "true" } else { "false" })
+    }
+    /// raw JSON value (already encoded)
+    pub fn raw(mut self, k: &str, v: &str) -> Self {
+        self.key(k);
+        self.s.push_str(v);
+        self
+    }
+    pub fn end(mut self) -> String {
+        self.s.push('}');
+        self.s
+    }
+    pub fn bytes(self) -> Vec<u8> {
+        self.end().into_bytes()
+    }
+}
+
+/// Formats a NEP-297 log line. `data` is one JSON object.
+pub fn event_line(event: &str, data: &str) -> String {
+    let mut l = String::with_capacity(64 + data.len());
+    l.push_str("EVENT_JSON:{\"standard\":\"");
+    l.push_str(EVENT_STANDARD);
+    l.push_str("\",\"version\":\"");
+    l.push_str(EVENT_VERSION);
+    l.push_str("\",\"event\":");
+    json_str(&mut l, event);
+    l.push_str(",\"data\":[");
+    l.push_str(data);
+    l.push_str("]}");
+    l
 }
 
 /// Emits a NEP-297 event: `EVENT_JSON:{"standard":"oiko","version":"1.0.0","event":..,"data":[data]}`.
-pub fn emit(event: &str, data: Value) {
-    near_sdk::env::log_str(&event_line(event, &data));
+pub fn emit(event: &str, data: J) {
+    near_sdk::env::log_str(&event_line(event, &data.end()));
 }
 
 /// Builds a stable error string `CODE: message`.
@@ -196,11 +308,13 @@ mod tests {
 
     #[test]
     fn event_format() {
-        let l = event_line("vault_created", &serde_json::json!({"vault_id":"v","owner":"o"}));
-        assert!(l.starts_with(r#"EVENT_JSON:{"standard":"oiko","version":"1.0.0","event":"vault_created","data":[{"#));
-        let v: Value = serde_json::from_str(&l["EVENT_JSON:".len()..]).unwrap();
-        assert_eq!(v["data"][0]["owner"], "o");
-        assert_eq!(v["data"][0]["vault_id"], "v");
+        let l = event_line("vault_created", &J::new().s("vault_id", "v").s("owner", "o\"\n\u{1}").u("amount", 5).n("id", 7).os("x", None).end());
+        assert_eq!(
+            l,
+            r#"EVENT_JSON:{"standard":"oiko","version":"1.0.0","event":"vault_created","data":[{"vault_id":"v","owner":"o\"\n\u0001","amount":"5","id":7,"x":null}]}"#
+        );
+        let v: near_sdk::serde_json::Value = near_sdk::serde_json::from_str(&l["EVENT_JSON:".len()..]).unwrap();
+        assert_eq!(v["data"][0]["owner"], "o\"\n\u{1}");
     }
 
     #[test]
@@ -254,6 +368,10 @@ pub const APP_KEY_METHODS: &[&str] = &[
     "ajo_join",
     "ajo_create",
     "ajo_start",
+    "ajo_cancel",
+    "ajo_leave",
+    "ajo_remove_member",
+    "ajo_set_invite",
     "sync",
     "run_schedules",
 ];

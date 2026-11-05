@@ -319,11 +319,23 @@ impl Env {
         receiver: &AccountId,
         actions: Vec<near_primitives::action::Action>,
     ) -> Result<()> {
+        raw_tx(&self.worker, signer, receiver, actions).await
+    }
+}
+
+/// Signs and sends a transaction with arbitrary actions on `worker`. Fails if any receipt failed.
+pub async fn raw_tx(
+    worker: &Worker<Sandbox>,
+    signer: &Account,
+    receiver: &AccountId,
+    actions: Vec<near_primitives::action::Action>,
+) -> Result<()> {
+    {
         use near_jsonrpc_client::{methods, JsonRpcClient};
         use near_primitives::transaction::{SignedTransaction, Transaction, TransactionV0};
         use near_primitives::types::{BlockReference, Finality};
         use near_primitives::views::{FinalExecutionStatus, QueryRequest, TxExecutionStatus};
-        let client = JsonRpcClient::connect(self.worker.rpc_addr());
+        let client = JsonRpcClient::connect(worker.rpc_addr());
         let sk: near_crypto::SecretKey = signer.secret_key().to_string().parse()?;
         let signer_id: near_primitives::types::AccountId = signer.id().as_str().parse()?;
         let receiver_id: near_primitives::types::AccountId = receiver.as_str().parse()?;
@@ -369,7 +381,9 @@ impl Env {
         }
         Ok(())
     }
+}
 
+impl Env {
     pub async fn token_balance(&self, token: &Contract, who: &AccountId) -> Result<u128> {
         let v: String = token.view("ft_balance_of").args_json(json!({"account_id": who})).await?.json()?;
         Ok(v.parse()?)

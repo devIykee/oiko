@@ -49,7 +49,7 @@ export interface Overview {
 export interface Circle {
   id: number; name: string; organiser: string; token: Token; amount_per_round: string; period_ns: string; max_members: number;
   members: string[]; order: string[]; bond_amount: string; bonds: Record<string, string>; start_at: string | null; round: number;
-  paid: Array<[number, string]>; defaults: Array<[number, string]>; collected: string; status: "forming" | "active" | "completed";
+  paid: Array<[number, string]>; defaults: Array<[number, string]>; collected: string; status: "forming" | "active" | "completed" | "cancelled";
   shuffle: boolean; payouts: Array<[number, string, string]>;
 }
 export interface NameInfo { account_id: string; vault_id: string; created_at: string }

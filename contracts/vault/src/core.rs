@@ -29,6 +29,8 @@ pub struct PendingReturn {
     pub pot_id: u32,
     pub token: Token,
     pub amount: u128,
+    pub burn: u128,
+    pub reduce: u128,
 }
 
 #[near_sdk::near(serializers = [borsh])]
@@ -41,8 +43,14 @@ pub struct Ledger {
     pub in_flight: Balances,
     /// bumped per token whenever `accounted` decreases (an outflow was finalised)
     pub epoch: [u64; 2],
-    /// lending withdrawals requested but not yet received; filled FIFO by incoming deposits
+    /// lending withdrawals requested but not yet settled (at most one per token)
     pub pending_returns: Vec<PendingReturn>,
+    /// per token: 0 idle, 1 earn_on/earn_off in progress, 2 waiting for a lending return (V-1)
+    pub earn_state: [u8; 2],
+    /// per token: bumped when entering state 2; only balance reads started after that settle
+    pub earn_seq: [u64; 2],
+    /// per token: when state 2 began (ns)
+    pub earn_since: [u64; 2],
 }
 
 /// Result of crediting incoming tokens.
@@ -106,6 +114,7 @@ impl Ledger {
                 kind: PotKind::Flex,
                 balances: Balances::default(),
                 earn_supplied: Balances::default(),
+                earn_shares: Balances::default(),
                 unlock_at: None,
                 target: None,
                 target_date: None,
@@ -118,6 +127,9 @@ impl Ledger {
             in_flight: Balances::default(),
             epoch: [0, 0],
             pending_returns: vec![],
+            earn_state: [0, 0],
+            earn_seq: [0, 0],
+            earn_since: [0, 0],
         }
     }
 
@@ -175,6 +187,7 @@ impl Ledger {
             kind,
             balances: Balances::default(),
             earn_supplied: Balances::default(),
+            earn_shares: Balances::default(),
             unlock_at: None,
             target,
             target_date,
@@ -262,42 +275,41 @@ impl Ledger {
         Ok(())
     }
 
-    /// Credits `amount` of incoming tokens: first to pending lending returns (FIFO), then splits.
+    /// Credits `amount` of incoming tokens through the plan (splits). Plan inflows never go to a
+    /// pending lending return.
     pub fn credit(&mut self, t: Token, amount: u128) -> R<Credit> {
         let mut c = Credit::default();
         if amount == 0 {
             return Ok(c);
         }
         self.accounted.add(t, amount)?;
-        let mut left = amount;
-        let mut i = 0;
-        while i < self.pending_returns.len() && left > 0 {
-            if self.pending_returns[i].token != t {
-                i += 1;
-                continue;
-            }
-            let pr = self.pending_returns[i].clone();
-            let take = pr.amount.min(left);
-            left -= take;
-            // pot may have been deleted meanwhile (not possible while pending, but be safe)
+        let allocs = compute_split(&self.splits, amount);
+        for (pot, a) in &allocs {
+            self.pot_mut(*pot)?.balances.add(t, *a)?;
+        }
+        c.allocations = allocs;
+        c.split_amount = amount;
+        Ok(c)
+    }
+
+    /// Settles the (single) pending lending return for `t` with what actually arrived:
+    /// `min(delta, requested)` goes back to the pot, the rest of `delta` goes through the plan,
+    /// and the pending record is cleared (V-2).
+    pub fn settle_return(&mut self, t: Token, delta: u128) -> R<Credit> {
+        let i = self.pending_returns.iter().position(|r| r.token == t);
+        let Some(i) = i else { return self.credit(t, delta) };
+        let pr = self.pending_returns.remove(i);
+        let take = pr.amount.min(delta);
+        let mut c = Credit::default();
+        if take > 0 {
+            self.accounted.add(t, take)?;
             let target = if self.idx(pr.pot_id).is_ok() { pr.pot_id } else { FLEX_ID };
             self.pot_mut(target)?.balances.add(t, take)?;
-            push_alloc(&mut c.returns, target, take);
-            if take == pr.amount {
-                self.pending_returns.remove(i);
-            } else {
-                self.pending_returns[i].amount -= take;
-                i += 1;
-            }
+            c.returns.push((target, take));
         }
-        if left > 0 {
-            let allocs = compute_split(&self.splits, left);
-            for (pot, a) in &allocs {
-                self.pot_mut(*pot)?.balances.add(t, *a)?;
-            }
-            c.allocations = allocs;
-            c.split_amount = left;
-        }
+        let rest = self.credit(t, delta - take)?;
+        c.allocations = rest.allocations;
+        c.split_amount = rest.split_amount;
         Ok(c)
     }
 
@@ -352,68 +364,83 @@ impl Ledger {
         Ok(())
     }
 
-    pub fn settle_supply(&mut self, pot: u32, t: Token, amount: u128, used: u128) -> R<()> {
+    pub fn total_shares(&self, t: Token) -> u128 {
+        self.pots.iter().map(|p| p.earn_shares.get(t)).sum()
+    }
+
+    /// Finalises a supply of `amount` (of which `used` was accepted by the lending market).
+    /// Shares are minted against the lending value *before* this supply (`value_before`, read in
+    /// the same serialized earn operation), so new money never takes interest owed to others.
+    pub fn settle_supply(&mut self, pot: u32, t: Token, amount: u128, used: u128, value_before: u128) -> R<()> {
         self.settle_out(pot, t, amount, used)?;
         let used = used.min(amount);
+        if used == 0 {
+            return Ok(());
+        }
+        let total = self.total_shares(t);
+        let minted = if total == 0 || value_before == 0 { used } else { mul_div(used, total, value_before) };
         let target = if self.idx(pot).is_ok() { pot } else { FLEX_ID };
         let p = self.pot_mut(target)?;
         p.earn_supplied.add(t, used)?;
-        if used > 0 {
-            p.earn = true;
-        }
+        p.earn_shares.add(t, minted)?;
+        p.earn = true;
         Ok(())
     }
 
-    /// Value of a pot's lending position given the vault's real lending balance (token units).
-    /// Interest is shared pro rata to principal.
+    /// Value (token units) of a pot's lending shares, given the vault's real lending balance.
     pub fn earn_value(&self, pot: u32, t: Token, real_lending: u128) -> R<u128> {
-        let principal = self.pot(pot)?.earn_supplied.get(t);
-        let total: u128 = self.pots.iter().map(|p| p.earn_supplied.get(t)).sum();
-        if total == 0 || principal == 0 {
+        let shares = self.pot(pot)?.earn_shares.get(t);
+        let total = self.total_shares(t);
+        if total == 0 || shares == 0 {
             return Ok(0);
         }
-        if real_lending <= total {
-            // never report more than principal if the pool lost value / rounding
-            return Ok(mul_div(principal, real_lending, total));
-        }
-        Ok(mul_div(principal, real_lending, total))
+        Ok(mul_div(shares, real_lending, total))
     }
 
-    /// Starts a lending withdrawal of `amount` tokens for `pot`. Reduces principal pro rata and
-    /// records a pending return. Returns the principal reduction (needed to roll back).
-    pub fn begin_earn_off(&mut self, pot: u32, t: Token, amount: u128, value: u128) -> R<u128> {
+    /// Starts a lending withdrawal of `amount` tokens for `pot`, valued from the current real
+    /// lending balance. Burns shares (rounded up) and principal pro rata, and records the single
+    /// pending return for this token. Returns (burned shares, principal reduction) for rollback.
+    pub fn begin_earn_off(&mut self, pot: u32, t: Token, amount: u128, real_lending: u128) -> R<(u128, u128)> {
         if amount == 0 {
             return Err(err("E_BAD_AMOUNT", "amount must be > 0"));
         }
+        if self.pending_returns.iter().any(|r| r.token == t) {
+            return Err(err("E_EARN_BUSY", "an Earn change for this token is still finishing"));
+        }
+        let value = self.earn_value(pot, t, real_lending)?;
         if amount > value {
             return Err(err(
                 "E_INSUFFICIENT",
                 format!("pot has {} {} in Earn, asked for {}", value, t.as_str(), amount),
             ));
         }
+        let total = self.total_shares(t);
         let p = self.pot_mut(pot)?;
+        let shares = p.earn_shares.get(t);
         let principal = p.earn_supplied.get(t);
-        let reduce = if amount == value { principal } else { mul_div_ceil(principal, amount, value).min(principal) };
+        let (burn, reduce) = if amount == value {
+            (shares, principal)
+        } else {
+            let burn = mul_div_ceil(amount, total, real_lending).min(shares);
+            (burn, mul_div_ceil(principal, burn, shares).min(principal))
+        };
+        p.earn_shares.sub(t, burn)?;
         p.earn_supplied.sub(t, reduce)?;
-        if p.earn_supplied.is_zero() {
+        if p.earn_shares.is_zero() {
             p.earn = false;
         }
-        self.pending_returns.push(PendingReturn { pot_id: pot, token: t, amount });
-        Ok(reduce)
+        self.pending_returns.push(PendingReturn { pot_id: pot, token: t, amount, burn, reduce });
+        Ok((burn, reduce))
     }
 
-    /// Rolls back `begin_earn_off` when the lending call failed.
-    pub fn abort_earn_off(&mut self, pot: u32, t: Token, amount: u128, reduce: u128) -> R<()> {
-        if let Some(i) = self
-            .pending_returns
-            .iter()
-            .rposition(|r| r.pot_id == pot && r.token == t && r.amount == amount)
-        {
-            self.pending_returns.remove(i);
-        }
-        let target = if self.idx(pot).is_ok() { pot } else { FLEX_ID };
+    /// Rolls back `begin_earn_off` (the lending call failed, or nothing ever arrived).
+    pub fn abort_earn_off(&mut self, t: Token) -> R<()> {
+        let Some(i) = self.pending_returns.iter().position(|r| r.token == t) else { return Ok(()) };
+        let pr = self.pending_returns.remove(i);
+        let target = if self.idx(pr.pot_id).is_ok() { pr.pot_id } else { FLEX_ID };
         let p = self.pot_mut(target)?;
-        p.earn_supplied.add(t, reduce)?;
+        p.earn_supplied.add(t, pr.reduce)?;
+        p.earn_shares.add(t, pr.burn)?;
         p.earn = true;
         Ok(())
     }
@@ -733,20 +760,65 @@ mod tests {
         l.credit(Token::Usdc, 100).unwrap();
         l.move_funds(0, 2, Token::Usdc, 100, T0).unwrap();
         l.begin_out(2, Token::Usdc, 100, T0, false).unwrap();
-        l.settle_supply(2, Token::Usdc, 100, 100).unwrap();
+        l.settle_supply(2, Token::Usdc, 100, 100, 0).unwrap();
         assert_eq!(l.pot(2).unwrap().earn_supplied.get(Token::Usdc), 100);
         assert_eq!(l.accounted.get(Token::Usdc), 0);
         // lending balance grew to 110
         let v = l.earn_value(2, Token::Usdc, 110).unwrap();
         assert_eq!(v, 110);
-        let red = l.begin_earn_off(2, Token::Usdc, 55, v).unwrap();
-        assert_eq!(red, 50);
-        let c = l.credit(Token::Usdc, 55).unwrap();
+        let (burn, red) = l.begin_earn_off(2, Token::Usdc, 55, 110).unwrap();
+        assert_eq!((burn, red), (50, 50));
+        // only one pending return per token
+        assert!(l.begin_earn_off(2, Token::Usdc, 1, 55).unwrap_err().starts_with("E_EARN_BUSY"));
+        let c = l.settle_return(Token::Usdc, 55).unwrap();
         assert_eq!(c.returns, vec![(2, 55)]);
         assert!(c.allocations.is_empty());
         assert!(l.check_invariant());
-        assert!(l.begin_earn_off(2, Token::Usdc, 56, l.earn_value(2, Token::Usdc, 55).unwrap()).unwrap_err().starts_with("E_INSUFFICIENT"));
+        assert!(l.begin_earn_off(2, Token::Usdc, 56, 55).unwrap_err().starts_with("E_INSUFFICIENT"));
     }
+
+    #[test]
+    fn short_lending_return_is_settled_and_cleared() {
+        // V-2: less arrives than requested; the pending record is cleared and the next inflow
+        // follows the plan instead of topping up the (locked) pot.
+        let mut l = ledger_with_pots();
+        l.set_splits(vec![SplitRule { pot_id: 1, mode: SplitMode::Percent, value: U128(10_000) }]).unwrap();
+        l.credit(Token::Usdc, 100).unwrap(); // all to pot 1
+        l.move_funds(1, 3, Token::Usdc, 100, T0).unwrap();
+        l.lock(3, T0 + 1_000, T0).unwrap();
+        l.begin_out(3, Token::Usdc, 100, T0, false).unwrap();
+        l.settle_supply(3, Token::Usdc, 100, 100, 0).unwrap();
+        l.begin_earn_off(3, Token::Usdc, 100, 100).unwrap();
+        let c = l.settle_return(Token::Usdc, 60).unwrap();
+        assert_eq!(c.returns, vec![(3, 60)]);
+        assert!(l.pending_returns.is_empty());
+        let c = l.credit(Token::Usdc, 40).unwrap();
+        assert_eq!(c.allocations, vec![(1, 40)]);
+        assert_eq!(l.pot(3).unwrap().balances.get(Token::Usdc), 60);
+        // a delta bigger than the pending return: the excess follows the plan
+        l.begin_out(3, Token::Usdc, 60, T0, false).unwrap();
+        l.settle_supply(3, Token::Usdc, 60, 60, 0).unwrap();
+        l.begin_earn_off(3, Token::Usdc, 60, 60).unwrap();
+        let c = l.settle_return(Token::Usdc, 70).unwrap();
+        assert_eq!(c.returns, vec![(3, 60)]);
+        assert_eq!(c.allocations, vec![(1, 10)]);
+        assert!(l.check_invariant());
+    }
+
+    #[test]
+    fn abort_restores_shares() {
+        let mut l = ledger_with_pots();
+        l.credit(Token::Usdt, 50).unwrap();
+        l.move_funds(0, 2, Token::Usdt, 50, T0).unwrap();
+        l.begin_out(2, Token::Usdt, 50, T0, false).unwrap();
+        l.settle_supply(2, Token::Usdt, 50, 50, 0).unwrap();
+        let before = l.pot(2).unwrap().clone();
+        l.begin_earn_off(2, Token::Usdt, 20, 50).unwrap();
+        l.abort_earn_off(Token::Usdt).unwrap();
+        assert_eq!(l.pot(2).unwrap(), &before);
+        assert!(l.pending_returns.is_empty());
+    }
+
 
     fn policy(per_tx: u128, daily: u128, weekly: u128) -> AgentPolicy {
         policy_from_input(
@@ -883,7 +955,8 @@ mod tests {
                     Op::Lock(p, d) => { let _ = l.lock(p, now + d * 1_000_000_000 + 1, now); }
                     Op::Supply(p, t, a, ok) => {
                         if l.begin_out(p, tok(t), a as u128, now, false).is_ok() {
-                            l.settle_supply(p, tok(t), a as u128, if ok { a as u128 } else { 0 }).unwrap();
+                            let v = l.total_shares(tok(t));
+                            l.settle_supply(p, tok(t), a as u128, if ok { a as u128 } else { 0 }, v).unwrap();
                         }
                     }
                     Op::Tick(s) => now += s * 1_000_000_000,
@@ -902,6 +975,102 @@ mod tests {
                         }
                     }
                 }
+            }
+        }
+
+        /// V-1: with earn operations serialized per token and claims valued by shares, nothing
+        /// another pot does can reduce a locked pot's lending claim (beyond 2 units of rounding).
+        #[test]
+        fn locked_earn_claim_never_shrinks(
+            a_amt in 1u128..1_000_000_000,
+            ops in proptest::collection::vec((0u8..3, 1u128..1_000_000_000), 1..40),
+        ) {
+            let t = Token::Usdc;
+            let mut l = ledger_with_pots();
+            l.credit(t, 10_000_000_000_000).unwrap(); // to flex
+            l.move_funds(0, 3, t, a_amt, T0).unwrap();
+            l.move_funds(0, 2, t, 5_000_000_000_000, T0).unwrap();
+            l.lock(3, T0 + NS_PER_DAY, T0).unwrap();
+            let mut real: u128 = 0; // lending balance
+            l.begin_out(3, t, a_amt, T0, false).unwrap();
+            l.settle_supply(3, t, a_amt, a_amt, real).unwrap();
+            real += a_amt;
+            for (kind, x) in ops {
+                let before = l.earn_value(3, t, real).unwrap();
+                match kind {
+                    0 => { // pot 2 supplies
+                        if l.begin_out(2, t, x, T0, false).is_ok() {
+                            l.settle_supply(2, t, x, x, real).unwrap();
+                            real += x;
+                        }
+                    }
+                    1 => { // pot 2 withdraws what it can
+                        let v = l.earn_value(2, t, real).unwrap();
+                        let amt = x.min(v);
+                        if amt > 0 {
+                            l.begin_earn_off(2, t, amt, real).unwrap();
+                            real -= amt;
+                            l.settle_return(t, amt).unwrap();
+                        }
+                    }
+                    _ => { real += x / 100; } // interest accrues
+                }
+                let after = l.earn_value(3, t, real).unwrap();
+                prop_assert!(after + 2 >= before, "locked claim shrank {} -> {}", before, after);
+                prop_assert!(l.check_invariant());
+            }
+            // locked pot can always take out its whole claim, and never more
+            let v = l.earn_value(3, t, real).unwrap();
+            prop_assert!(l.clone().begin_earn_off(3, t, v + 1, real).is_err());
+        }
+
+        /// V-1: with earn operations serialized per token and claims held as shares, nothing
+        /// another pot does (supply, withdraw) can reduce a locked pot's claim on the lending
+        /// balance (beyond 1 unit of rounding per operation).
+        #[test]
+        fn locked_earn_claim_is_never_diluted(
+            init in 1u128..1_000_000,
+            ops in proptest::collection::vec((0u8..3, 1u128..1_000_000), 1..40),
+        ) {
+            let t = Token::Usdc;
+            let mut l = ledger_with_pots();
+            l.credit(t, 10_000_000).unwrap();
+            l.move_funds(0, 3, t, init, T0).unwrap();
+            l.lock(3, T0 + 1_000_000_000_000, T0).unwrap();
+            l.move_funds(0, 2, t, 10_000_000 - init, T0).unwrap();
+            let mut real: u128 = 0; // vault's real lending balance
+            l.begin_out(3, t, init, T0, false).unwrap();
+            l.settle_supply(3, t, init, init, real).unwrap();
+            real += init;
+            let mut claim = l.earn_value(3, t, real).unwrap();
+            let mut n_ops: u128 = 0;
+            for (kind, x) in ops {
+                match kind {
+                    0 => { // interest accrues
+                        real += x / 100;
+                        claim = l.earn_value(3, t, real).unwrap();
+                        continue;
+                    }
+                    1 => { // pot 2 supplies x
+                        let have = l.pot(2).unwrap().balances.get(t);
+                        let a = x.min(have);
+                        if a == 0 { continue; }
+                        l.begin_out(2, t, a, T0, false).unwrap();
+                        l.settle_supply(2, t, a, a, real).unwrap();
+                        real += a;
+                    }
+                    _ => { // pot 2 withdraws up to x
+                        let v = l.earn_value(2, t, real).unwrap();
+                        let a = x.min(v);
+                        if a == 0 { continue; }
+                        l.begin_earn_off(2, t, a, real).unwrap();
+                        real -= a;
+                        l.settle_return(t, a).unwrap();
+                    }
+                }
+                n_ops += 1;
+                let now_claim = l.earn_value(3, t, real).unwrap();
+                prop_assert!(now_claim + n_ops >= claim, "claim {} -> {}", claim, now_claim);
             }
         }
 

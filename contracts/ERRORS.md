@@ -8,6 +8,7 @@ succeeds and the code is written to the logs next to an event, so the UI should 
 | Code | Meaning |
 |---|---|
 | `E_NOT_OWNER` | Only the account owner can do this. |
+| `E_BAD_ARGS` | The call's arguments were malformed (bad JSON, a missing field or a wrong type). |
 | `E_BAD_INIT` | The vault can only be set up by its owner, on `vault.<owner>`. |
 | `E_BAD_CONFIG` | A setting is out of range (for example utilization above 95%, or a zero agent allowance). |
 | `E_BAD_INPUT` | A name, label or other field is empty, too long or doesn't make sense. |
@@ -24,11 +25,12 @@ succeeds and the code is written to the logs next to an event, so the UI should 
 | `E_LOCK_SHORTEN` | Locks can be extended but never shortened. |
 | `E_NOT_LOCKED` | This pot has no lock to extend. |
 | `E_BAD_TIME` | The unlock date must be in the future. |
-| `E_LARGE` | This withdrawal is above your quick-withdraw limit; confirm it with your login key. |
+| `E_LARGE` | Above your quick-withdraw limit (a withdrawal, an approved payment, or an agent's weekly cap); confirm it with your login key (`withdraw_large`, `approve_proposal_large`, `add_agent_large`). |
 | `E_TRANSFER_FAILED` *(log)* | The token transfer failed (for example the receiver can't hold this token); the money went back to the pot. |
 | `E_FLEX_EARN` | Spend can't earn; move money to another pot first. |
 | `E_NO_LENDING` | Earn isn't available for this account. |
 | `E_LENDING` | The lending market couldn't be read or the withdrawal failed; nothing changed. |
+| `E_EARN_BUSY` | An Earn change for this token is still finishing; try again in a few seconds. |
 | `E_UTILIZATION` *(log + `earn_refused` event)* | The lending market is too heavily borrowed right now, so Earn was refused to keep your money withdrawable. |
 | `E_NO_AGENT` | No agent with that key. |
 | `E_AGENT_EXISTS` | That key is already a connected agent. |
@@ -66,7 +68,7 @@ succeeds and the code is written to the logs next to an event, so the UI should 
 | Code | Meaning |
 |---|---|
 | `E_NOT_RELAYER` | Only the Oiko relayer can register names. |
-| `E_BAD_NAME` | Names are 2–32 characters: a–z, 0–9, `_` and `-`. |
+| `E_BAD_NAME` | Names are 2–32 characters: a–z, 0–9, `_` and `-`, not at the start or end and not doubled. |
 | `E_RESERVED` | That name is reserved. |
 | `E_TAKEN` | That name is taken. |
 | `E_CREATE_FAILED` *(log)* | The account couldn't be created; the deposit was refunded. |
@@ -76,12 +78,12 @@ succeeds and the code is written to the logs next to an event, so the UI should 
 | Code | Meaning |
 |---|---|
 | `E_NO_CIRCLE` | That circle doesn't exist. |
-| `E_NOT_ORGANISER` | Only the organiser can start the circle. |
-| `E_NOT_FORMING` | The circle has already started. |
+| `E_NOT_ORGANISER` | Only the organiser can do this (start, cancel early, remove a member, change the invite); the organiser cancels instead of leaving. |
+| `E_NOT_FORMING` | The circle has already started (or was cancelled). |
 | `E_NOT_ACTIVE` | The circle isn't running. |
 | `E_ALREADY_MEMBER` | You're already in this circle. |
 | `E_FULL` | The circle is full. |
-| `E_BAD_INVITE` | The invite code is wrong. |
+| `E_BAD_INVITE` | The invite code is wrong (codes are at least 10 characters). |
 | `E_NOT_MEMBER` | Only members can pay into this circle. |
 | `E_TOO_FEW` | A circle needs at least 2 members. |
 | `E_BOND_MISSING` | Members who collect early must post their bond before the circle starts. |
