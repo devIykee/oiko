@@ -15,6 +15,8 @@ const acorn = localFont({
   ],
   variable: "--font-acorn",
   display: "swap",
+  // Metric-matched Arial fallback while Acorn loads, so swapping fonts does not shift layout (CLS).
+  adjustFontFallback: "Arial",
   fallback: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
 });
 

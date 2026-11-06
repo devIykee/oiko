@@ -13,14 +13,14 @@ import { PasskeyError, passkeySupported } from "@/lib/passkey";
 import { useSession, type LoginMethod } from "@/lib/session";
 import { signUp, type SignupStep } from "@/lib/signup";
 
-type Stage = "name" | "login" | "progress" | "pots" | "agent";
+type Stage = "name" | "login" | "progress" | "pots" | "agent" | "code";
 const NAME_RE = /^[a-z0-9_-]{2,32}$/;
 
 export function StartScreen() {
   const t = useT();
   const router = useRouter();
   const sp = useSearchParams();
-  const { status, save, passkeySignIn } = useSession();
+  const { status, save, passkeySignIn, codeSignIn } = useSession();
   const { config, oiko } = useConfig();
   const [stage, setStage] = useState<Stage>("name");
   const [name, setName] = useState((sp.get("name") ?? "").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 32));
@@ -32,6 +32,18 @@ export function StartScreen() {
   const [canPasskey, setCanPasskey] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
   const local = config?.network === "local";
+  const [code, setCode] = useState("");
+  const [codePass, setCodePass] = useState("");
+
+  // A QR from Settings → "Move to another device" opens /start#move=<code>. The fragment never reaches the server;
+  // it is cleared from the address bar straight away.
+  useEffect(() => {
+    const m = /^#move=(.+)$/.exec(window.location.hash);
+    if (!m) return;
+    setCode(decodeURIComponent(m[1]));
+    setStage("code");
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  }, []);
 
   useEffect(() => { const ok = passkeySupported(); setCanPasskey(ok); if (!ok) setMethod("browser"); }, []);
   useEffect(() => { if (status === "signed-in" && stage === "name") router.replace("/home"); }, [status, stage, router]);
@@ -73,6 +85,13 @@ export function StartScreen() {
     finally { setSigningIn(false); }
   };
 
+  const signInCode = async () => {
+    setSigningIn(true); setErr(null);
+    try { await codeSignIn(code, codePass); router.push("/home"); }
+    catch (e) { setErr(explain(e)); }
+    finally { setSigningIn(false); }
+  };
+
   const stepIndex = step === "name" ? 0 : step === "account" ? 1 : step === "done" ? 3 : 0;
 
   return (
@@ -101,9 +120,10 @@ export function StartScreen() {
             </div>
           )}
           <Button block size="lg" disabled={!info?.available} onClick={() => setStage("login")} data-testid="start-continue">{t("common.continue")}</Button>
-          <div className="oi-row" style={{ justifyContent: "center" }}>
+          <div className="oi-row" style={{ justifyContent: "center", flexWrap: "wrap" }}>
             <span className="oi-small oi-muted">{t("start.haveAccount")}</span>
             <Button variant="ghost" size="sm" loading={signingIn} onClick={signIn} disabled={!canPasskey}>{t("start.signInPasskey")}</Button>
+            <Button variant="ghost" size="sm" onClick={() => { setErr(null); setStage("code"); }} data-testid="start-code">{t("start.signInCode")}</Button>
           </div>
           {err && <div role="alert"><Note tone="danger" title={err.title}>{err.next}</Note></div>}
         </>
@@ -126,6 +146,22 @@ export function StartScreen() {
           {err && <div role="alert"><Note tone="danger" title={err.title}>{err.next}</Note></div>}
           <Button block size="lg" onClick={create} data-testid="start-create">{t("start.create")}</Button>
           <p className="oi-micro oi-muted" style={{ margin: 0, textAlign: "center" }}>{t("start.noSeed")}</p>
+        </>
+      )}
+
+      {stage === "code" && (
+        <>
+          <button type="button" className="oi-btn oi-btn--ghost oi-btn--sm" style={{ alignSelf: "flex-start" }} onClick={() => { setErr(null); setStage("name"); }}>← {t("common.back")}</button>
+          <div>
+            <h1 className="oi-h1" style={{ fontSize: 28 }}>{t("start.codeTitle")}</h1>
+            <p className="oi-muted" style={{ margin: "8px 0 0" }}>{t("start.codeSub")}</p>
+          </div>
+          <Input label={t("start.codeLabel")} value={code} placeholder={t("start.codePlaceholder")} autoComplete="off" spellCheck={false} autoCapitalize="none"
+            onChange={(e) => setCode(e.target.value.trim())} data-testid="code-input" />
+          <Input label={t("start.codePass")} type="password" autoComplete="current-password" value={codePass} onChange={(e) => setCodePass(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && code && codePass) void signInCode(); }} data-testid="code-pass" />
+          {err && <div role="alert"><Note tone="danger" title={err.title}>{err.next}</Note></div>}
+          <Button block size="lg" loading={signingIn} disabled={!code || !codePass} onClick={signInCode} data-testid="code-go">{signingIn ? t("start.codeChecking") : t("start.codeGo")}</Button>
         </>
       )}
 

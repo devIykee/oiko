@@ -122,3 +122,17 @@ export function useAgentLog(publicKey: string | null) {
     { refreshMs: 30_000 },
   );
 }
+
+/** True when this account runs an older version of the account code than the one Oiko publishes today (see
+ *  HANDOFF G7: accounts made before 2026-11-05 lack newer ROSCA methods and safety fixes). */
+export function useOlderVersion(): boolean {
+  const { session } = useSession();
+  const { config, rpc } = useConfig();
+  const vaultId = session?.vaultId;
+  const want = config?.vaultCodeHash ?? null;
+  const q = useQuery<string | null>(
+    vaultId && rpc && want && !isFixtureMode() ? `vault:${vaultId}:codehash` : null,
+    async () => (await rpc!.viewAccount(vaultId!))?.global_contract_hash ?? null,
+  );
+  return !!(want && q.data && q.data !== want);
+}

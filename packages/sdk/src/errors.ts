@@ -151,6 +151,8 @@ const M: Record<string, [string, string]> = {
   E_NONCE: ["Two actions collided.", "Try again."],
   E_EXPIRED_TX: ["The request took too long.", "Try again."],
   E_NO_KEY: ["This device's key isn't on the account.", "Sign in again."],
+  E_BAD_CODE: ["That isn't a working sign-in code.", "Copy the whole code again from your other device (it starts with oikomove1:)."],
+  E_BAD_PASSPHRASE: ["That passphrase doesn't open this code.", "Check the passphrase you chose when you made the code."],
   E_RPC: ["Oiko couldn't reach NEAR just now.", "Try again in a moment."],
   E_TX_FAILED: ["That didn't go through.", "Nothing was taken. Try again."],
   E_MIN_AMOUNT: ["That amount is below the minimum.", "Send at least the minimum shown."],

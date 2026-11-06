@@ -1,15 +1,16 @@
 "use client";
+import { OlderVersionBanner } from "@/components/app/OlderVersionBanner";
 import { Avatar, Button, GroupedList, Input, ListRow, SectionTitle, SegmentedControl, Toggle, useToast } from "@oiko/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/app/PageHeader";
-import { describeActivity } from "@/components/app/describe";
+import { MoveDeviceSheet } from "@/components/app/MoveDeviceSheet";
+import { activityCsv } from "@/lib/activityCsv";
+import { downloadText } from "@/components/app/download";
 import { useConfig } from "@/lib/config";
-import { useActivity, useOverview } from "@/lib/data";
+import { useActivity, useOverview, useReceipts } from "@/lib/data";
 import { downloadInvoicesCsv } from "@/lib/invoices";
 import { explain } from "@/lib/actions";
-import { nsToMs } from "@/lib/format";
-import { fromUnits } from "@oiko/sdk";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { useSettings, type Theme } from "@/lib/settings";
@@ -23,6 +24,8 @@ export function SettingsScreen() {
   const { config } = useConfig();
   const ov = useOverview();
   const act = useActivity(200);
+  const receipts = useReceipts().data?.receipts ?? [];
+  const [moving, setMoving] = useState(false);
   const [name, setName] = useState(session?.displayName ?? "");
   const loadedName = session?.displayName;
   useEffect(() => { if (loadedName) setName((n) => n || loadedName); }, [loadedName]);
@@ -30,21 +33,13 @@ export function SettingsScreen() {
 
   const exportCsv = () => {
     if (!act.data || !ov.data) return;
-    const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;
-    const rows = [["time", "what", "details", "amount", "ticker", "by"].join(",")];
-    for (const a of act.data) {
-      const d = describeActivity(a, ov.data.pots, ov.data.agents, t);
-      rows.push([new Date(nsToMs(a.at)).toISOString(), esc(d.title), esc(d.subtitle), a.amount ? fromUnits(a.amount) : "", a.token?.toUpperCase() ?? "", esc(a.by)].join(","));
-    }
-    const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
-    const el = document.createElement("a");
-    el.href = url; el.download = `oiko-${session.name}-activity.csv`; el.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadText(`oiko-${session.name}-activity.csv`, activityCsv(act.data, ov.data.pots, ov.data.agents, receipts, t), "text/csv;charset=utf-8");
   };
 
   return (
     <div className="oi-col oi-page" data-testid="settings">
       <PageHeader title={t("nav.settings")} />
+      <OlderVersionBanner />
       <section className="oi-card oi-stack-sm" aria-labelledby="profile">
         <div className="oi-row">
           <Avatar name={name || session.name} size={56} />
@@ -69,11 +64,24 @@ export function SettingsScreen() {
         </GroupedList>
       </section>
 
+      {(config?.features.earn !== undefined) && (
+        <section aria-labelledby="features">
+          <SectionTitle id="features">{t("settings.features")}</SectionTitle>
+          <GroupedList label={t("settings.features")}>
+            <ListRow icon="earn" color="mint" title={t("settings.showEarn")} subtitle={t("settings.showEarnSub")}
+              trailing={<Toggle checked={settings.showEarn} onChange={(v) => set({ showEarn: v })} label={t("settings.showEarn")} data-testid="toggle-earn" />} />
+            <ListRow icon="invest" color="sun" title={t("settings.showInvest")} subtitle={t("settings.showInvestSub")}
+              trailing={<Toggle checked={settings.showInvest} onChange={(v) => set({ showInvest: v })} label={t("settings.showInvest")} data-testid="toggle-invest" />} />
+          </GroupedList>
+        </section>
+      )}
+
       <section aria-labelledby="security">
         <SectionTitle id="security">{t("settings.security")}</SectionTitle>
         <GroupedList label={t("settings.security")}>
           <ListRow icon="shield" color="mint" title={t(`settings.method.${session.method}`)} subtitle={t(`settings.methodSub.${session.method}`)} />
           <ListRow icon="security" color="stone" title={t("settings.recovery")} subtitle={t("settings.recoverySub")} />
+          {session.method !== "demo" && <ListRow icon="send" color="violet" title={t("settings.move")} subtitle={t("settings.moveSub")} onClick={() => setMoving(true)} chevron data-testid="settings-move" />}
           <ListRow icon="export" color="blue" title={t("settings.export")} subtitle={t("settings.exportSub")} onClick={exportCsv} chevron />
           <ListRow icon="export" color="blue" title={t("settings.exportInvoices")} subtitle={t("settings.exportInvoicesSub")} chevron data-testid="settings-export-invoices"
             onClick={() => { downloadInvoicesCsv(session).then(() => toast.show({ message: t("inv.exported") }), (e) => { const f = explain(e); toast.show({ message: `${f.title} ${f.next}` }); }); }} />
@@ -83,6 +91,7 @@ export function SettingsScreen() {
       {config && config.network !== "mainnet" && <p className="oi-small oi-muted" style={{ margin: 0 }}>{t("settings.testNote")}</p>}
       <Button variant="danger-soft" block onClick={() => { signOut(); router.push("/start"); }}>{t("common.signOut")}</Button>
       {session.method !== "passkey" && <p className="oi-micro oi-muted" style={{ margin: 0 }}>{t("settings.signOutWarn")}</p>}
+      <MoveDeviceSheet open={moving} onOpenChange={setMoving} />
     </div>
   );
 }

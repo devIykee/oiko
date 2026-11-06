@@ -1,6 +1,10 @@
 export const misc = {
   "activityPage.sub": "Everything that happened in your account, and who did it.",
+  "older.title": "This account uses an older version of Oiko",
+  "older.body": "Your money is safe and everything you use today keeps working. A few newer features, like leaving a ROSCA savings group and some extra safety checks, need the latest version. To get it, move your unlocked money out, then sign out and claim a new name.",
   "activityPage.filter": "Show",
+  "activityPage.export": "Export CSV",
+  "activityPage.exported": "CSV downloaded",
   "activityPage.all": "All",
   "activityPage.in": "In",
   "activityPage.out": "Out",

@@ -1,4 +1,5 @@
 "use client";
+import { OlderVersionBanner } from "@/components/app/OlderVersionBanner";
 import { Avatar, Badge, BalanceHeader, IconButton, ProposalCard, RoundAction, SectionTitle, TokenLogo, WalletStack } from "@oiko/ui";
 import type { Proposal } from "@oiko/sdk";
 import Link from "next/link";
@@ -45,6 +46,8 @@ export function HomeScreen() {
         </div>
         <IconButton icon={hidden ? "show" : "hide"} label={hidden ? t("home.showBalance") : t("home.hideBalance")} onClick={() => set({ hideBalance: !hidden })} />
       </div>
+
+      <OlderVersionBanner />
 
       {/* 1. Money block: balance, coin breakdown, actions and the three summary numbers, nested in one card. */}
       <section className="oi-home-hero" aria-label={t("home.balanceLabel")}>

@@ -3,7 +3,7 @@
 //      TELEGRAM_ALLOWED_CHAT_IDS=123,456 (required: only these chats may use the bot; it holds an agent key).
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { connectionFromEnv, createOikoMcpServer, GatewayBackend } from "oiko-mcp";
+import { connectionFromEnv, createOikoMcpServer, GatewayBackend } from "oiko-mcp/internal";
 import { toUnits } from "@oiko/sdk";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;

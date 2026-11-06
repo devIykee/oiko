@@ -6,6 +6,7 @@ import { APP_KEY_METHODS, Signer, act, generateKeyPair, publicKeyFromSecretKey }
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { isFixtureMode } from "./fixtures/mode";
 import { signInWithPasskey } from "./passkey";
+import { decryptMoveCode } from "./moveCode";
 import { fetchApiConfig, rpcFor, toOikoConfig } from "./config";
 
 export type LoginMethod = "passkey" | "browser" | "demo";
@@ -53,6 +54,8 @@ interface SessionCtx {
   signOut: () => void;
   /** Sign in with an existing passkey (new device): derives the owner key and adds a fresh app key. */
   passkeySignIn: () => Promise<Session>;
+  /** Sign in with a passphrase-encrypted code exported from another device (Settings → Move to another device). */
+  codeSignIn: (code: string, passphrase: string) => Promise<Session>;
   /** Full-access key for rare actions (large withdrawals, recovery). Prompts for the passkey when needed. */
   getOwnerKey: () => Promise<string>;
 }
@@ -94,6 +97,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return s;
   }, [save]);
 
+  const codeSignIn = useCallback(async (code: string, passphrase: string) => {
+    const p = await decryptMoveCode(code, passphrase);
+    const cfg = toOikoConfig(await fetchApiConfig());
+    const rpc = rpcFor(cfg);
+    if (!p.accountId.endsWith(`.${cfg.root}`) || p.vaultId !== `vault.${p.accountId}`) throw new Error("E_BAD_CODE: this code is for a different version of Oiko");
+    // The exported keys must still be on the account (a key removed since the export can't sign in).
+    if (!(await rpc.viewAccessKey(p.accountId, publicKeyFromSecretKey(p.appKey)))) throw new Error("E_NO_KEY: this code's key was removed from the account");
+    let appKey = p.appKey;
+    if (p.ownerKey && (await rpc.viewAccessKey(p.accountId, publicKeyFromSecretKey(p.ownerKey)))) {
+      // With the owner key, give this device its own app key (so either device can be signed out on its own).
+      const app = generateKeyPair();
+      const owner = new Signer(rpc, p.accountId, p.ownerKey);
+      const res = await owner.signAndSend(p.accountId, [act.addFunctionCallKey(app.publicKey, p.vaultId, [...APP_KEY_METHODS], "250000000000000000000000")]).catch(() => null);
+      if (res?.ok) appKey = app.secretKey;
+    }
+    const s: Session = { name: p.name, displayName: p.displayName || p.name, accountId: p.accountId, vaultId: p.vaultId, appKey, method: p.method, ownerKey: p.ownerKey, credentialId: p.credentialId, createdAt: Date.now() };
+    save(s);
+    return s;
+  }, [save]);
+
   const getOwnerKey = useCallback(async () => {
     if (!session) throw new Error("E_NO_KEY: signed out");
     if (session.ownerKey) return session.ownerKey;
@@ -103,8 +126,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<SessionCtx>(() => ({
     status: !ready ? "loading" : session ? "signed-in" : "signed-out",
-    session, save, update, signOut, passkeySignIn, getOwnerKey,
-  }), [ready, session, save, update, signOut, passkeySignIn, getOwnerKey]);
+    session, save, update, signOut, passkeySignIn, codeSignIn, getOwnerKey,
+  }), [ready, session, save, update, signOut, passkeySignIn, codeSignIn, getOwnerKey]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
