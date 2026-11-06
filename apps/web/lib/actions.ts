@@ -14,16 +14,8 @@ type Methods = {
 };
 export type VaultMethod = { [K in keyof Methods]: Methods[K] extends never ? never : K }[keyof Methods];
 
-export class ActionError extends Error {
-  constructor(public readonly code: string, public readonly title: string, public readonly next: string, public readonly txHash?: string) {
-    super(`${code}: ${title}`);
-  }
-}
-export function explain(e: unknown): { title: string; next: string; code: string } {
-  if (e instanceof ActionError) return { title: e.title, next: e.next, code: e.code };
-  const msg = e instanceof Error ? `${(e as { code?: string }).code ?? ""} ${e.message}` : String(e);
-  return friendlyError(msg);
-}
+import { ActionError } from "./explain";
+export { ActionError, explain } from "./explain";
 
 let lastTopup = 0;
 async function topup(accountId: string) {

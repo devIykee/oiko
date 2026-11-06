@@ -7,7 +7,7 @@ Oiko: **Personal finance meets personal intelligence.** Get paid from anywhere, 
 
 ## What it is
 
-You claim a name (`ada.oiko.testnet`) and share a pay link. Anyone can pay that link, and every payment is split by your plan into pots: Spend, Bills, Savings, Goals and Locked. Money sits in a separate account (`vault.ada.oiko.testnet`) that holds no owner keys at all (only the capped agent keys it adds to itself) and runs code with no upgrade or admin method. Locks, plans and agent limits are enforced by that code, not by Oiko. Oiko has no built-in AI. You connect the agent you already use (over MCP or REST), and it can read, propose, or act only within caps the account enforces.
+You claim a name (`steve.oiko.testnet`) and share a pay link. Anyone can pay that link, and every payment is split by your plan into pots: Spend, Bills, Savings, Goals and Locked. Money sits in a separate account (`vault.steve.oiko.testnet`) that holds no owner keys at all (only the capped agent keys it adds to itself) and runs code with no upgrade or admin method. Locks, plans and agent limits are enforced by that code, not by Oiko. Oiko has no built-in AI. You connect the agent you already use (over MCP or REST), and it can read, propose, or act only within caps the account enforces.
 
 Why personal finance: payday is where people lose control of money. Oiko makes the plan run on every payment and lets an agent help without ever holding your keys.
 
@@ -78,8 +78,8 @@ To run the app against NEAR testnet instead, set `OIKO_NETWORK=testnet`, the con
 ## Run the tests
 
 ```bash
-pnpm test:unit        # 161 Vitest tests: SDK (NEP-413, amounts, caps, insights), API server (gateway auth, relayer allow-list, 1Click mock exactly-once, invoices, receipts), sign-in codes, MCP, examples  (~20 s)
-pnpm e2e              # 13 Playwright tests against `pnpm local` or `docker compose up`  (~3 min)
+pnpm test:unit        # 179 Vitest tests: SDK (NEP-413, amounts, caps, insights), API server (gateway auth, relayer allow-list, 1Click mock exactly-once, invoices, receipts, agent events, change proposals, webhooks, how_to_fix), sign-in codes, MCP, examples  (~20 s)
+pnpm e2e              # 14 Playwright tests against `pnpm local` or `docker compose up`  (~3 min)
 pnpm readme-check     # fails if an [e2e: …] marker in "Try it" has no matching test
 pnpm test:contracts   # cargo test: unit + proptest invariants + near-workspaces sandbox integration (critical path, ROSCA cycle)  (~2-3 min after first build)
 node scripts/check-no-llm.mjs   # fails if any LLM SDK or LLM API host is in apps/, services/, packages/
@@ -93,7 +93,7 @@ node scripts/check-copy.mjs     # banned-words test for user-facing copy
 | hosted demo (`testnet`) | NEAR testnet, real contracts | built-in mock with the real 1Click request/response shapes (NEAR Intents has **no testnet**) | mock lending contract with Rhea's method names and JSON | mock USDC/USDT (NEP-141, 6 decimals) |
 | `mainnet` | NEAR mainnet | real `https://1click.chaindefuser.com` (live minimum: 100 units) | real Rhea `contract.main.burrow.near` | native USDC, USDt |
 
-Testnet contracts: registry `oiko.testnet`, `usdc.oiko.testnet`, `usdt.oiko.testnet`, `lending.oiko.testnet`, `ajo.oiko.testnet` (ROSCA savings), vault code published as a NEAR Global Contract with hash `3G9Gwhrtq8gN1ugLLNBShdjbw3s1imNH8FVrUXYWTPPR`, relayer `oiko-relayer.testnet`.
+Testnet contracts: registry `oiko.testnet`, `usdc.oiko.testnet`, `usdt.oiko.testnet`, `lending.oiko.testnet`, `ajo.oiko.testnet` (ROSCA savings), vault code published as a NEAR Global Contract with hash `72sdtZyfMEdLh2RSqSjBAPt73PpsHCr24irGCi9yahex` (accounts made before 2026-11-05 use the earlier `3G9Gwhrtq8gN1ugLLNBShdjbw3s1imNH8FVrUXYWTPPR`, and the app tells them), relayer `oiko-relayer.testnet`. The registry and ROSCA contracts have no keys left: nobody, including the team, can change them.
 
 ## Mainnet proof
 
@@ -128,6 +128,21 @@ flowchart LR
 - **Savings account** `vault.name.root`: holds all money, has no keys except agent function-call keys it adds to itself (methods `agent_execute`, `agent_propose` only). No upgrade method: "upgrading" means moving unlocked money to a new account.
 - **Agents** authenticate to the gateway with NEP-413 signatures from their own key; revoking the key on-chain ends both actions and reads. Caps (per transaction, day, week), allowlist, expiry and scopes are checked by the contract.
 
+## Your agent, on a budget
+
+Oiko has no built-in AI. You connect the agent you already use (Claude, ChatGPT, Grok, your own code) and decide what it may do. The account's contract enforces those limits, not Oiko's servers.
+
+- **Connect:** `npx -y oiko-mcp` (MCP over stdio), MCP over HTTP at `/api/mcp` (hosted assistants get a 24-hour link), or plain REST. Every request is signed with the agent's own key (NEP-413).
+- **Read, suggest, act:** read balances, pots, plan, bills, invoices and ROSCA groups; propose payments for you to approve; or pay and move money on its own within per-payment, daily and weekly caps, only to people on its list.
+- **Proactive:** `get_events` (or a signed webhook, or MCP notifications) tells the agent what happened: money in, bills due or missed, goals reached, Spend running low, invoices paid, its own cap at 80%, a weekly summary. Each event comes with suggested actions computed by code, which the agent can take, propose or pass on.
+- **Proposals for everything:** besides money, an agent can suggest plan changes, new pots and goals, locks, Earn on/off, bills, savings schedules and draft invoices. You approve on Home; your own key carries it out.
+- **Autopilot:** opt-in rules (top up Bills on every payment, pay bills on their due day, sweep Spend into savings weekly) that your agent runs inside its limits.
+- **Every refusal explains itself:** `how_to_fix` tells the agent the next step, for example "use propose, or ask the owner to raise the weekly cap to at least 115.00".
+- **Before paying anyone:** a counterparty check (account age, activity, code changes, shared scam reports) answers allow, warn or block.
+- **Off switch:** Disconnect deletes the agent's key from your account; reads and actions stop at once.
+
+Developer guide: `docs/AGENTS.md`. Discovery for agents: `/llms.txt`, `/.well-known/oiko-agent.json`.
+
 ## NEAR features used
 
 Named accounts and sub-accounts, Global Contracts (NEP-591, vault code by hash), NEP-366 meta transactions, function-call access keys with allowances, NEP-413 message signing, NEP-141/145 tokens, NEP-297 events, cross-contract calls with callbacks (sync, Earn, ROSCA), NEAR Intents 1Click, Rhea lending, chain signatures (`rescue_sign` via the MPC signer).
@@ -148,16 +163,17 @@ Summary: Oiko holds no keys over user money, and the savings account holds no ow
 - Payments from other chains are simulated on testnet (no Intents testnet). Mainnet code paths exist but no mainnet proof has been run.
 - Testnet uses mock tokens and a mock lending contract.
 - No audit. Contracts are deployed on testnet only.
-- Not finished: Lighthouse reports, rescue sweeper UI, Invest (flagged off).
+- Not finished: rescue sweeper UI, Invest (flagged off).
+- Autopilot rules need a connected agent: Oiko holds no key that could run them for you, by design.
 - The hosted demo stores nonces and the agent access log in Postgres (Neon). Without `DATABASE_URL` (e.g. a fresh local run) they are kept in memory per server instance.
 - The agent connector has not been validated with users.
 - Not a bank; balances are not insured; yields are variable and can go to zero; not investment, legal or tax advice. Rules for stablecoin yield products are still forming in many places.
 
 ## Built with
 
-Next.js 16, React 19, Tailwind CSS 4, motion, Radix Dialog, qrcode, zod, near-api-js 7, @noble/curves + @noble/hashes, bs58, drizzle-orm + postgres (optional), web-push, @modelcontextprotocol/sdk, framework7-icons (MIT), Inter / Inter Tight, Acorn (display, supplied by the author); Rust near-sdk 5.29.1, near-contract-standards, near-workspaces, proptest, cargo-near; Vitest, Playwright, @resvg/resvg-js, opentype.js, svgo. Hosted on Vercel.
+Next.js 16, React 19, Tailwind CSS 4, motion, Radix Dialog, qrcode, zod, near-api-js 7, @noble/curves + @noble/hashes, bs58, drizzle-orm + postgres (optional), web-push, @modelcontextprotocol/sdk, framework7-icons (MIT), web3icons, Acorn (headings and UI, licensed by the author), Chillax (supporting text, Fontshare free licence); Rust near-sdk 5.29.1, near-contract-standards, near-workspaces, proptest, cargo-near; Vitest, Playwright, @resvg/resvg-js, opentype.js, svgo. Hosted on Vercel.
 
-Code was written during the hackathon window with AI coding assistance (Claude Code). Libraries above are used under their own licences.
+Code was written during the hackathon window with AI coding assistance (Claude Code). Grok was used as a real agent to test the demo end to end. The product itself has no built-in AI (`node scripts/check-no-llm.mjs`). Libraries above are used under their own licences.
 
 ## License
 

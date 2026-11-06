@@ -1,5 +1,4 @@
 "use client";
-import QRCode from "qrcode";
 import { useEffect, useState, type ReactNode } from "react";
 import { Icon } from "../icons";
 import { Avatar, Skeleton } from "./primitives";
@@ -60,7 +59,9 @@ export function QRCode_({ value, size = 220, label }: { value: string; size?: nu
   const [svg, setSvg] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
-    QRCode.toString(value, { type: "svg", margin: 0, errorCorrectionLevel: "M", color: { dark: "#16181d", light: "#ffffff" } })
+    // Loaded on demand: most pages that import this file never show a QR code.
+    import("qrcode")
+      .then(({ default: QRCode }) => QRCode.toString(value, { type: "svg", margin: 0, errorCorrectionLevel: "M", color: { dark: "#16181d", light: "#ffffff" } }))
       .then((s) => { if (alive) setSvg(s); })
       .catch(() => setSvg(null));
     return () => { alive = false; };

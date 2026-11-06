@@ -72,11 +72,7 @@ export function useEarnRates(enabled = true) {
   return useQuery<EarnRates>(enabled ? "rates:earn" : null, () => api("/api/rates/earn"), { refreshMs: 60_000 });
 }
 
-export interface NameInfoResp { name: string; available: boolean; accountId: string; vaultId: string; exists: boolean; suggestions: string[] }
-export function fetchName(name: string) { return api<NameInfoResp>(`/api/names/${encodeURIComponent(name)}`); }
-export function useNameInfo(name: string | null) {
-  return useQuery<NameInfoResp>(name ? `name:${name}` : null, () => fetchName(name!));
-}
+export { fetchName, useNameInfo, useIntentTokens, type IntentGroup, type NameInfoResp } from "./publicData";
 
 export function useReceipts() {
   const { session } = useSession();
@@ -87,11 +83,6 @@ export function useReceipts() {
 export interface VerifiedBiller { accountId: string; name: string; category: string }
 export function useBillers() {
   return useQuery<{ billers: VerifiedBiller[] }>("billers", () => api("/api/billers"));
-}
-
-export interface IntentGroup { id: string; label: string; chain: string; symbol: string; assetId: string; decimals: number }
-export function useIntentTokens() {
-  return useQuery<{ groups: IntentGroup[] }>("intents:tokens", () => api("/api/intents/tokens"));
 }
 
 export function useCircles() {

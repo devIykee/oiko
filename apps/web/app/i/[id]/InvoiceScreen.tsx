@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
 import { Logo } from "@/components/brand/Logo";
 import { PayFlow, type PayStatus } from "@/components/app/PayFlow";
-import { explain } from "@/lib/actions";
+import { explain } from "@/lib/explain";
 import { fmt, fmtDate, fmtToken } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { STATUS_TONE, usePublicInvoice, type PublicInvoice } from "@/lib/invoices";

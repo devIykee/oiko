@@ -48,7 +48,8 @@ const pill: Record<PillVariant, string> = {
 const pillSize = { sm: "h-9 px-4 text-[14px]", md: "h-11 px-5 text-[15px]", lg: "h-13 px-6 text-[16px]" } as const;
 export function PillLink({ variant = "black", size = "md", className, children, ...p }: ComponentProps<typeof Link> & { variant?: PillVariant; size?: keyof typeof pillSize }) {
   return (
-    <Link {...p} className={cx("mk-press inline-flex items-center justify-center gap-2 rounded-full font-semibold whitespace-nowrap transition-colors", pill[variant], pillSize[size], className)}>
+    // No prefetch: most pills lead into the app, whose code (keys, motion) the landing page shouldn't download.
+    <Link prefetch={false} {...p} className={cx("mk-press inline-flex items-center justify-center gap-2 rounded-full font-semibold whitespace-nowrap transition-colors", pill[variant], pillSize[size], className)}>
       {children}
     </Link>
   );

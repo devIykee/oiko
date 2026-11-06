@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { PublicFrame } from "@/components/app/PublicFrame";
+import { AnonymousFrame } from "@/components/app/AnonymousFrame";
 
 export default function Layout({ children }: { children: ReactNode }) {
-  return <PublicFrame>{children}</PublicFrame>;
+  return <AnonymousFrame>{children}</AnonymousFrame>;
 }

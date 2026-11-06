@@ -1,7 +1,7 @@
 "use client";
 import { Button, EmptyState, Loading, Skeleton } from "@oiko/ui";
 import { useT } from "@/lib/i18n";
-import { explain } from "@/lib/actions";
+import { explain } from "@/lib/explain";
 
 export function LoadError({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const t = useT();

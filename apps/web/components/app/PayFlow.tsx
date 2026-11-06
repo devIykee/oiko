@@ -6,9 +6,9 @@ import { fromUnits, toUnits, type Token } from "@oiko/sdk";
 import { useEffect, useRef, useState } from "react";
 import { validAddress } from "@/lib/address";
 import { api } from "@/lib/api";
-import { explain } from "@/lib/actions";
+import { explain } from "@/lib/explain";
 import { useConfig } from "@/lib/config";
-import { useIntentTokens, type IntentGroup } from "@/lib/data";
+import { useIntentTokens, type IntentGroup } from "@/lib/publicData";
 import { useT } from "@/lib/i18n";
 
 type Step = 1 | 2 | 3 | 4;
@@ -17,9 +17,9 @@ export type PayStatus = "PENDING_DEPOSIT" | "KNOWN_DEPOSIT_TX" | "PROCESSING" | 
 const DIRECT = "__direct__";
 
 export interface PayFlowProps {
-  /** Oiko name being paid ("ada"). */
+  /** Oiko name being paid ("steve"). */
   name: string;
-  /** Display name ("Ada"). */
+  /** Display name ("Steve"). */
   display: string;
   /** Their account id, for "Already on NEAR". */
   recipient: string;

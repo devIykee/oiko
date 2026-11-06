@@ -4,17 +4,18 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Logo } from "@/components/brand/Logo";
 import { PayFlow } from "@/components/app/PayFlow";
-import { explain } from "@/lib/actions";
-import { useConfig } from "@/lib/config";
-import { useNameInfo } from "@/lib/data";
+import { explain } from "@/lib/explain";
+import { useNameInfo, type NameInfoResp } from "@/lib/publicData";
 import { useT } from "@/lib/i18n";
 
-export function PayScreen() {
+export type NameInfo = NameInfoResp;
+
+export function PayScreen({ initial }: { initial: NameInfo | null }) {
   const t = useT();
   const { name: raw } = useParams<{ name: string }>();
   const name = decodeURIComponent(raw).toLowerCase();
-  const info = useNameInfo(name);
-  const { config } = useConfig();
+  const q = useNameInfo(name);
+  const info = { data: q.data ?? (initial?.name === name ? initial : undefined), error: q.error };
   const display = name.charAt(0).toUpperCase() + name.slice(1);
 
   if (info.error && !info.data) return <Frame><EmptyState icon="warning" title={t("pay.loadError")} body={explain(info.error).next} /></Frame>;
@@ -29,20 +30,21 @@ export function PayScreen() {
         <h1 className="oi-h1" style={{ fontSize: 26 }}>{t("pay.title", { name: display })}</h1>
         <div className="oi-small oi-muted">{recipient}</div>
         <Badge tone="success" icon="shield" data-testid="pay-verified">{t("pay.verified")}</Badge>
+        {/* Above the form, so the form growing as options load never moves it (no layout shift). */}
+        <p className="oi-micro oi-muted" style={{ margin: 0 }}>{t("pay.footer")}</p>
       </section>
       <PayFlow name={name} display={display} recipient={recipient} />
-      {config && <p className="oi-micro oi-muted" style={{ textAlign: "center", margin: 0 }}>{t("pay.footer")}</p>}
     </Frame>
   );
 }
 
 function Frame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="oi-public__col" data-testid="pay">
+    <main className="oi-public__col" data-testid="pay">
       <header className="oi-row" style={{ minHeight: 44 }}>
-        <Link href="/" aria-label="Oiko" style={{ color: "var(--ink)" }}><Logo variant="wordmark" height={22} /></Link>
+        <Link href="/" prefetch={false} aria-label="Oiko" style={{ color: "var(--ink)" }}><Logo variant="wordmark" height={22} /></Link>
       </header>
       {children}
-    </div>
+    </main>
   );
 }

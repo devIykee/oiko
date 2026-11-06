@@ -36,7 +36,7 @@ export function Footer() {
                       {h.startsWith("http") || h.startsWith("mailto") || h.startsWith("/.well") || h === "/llms.txt" ? (
                         <a href={h} className="hover:text-ink" {...(h.startsWith("http") ? { target: "_blank", rel: "noreferrer" } : {})}>{l}</a>
                       ) : (
-                        <Link href={h} className="hover:text-ink">{l}</Link>
+                        <Link href={h} prefetch={false} className="hover:text-ink">{l}</Link>
                       )}
                     </li>
                   ))}
