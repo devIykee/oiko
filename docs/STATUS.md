@@ -1,52 +1,45 @@
-# Status (2026-11-04)
+# Status (2026-11-06)
 
 ## Works (verified)
 
-- Contracts: registry, keyless vault (pots, plan/splits, locks, withdraw, Earn guard, agents with caps/allowlist/expiry, proposals, schedules, bills, ROSCA hooks, rescue_sign), ROSCA (`ajo`) contract, mock USDC/USDT, mock lending. `cargo test --workspace` passes (unit + proptest invariants + sandbox integration incl. a full 3-member ROSCA cycle).
-- Deployed on NEAR testnet (see README). Vault code published as a Global Contract.
-- Hosted app: https://oikodotnear.vercel.app (Vercel project `oiko`, linked to GitHub `devIykee/oiko`, auto-deploys from `main`).
-- Live critical path on testnet passes end to end (`pnpm smoke`): register → keyless account → pay 100 USDT via 1Click proxy → plan split → lock refusal → withdraw → agent within cap, over-cap refused → revoke deletes key → reads refused.
-- 68 unit tests, no-LLM check, banned-words check, typecheck, production build: all pass.
-- Product UI: landing, /start (passkey or browser key), /pay/[name], home, plan, bills, pots, earn, ROSCA, insights, agents (connect, caps, proposals, disconnect), activity, settings, /connect, /security, /how-it-works; MCP stdio package and HTTP endpoint; scripted example agent; Telegram skeleton.
+- **Contracts** on NEAR testnet: registry `oiko.testnet` and ROSCA `ajo.oiko.testnet` (both **keyless since 2026-11-05**, so nobody can change them), mock USDC/USDT and lending, vault code as a Global Contract (`72sdtZyfMEdLh2RSqSjBAPt73PpsHCr24irGCi9yahex`). `pnpm test:contracts` passes (unit, proptest invariants, sandbox integration incl. a 3-member ROSCA cycle).
+- **Hosted app** https://oikodotnear.vercel.app (auto-deploys from `main`), Postgres (Neon) for nonces, access log, invoices, agent change proposals and settings.
+- **Product:** landing, sign-up (passkey or browser key), pay by name from other chains (test-mode 1Click), plan, bills, pots, locks, Earn with a utilization guard, ROSCA savings, invoices with CSV export, insights, activity with CSV export, move to another device, agents.
+- **Agents:** MCP (`npx -y oiko-mcp`, 0.1.0 published; 0.2.0 built, not yet published) and MCP over HTTP with hosted 24-hour links; REST with NEP-413. Read, propose and act within caps the contract enforces; counterparty check before every payment; Disconnect deletes the key.
+- **Proactive agents (Phase 3):** events (`/api/agent/events`, signed webhooks delivered by cron, MCP notifications) with deterministic suggested actions; proposals for non-money changes approved on Home; opt-in autopilot rules; month brief; `how_to_fix` on every refusal; each agent's approved/rejected record.
+- **Local mode:** `pnpm local` or `docker compose up` with no keys and no testnet; `pnpm e2e` (14 Playwright tests, ~3 min) passes against both. CI runs checks, unit tests, contracts, e2e and a fresh-clone compose run.
+- **Checks:** 179 unit tests, typecheck, production build, `check-no-llm`, `check-copy`, `readme-check`.
 
-## Blocked on you
+## Quality (Phase 4)
 
-1. **Fund and redeploy testnet contracts** (the app on main expects the new contracts):
-   - Send **30 testnet NEAR to `oiko.testnet`**. Publishing the new vault (298,917 bytes) as a global contract burns 29.9 NEAR. The new registry's storage is about 1.6 NEAR. The script keeps 0.5 NEAR for gas and refunds. The account holds 1.99 NEAR today; the script prints the exact shortfall.
-   - Send **20 testnet NEAR to `oiko-relayer.testnet`**: about 30 signups at 0.6 NEAR + gas each.
-   - `ajo.oiko.testnet` (2.90 NEAR) and the mocks need nothing.
-   - Faucet: https://near-faucet.io.
-   - Run `bash scripts/redeploy-testnet.sh`. It is safe to re-run and aborts with the exact amount if anything is short.
-   - Set the printed env block in Vercel and redeploy the app.
-   - Once signup, receive and a ROSCA round work, run `bash scripts/redeploy-testnet.sh --lock`. This makes `oiko.testnet` and `ajo.oiko.testnet` keyless, so no further changes are possible after it.
-   - The 13 names in the old registry are not carried over. Their accounts still exist on the old vault code.
-2. ~~Database~~ Done (2026-11-04): Neon is connected to the Vercel project (`DATABASE_URL`). Nonces, the agent access log and test-mode payments are now stored in Postgres; verified on production by looking up a deposit across instances without its ticket.
-3. **Make the repo public** before submitting: `gh repo edit devIykee/oiko --visibility public --accept-visibility-change-consequences`. Check first that you may publish the Acorn font files in `apps/web/fonts` (otherwise remove them; the site falls back to Inter Tight).
-4. **Publish the MCP package** (needs your npm login; `npx oiko-mcp` 404s until then):
-   ```
-   npm login                      # once, as the owner of the @oiko scope (or create the scope)
-   pnpm --filter oiko-mcp build && cd packages/mcp && npm pack --dry-run   # check: dist/cli.mjs, bin, README, package.json only
-   npm publish --access public    # from packages/mcp
-   ```
-   Until it is published, agents use the hosted endpoint instead (no install): see "Connect a hosted agent" on /agents and docs/AGENTS.md.
-5. **Cron**: set GitHub repo variable `OIKO_APP_URL=https://oikodotnear.vercel.app` and secret `CRON_SECRET` (same value as the Vercel env var) so `.github/workflows/cron.yml` runs schedules and ROSCA settlement every 5 minutes.
+Lighthouse mobile, see `docs/lighthouse/README.md` for the reports.
+
+| Page | Performance | Accessibility | Best practices | CLS |
+|---|---|---|---|---|
+| `/` (live) | 86-89 | 100 (was 96) | 100 | 0 |
+| `/pay/<name>` (live) | 88-92 (was 80) | 100 | 100 | 0 (was 0.026) |
+| `/home` (local production build) | 89-91 | 100 | 100 | 0 |
+
+- Performance sits around the 90 target; what is left is React hydration (about 350-450 ms of blocking time on a throttled phone). LCP is 1.0-1.6 s. Next step if time allows: fewer client components on the landing page.
+- Accessibility: axe WCAG 2 A/AA scan of `/`, `/pay`, `/security`, `/how-it-works`, `/docs/agents`, `/start` in light and dark mode: clean after the 2026-11-06 fixes.
+- Motion: no animation longer than 420 ms except the decorative night sky and loading spinner; reduced motion stops the sky, reveals and flashes (e2e README-10).
+- Fonts: Acorn for headings/UI/amounts, Chillax for supporting text; Acorn's fallback is metric-matched so the swap doesn't shift layout.
+
+## Needs the founder
+
+1. **Publish `oiko-mcp` 0.2.0** (2FA in your own terminal): `npm publish ./packages/mcp/oiko-mcp-0.2.0.tgz --access public`.
+2. **Cron:** GitHub variable `OIKO_APP_URL=https://oikodotnear.vercel.app` and secret `CRON_SECRET` (same value as in Vercel). Without them schedules, ROSCA settlement and agent webhooks don't run on their own.
+3. **Fonts licence check, then make the repo public:** Acorn (supplied by you) and Chillax (Fontshare free licence) are in `apps/web/fonts`. Then `gh repo edit devIykee/oiko --visibility public --accept-visibility-change-consequences`.
+4. **Submission** (`docs/SUBMISSION.md`): demo video, X post with @NEARProtocol and #NEARHackathon, a mainnet NEAR account for the payout, submit by 2026-11-14 23:59 UTC. Mainnet deployment is optional under the rules (testnet projects are eligible).
 
 ## Not finished
 
-- Zero-config local mode (`docker compose up` with a sandbox chain) and the Playwright e2e suite + `scripts/readme-check.ts`.
-- `docs/SECURITY.md`, `docs/AGENTS.md` long-form docs (agent docs exist as `/llms.txt`, `/.well-known/oiko-agent.json`, `/openapi.json`), `scripts/mainnet-proof.ts`.
-- Lighthouse reports, rescue sweeper UI, Invest (flag off).
-
-## Next commands
-
-```bash
-OIKO_API=https://oikodotnear.vercel.app pnpm smoke   # after funding the relayer
-pnpm test:unit && pnpm test:contracts
-```
-
+- Lighthouse performance ≥ 90 on every run (landing is 86-89; see above).
+- Rescue sweeper UI; Invest (flag off).
+- Autopilot without a connected agent (Oiko holds no key to run it, by design).
+- Mainnet proof (Phase 6, only with your go-ahead and funds).
+- Open security items: `docs/SECURITY.md` (S-1, S-3, S-5, counterparty report threshold).
 
 ## Testnet lock (2026-11-05)
 
-`oiko.testnet` (registry) and `ajo.oiko.testnet` (ROSCA) have **zero access keys** since 2026-11-05: nobody can change, upgrade or redeploy them. Spare NEAR was moved to the relayer first. User vaults were already keyless. Verify: `view_access_key_list` on both accounts returns no keys.
-
-Demo billers created for videos and the counterparty check: `brightline-fibre.testnet` (Brightline Fibre) and `metro-power-co.testnet` (Metro Power), registered on the test USDC/USDT tokens.
+`oiko.testnet` and `ajo.oiko.testnet` have **zero access keys**. Verify with `view_access_key_list`. Demo billers: `brightline-fibre.testnet` (Brightline Fibre), `metro-power-co.testnet` (Metro Power).

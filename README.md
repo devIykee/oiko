@@ -86,6 +86,8 @@ node scripts/check-no-llm.mjs   # fails if any LLM SDK or LLM API host is in app
 node scripts/check-copy.mjs     # banned-words test for user-facing copy
 ```
 
+Lighthouse (mobile): landing 86-89 performance / 100 accessibility, pay page 88-92 / 100, signed-in Home 89-91 / 100, best practices 100 and CLS 0 on all three. Reports: `docs/lighthouse/`.
+
 ## What runs where
 
 | | Chain | Payments from other chains (1Click) | Earn (Rhea) | Tokens |
