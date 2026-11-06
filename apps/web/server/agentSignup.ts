@@ -195,11 +195,13 @@ export async function agentCreateAccount(input: AgentSignupInput, ip: string): P
   // 11. Wait for the vault to exist
   await waitFor(`vault account ${vaultId}`, () => rpc().accountExists(vaultId));
 
-  // 12. Key rotation: add agent's full-access key, delete the ephemeral key
-  //     Sent from the ephemeral key (it is still a full-access key on accountId at this point).
+  // 12. Key rotation: delete both keys (ephemeral owner + agent's function-call app key),
+  //     then add agent's key as full-access. We must delete the agent's function-call key first
+  //     because NEAR doesn't allow the same public key with two different permission types.
   const r3 = await ephSigner.signAndSend(accountId, [
-    act.addFullAccessKey(agentPk),
-    act.deleteKey(ephemeral.publicKey),
+    act.deleteKey(agentPk),              // remove the function-call app key
+    act.deleteKey(ephemeral.publicKey),  // remove the ephemeral owner key
+    act.addFullAccessKey(agentPk),       // add agent's key as full-access
   ]);
   if (!r3.ok) txFail("key rotation", r3.txHash, r3.errorCode, r3.errorMessage);
 
