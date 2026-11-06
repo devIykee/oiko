@@ -8,7 +8,7 @@ const NOW = Date.now();
 const ns = (ms: number) => (BigInt(Math.round(ms)) * 1_000_000n).toString();
 const DAY = 86_400_000;
 const root = "oiko.testnet";
-const vaultId = `vault.ada.${root}`;
+const vaultId = `vault.steve.${root}`;
 
 const pot = (p: Partial<Pot> & Pick<Pot, "id" | "name" | "kind" | "color" | "icon">): Pot => ({
   balances: { usdc: "0", usdt: "0" }, earn_supplied: { usdc: "0", usdt: "0" }, unlock_at: null, target: null, target_date: null,
@@ -83,7 +83,7 @@ let splits: Overview["splits"] = [{ pot_id: 1, mode: "percent", value: "3000" },
 function overview(): Overview {
   const all = sumB("balances", () => true), earn = sumB("earn_supplied", () => true);
   return {
-    owner: `ada.${root}`, tokens: { usdc: `usdc.${root}`, usdt: `usdt.${root}` }, pots: structuredClone(pots),
+    owner: `steve.${root}`, tokens: { usdc: `usdc.${root}`, usdt: `usdt.${root}` }, pots: structuredClone(pots),
     splits: structuredClone(splits),
     totals: { usdc: (BigInt(all.usdc) + BigInt(earn.usdc)).toString(), usdt: (BigInt(all.usdt) + BigInt(earn.usdt)).toString() },
     flex: structuredClone(pots[0]!.balances),
@@ -114,7 +114,7 @@ const fxPayment = (p: Partial<InvoicePayment>): InvoicePayment => ({
   checkedAt: null, receivedAmount: null, depositedAmount: null, nearTxHashes: [], completedAt: null, ...p,
 });
 const fxInvoice = (p: Partial<Invoice> & Pick<Invoice, "id" | "number" | "client" | "items" | "token">): Invoice => ({
-  owner: `ada.${root}`, fromName: "Ada Okafor Design", issueDate: isoDay(NOW - 3 * DAY), dueDate: isoDay(NOW + 14 * DAY), note: null, state: "open",
+  owner: `steve.${root}`, fromName: "Steve Carter Design", issueDate: isoDay(NOW - 3 * DAY), dueDate: isoDay(NOW + 14 * DAY), note: null, state: "open",
   payments: [], createdAt: iso(NOW - 3 * DAY), updatedAt: iso(NOW - 3 * DAY), ...p,
 });
 const invoices: Invoice[] = [
@@ -182,7 +182,7 @@ export async function handle(path: string, method: string, body: unknown): Promi
   if (p === "/api/rates/earn") return { source: "fixture", fetchedAt: new Date(NOW - 300_000).toISOString(), assets: [{ token: "usdc", supplyApr: "0.0412", utilizationBps: 7840, paused: false }, { token: "usdt", supplyApr: "0.0388", utilizationBps: 9310, paused: true }] };
   if (p.startsWith("/api/names/")) {
     const name = decodeURIComponent(p.slice(11));
-    const taken = ["ada", "maya", "sam", "admin"].includes(name);
+    const taken = ["steve", "maya", "sam", "admin"].includes(name);
     return { name, available: !taken && /^[a-z0-9_-]{2,32}$/.test(name), accountId: `${name}.${root}`, vaultId: `vault.${name}.${root}`, exists: taken, suggestions: taken ? [`${name}1`, `${name}-ng`, `${name}_pay`] : [] };
   }
   if (p.startsWith("/api/receipts")) return { receipts: [

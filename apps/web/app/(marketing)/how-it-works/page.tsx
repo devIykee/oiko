@@ -9,8 +9,8 @@ export const metadata: Metadata = {
 };
 
 const steps: Array<[string, string]> = [
-  ["Claim your name", "Pick a name like ada. In under a minute Oiko creates ada.oiko.near (your identity, with your keys on your device) and your account, vault.ada.oiko.near, where your money lives. No seed phrase to write down."],
-  ["Share your pay link", "Anyone can pay /pay/ada. They choose where their money is now, for example USDT on TRON or USDC on Base, and get an address and exact amount. NEAR Intents converts it and delivers USDC or USDT to your account."],
+  ["Claim your name", "Pick a name like steve. In under a minute Oiko creates steve.oiko.near (your identity, with your keys on your device) and your account, vault.steve.oiko.near, where your money lives. No seed phrase to write down."],
+  ["Share your pay link", "Anyone can pay /pay/steve. They choose where their money is now, for example USDT on TRON or USDC on Base, and get an address and exact amount. NEAR Intents converts it and delivers USDC or USDT to your account."],
   ["Your plan runs", "When money arrives it is split by your plan into pots: Spend for now, Bills, Savings, Goals, and Locked pots that only open on their date. Payments are noticed even if nobody pressed a button: anyone can ask the account to sync, and it is safe to ask twice."],
   ["Pay, save, withdraw", "Pay bills, move between pots, or withdraw from Spend to an exchange or another account. Every money action shows the amount, the source pot, where it goes and the fees in one sentence before you confirm."],
   ["Let your agent help", "Connect the AI agent you already use through MCP or the REST API. It gets its own limited key: read only, suggest only, or act within caps and payees you choose. Disconnect revokes it at once."],

@@ -102,7 +102,7 @@ function WhatItIs() {
       visual: (
         <div className="rounded-[16px] bg-surface p-4">
           <p className="text-[12px] text-ink-2">Your pay link</p>
-          <p className="mt-1 font-semibold">/pay/ada</p>
+          <p className="mt-1 font-semibold">/pay/steve</p>
           <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-medium text-ink-2">
             {([["USDT on TRON", "tron"], ["USDC on Base", "base"], ["USDT on BNB", "bsc"]] as const).map(([s, c]) => <span key={s} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-surface-2 py-1 pl-1.5 pr-2.5"><AssetLogo chain={c} token={s.slice(0, 4)} size={20} />{s}</span>)}
           </div>
@@ -205,7 +205,7 @@ function UseCases() {
     { title: "Saving for a laptop", body: "A goal with a target and a date. Oiko shows when you will get there at your current pace.", color: "violet", d: I.deviceLaptop },
     { title: "A rainy-day fund", body: "Locked until the date you choose. On a bad day, nobody can open it early, not even you.", color: "stone", glyph: <LockedPotGlyph size={20} /> },
     { title: "ROSCA savings with friends", body: "Rotating savings where the order and contributions are enforced by code, not by trust in one organiser.", color: "mint", glyph: <AjoCircleGlyph size={20} /> },
-    { title: "Family sending by name", body: "Your aunt pays ada, not a long account number. It arrives split by your plan.", color: "rose", d: I.person2Fill },
+    { title: "Family sending by name", body: "Your aunt pays steve, not a long account number. It arrives split by your plan.", color: "rose", d: I.person2Fill },
   ];
   return (
     <Section tone="white" labelledBy="uses-title">
@@ -251,7 +251,7 @@ function Developers() {
   const code = [
     ["k", "import"], ["t", " { gatewayAuthHeader } "], ["k", "from"], ["s", ' "@oiko/sdk"'], ["t", ";\n\n"],
     ["k", "const"], ["t", " path = "], ["s", '"/api/agent/overview"'], ["t", ";\n"],
-    ["k", "const"], ["t", " auth = gatewayAuthHeader(\n  agentKey,\n  "], ["s", '"vault.ada.oiko.near"'], ["t", ",\n  "], ["s", '"GET"'], ["t", ", path, "], ["s", '""'], ["t", ",\n);\n\n"],
+    ["k", "const"], ["t", " auth = gatewayAuthHeader(\n  agentKey,\n  "], ["s", '"vault.steve.oiko.near"'], ["t", ",\n  "], ["s", '"GET"'], ["t", ", path, "], ["s", '""'], ["t", ",\n);\n\n"],
     ["k", "const"], ["t", " res = "], ["k", "await"], ["t", " fetch(oikoHost + path, {\n  headers: { Authorization: auth },\n});\n\n"],
     ["c", "// balances, pots, plan and bills,\n// each with a plain-English _help\n"],
     ["k", "const"], ["t", " overview = "], ["k", "await"], ["t", " res.json();"],

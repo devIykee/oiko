@@ -49,7 +49,7 @@ const SOURCE_CHAIN: Record<(typeof SOURCES)[number], string> = { "USDT on TRON":
 const STEPS = ["Waiting for your payment", "Received", "Delivering", "Done"] as const;
 
 export function PayByNameDemo() {
-  const [name, setName] = useState("ada");
+  const [name, setName] = useState("steve");
   const [source, setSource] = useState<(typeof SOURCES)[number]>("USDT on TRON");
   const [amount, setAmount] = useState(50);
   const [step, setStep] = useState(-1);

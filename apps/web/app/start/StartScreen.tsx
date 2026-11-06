@@ -59,7 +59,7 @@ export function StartScreen() {
     return () => { clearTimeout(h); setChecking(false); };
   }, [name]);
 
-  const fullName = oiko ? `${name || "ada"}.${oiko.root}` : `${name || "ada"}.oiko`;
+  const fullName = oiko ? `${name || "steve"}.${oiko.root}` : `${name || "steve"}.oiko`;
   const valid = NAME_RE.test(name);
 
   const create = async () => {

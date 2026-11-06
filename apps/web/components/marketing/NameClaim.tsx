@@ -46,7 +46,7 @@ export function NameClaim() {
             id={inputId}
             value={name}
             onChange={(e) => setName(e.target.value.toLowerCase().replace(/\s/g, ""))}
-            placeholder="ada"
+            placeholder="steve"
             autoComplete="off"
             autoCapitalize="none"
             spellCheck={false}

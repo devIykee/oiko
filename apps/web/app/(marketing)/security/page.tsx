@@ -15,11 +15,11 @@ function Custody() {
       <div className="grid gap-3 md:grid-cols-3 md:items-stretch">
         <div className={box}>
           <p className="font-semibold text-ink">You</p>
-          <p className="mt-1 text-ink-2">ada.oiko.near holds your keys, on your device (passkey).</p>
+          <p className="mt-1 text-ink-2">steve.oiko.near holds your keys, on your device (passkey).</p>
         </div>
         <div className={`${box} border-2 border-accent`}>
           <p className="font-semibold text-ink">Your account</p>
-          <p className="mt-1 text-ink-2">vault.ada.oiko.near holds the money. It has no keys of its own and its code cannot be changed.</p>
+          <p className="mt-1 text-ink-2">vault.steve.oiko.near holds the money. It has no keys of its own and its code cannot be changed.</p>
         </div>
         <div className={box}>
           <p className="font-semibold text-ink">Your agents</p>
@@ -36,7 +36,7 @@ export default function SecurityPage() {
     <>
       <PageHero eyebrow="Trust and security" title="Your money, in an account only you control." lead="Oiko runs on USDC and USDT stablecoins on NEAR. Here is exactly who can do what, the code you can check, and the risks in plain words." />
       <Block title="Who holds the money">
-        <p>Your name, like <strong>ada.oiko.near</strong>, is your identity account. It holds your keys. Your money lives in a separate account, <strong>vault.ada.oiko.near</strong>, which has <strong>no access keys</strong>: nobody can sign for it directly, including Oiko. It only follows the rules in its code, on instructions signed by you or by an agent you allowed.</p>
+        <p>Your name, like <strong>steve.oiko.near</strong>, is your identity account. It holds your keys. Your money lives in a separate account, <strong>vault.steve.oiko.near</strong>, which has <strong>no access keys</strong>: nobody can sign for it directly, including Oiko. It only follows the rules in its code, on instructions signed by you or by an agent you allowed.</p>
         <Custody />
       </Block>
       <Block id="code" title="Code you can check" tone="grey">

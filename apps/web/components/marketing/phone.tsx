@@ -59,7 +59,7 @@ export function HomeScreen() {
     <div className="px-4">
       <div className="flex items-center justify-between pt-2">
         <span className="flex size-8 items-center justify-center rounded-full bg-tile-violet-soft text-[13px] font-semibold text-tile-violet">A</span>
-        <span className="rounded-full bg-surface px-3 py-1 text-[11px] font-medium text-ink-2">ada</span>
+        <span className="rounded-full bg-surface px-3 py-1 text-[11px] font-medium text-ink-2">steve</span>
         <span className="flex size-8 items-center justify-center rounded-full bg-surface text-ink-2"><Glyph d={I.bellFill} size={14} /></span>
       </div>
       <div className="pt-7 text-center">

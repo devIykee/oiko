@@ -25,7 +25,7 @@ export interface Session {
 
 const KEY = "oiko.session.v1";
 const FIXTURE_SESSION: Session = {
-  name: "ada", displayName: "Ada", accountId: "ada.oiko.testnet", vaultId: "vault.ada.oiko.testnet",
+  name: "steve", displayName: "Steve", accountId: "steve.oiko.testnet", vaultId: "vault.steve.oiko.testnet",
   appKey: "ed25519:fixture", method: "demo", createdAt: 0,
 };
 

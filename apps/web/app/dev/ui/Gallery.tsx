@@ -86,10 +86,10 @@ export function Gallery() {
       </Block>
 
       <Block title="Inputs">
-        <Input label="Your name" placeholder="ada" suffix=".oiko.near" hint="2 to 32 lowercase letters" />
+        <Input label="Your name" placeholder="steve" suffix=".oiko.near" hint="2 to 32 lowercase letters" />
         <Input label="Address" defaultValue="0x12" error="That doesn't look like an address." />
         <div className="oi-card"><AmountInput label="Amount" value={amt} onChange={setAmt} ticker="USDT" sub="120.50 USDT available" chips={[{ label: "Max", value: "120.5" }]} keypad="always" /></div>
-        <CopyField label="Your pay link" value="https://oiko.app/pay/ada" mono={false} />
+        <CopyField label="Your pay link" value="https://oiko.app/pay/steve" mono={false} />
       </Block>
 
       <Block title="Tabs, segmented, toggle, mode badge">
@@ -113,7 +113,7 @@ export function Gallery() {
       <Block title="Status timeline (cycles), circle timeline, QR">
         <div className="oi-card"><StatusTimeline label="Status" current={tl} steps={[{ key: "a", title: "Waiting for your payment" }, { key: "b", title: "Received" }, { key: "c", title: "Delivering" }, { key: "d", title: "Done" }]} liveText="" /></div>
         <div className="oi-card"><CircleTimeline label="Order" slots={[{ name: "maya", round: 0, state: "paid", caption: "3 Oct" }, { name: "You", round: 1, state: "current", caption: "10 Oct" }, { name: "sam", round: 2, state: "upcoming", caption: "17 Oct" }, { name: "lena", round: 3, state: "default", caption: "24 Oct" }]} /></div>
-        <QRCodeCard value="https://oiko.app/pay/ada" label="QR" caption="Scan to pay ada" size={180} />
+        <QRCodeCard value="https://oiko.app/pay/steve" label="QR" caption="Scan to pay steve" size={180} />
       </Block>
 
       <Block title="Agents: proposal, card with caps, scopes, access log, risk">
@@ -129,7 +129,7 @@ export function Gallery() {
 
       <Block title="Avatar, tile colours, empty, skeleton">
         <div className="oi-row" style={{ flexWrap: "wrap" }}>
-          <Avatar name="Ada" /><Avatar name="Maya Chen" size={48} />
+          <Avatar name="Steve" /><Avatar name="Maya Chen" size={48} />
           {tileColors.map((c) => <Tile key={c} icon="star" color={c} />)}
         </div>
         <div className="oi-card"><EmptyState icon="bills" color="sun" title="No bills yet" body="Add rent, power or internet." action={<Button size="sm">Add bill</Button>} /></div>
