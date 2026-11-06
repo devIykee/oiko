@@ -2,6 +2,7 @@ export const flows = {
   "act.received": "Money in",
   "act.receivedFrom": "From {who}",
   "act.splitByPlan": "Split by your plan",
+  "act.fee": "fee {fee}",
   "act.planRan": "Your plan ran",
   "act.planRanSub": "Split across your pots",
   "act.moved": "{from} → {to}",

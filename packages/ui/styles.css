@@ -448,3 +448,18 @@ textarea.oi-input { height: auto; min-height: 88px; padding: 12px 0; resize: ver
 @media (min-width: 900px) { .oi-home-hero { padding: 28px 28px 20px; } }
 /* Compact segmented control for row trailing slots (e.g. Settings > Appearance). */
 .oi-seg--compact .oi-seg__btn { padding: 0 6px; font-size: 13px; height: 30px; }
+
+/* Biller picker (verified billers directory) */
+.oi-billers { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.oi-biller { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; border: 0; background: var(--surface-2); color: var(--ink); font: inherit; text-align: left; cursor: pointer; box-shadow: inset 0 0 0 1.5px transparent; transition: box-shadow var(--dur-fast), background var(--dur-fast); }
+.oi-biller:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.oi-biller--on { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.oi-biller__tile { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--tile-deep); color: var(--tile-soft); font-weight: 700; font-size: 13px; letter-spacing: 0.02em; }
+.oi-biller__body { display: flex; flex-direction: column; min-width: 0; }
+.oi-biller__name { font-weight: 600; font-size: 15px; }
+.oi-biller__sub { font-size: 12px; color: var(--ink-2); }
+/* Access log outcomes */
+.oi-outcome { font-weight: 700; margin-right: 4px; }
+.oi-outcome--approved, .oi-outcome--proposed { color: var(--success-ink); }
+.oi-outcome--blocked, .oi-outcome--refused { color: var(--danger-ink); }
+.oi-outcome--read { color: var(--ink-2); }

@@ -1,4 +1,5 @@
 // NEAR Intents 1Click proxy. Real API on mainnet (fields per docs/DECISIONS.md §5); the built-in mock elsewhere.
+import { recordReceipt } from "./receipts";
 import { isVaultId, nameFromAccount, NAME_RE, vaultIdFor, type Token } from "@oiko/sdk";
 import { serverConfig } from "./config";
 import { ApiError } from "./errors";
@@ -119,9 +120,11 @@ export async function depositAddress(input: { name: string; originAsset: string;
   const q = r.quote;
   if (!q.depositAddress) throw new ApiError("E_QUOTE", 502);
   deposits.set(q.depositAddress, vaultId);
+  const fee = feeUnits(q.amountInFormatted, q.amountOutFormatted);
+  await recordReceipt(vaultId, { depositAddress: q.depositAddress, amountIn: q.amountIn, originDecimals: origin.decimals, amountOut: q.amountOut, fee, token: dest.token, originSymbol: origin.symbol === "USDt" ? "USDT" : origin.symbol, createdAt: new Date().toISOString() });
   return {
     depositAddress: q.depositAddress, ...(q.depositMemo ? { depositMemo: q.depositMemo } : {}),
-    amountIn: q.amountIn, amountOut: q.amountOut, fee: feeUnits(q.amountInFormatted, q.amountOutFormatted),
+    amountIn: q.amountIn, amountOut: q.amountOut, fee,
     deadline: q.deadline ?? body.deadline, quoteId: r.correlationId, destinationToken: dest.token,
     timeEstimate: q.timeEstimate, minAmountOut: q.minAmountOut,
     ...((r as { ticket?: string }).ticket ? { ticket: (r as { ticket?: string }).ticket } : {}),

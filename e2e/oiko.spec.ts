@@ -1,0 +1,276 @@
+// Oiko end-to-end tests (local mode). Each title starts with a stable id that README.md can reference as `[e2e: README-n]`.
+// Run against `pnpm local` or `docker compose up`:  pnpm e2e
+import { expect, test, type Page } from "@playwright/test";
+import { execFileSync, spawnSync } from "node:child_process";
+import { join } from "node:path";
+import { GatewayClient, decodeConnectionString, friendlyError, generateKeyPair, toUnits, type Overview } from "../packages/sdk/src/index.ts";
+import {
+  BASE, apiUser, claimNameUI, config, fund, loginAs, payFromTron, relayerCall, rpc, until, vaultOf, waitForUsdt, type Session,
+} from "./helpers";
+
+const ROOT = join(__dirname, "..");
+const potBy = (o: Overview, kind: string) => o.pots.find((p) => p.kind === kind)!;
+const share = (amount: bigint, bps: number) => (amount * BigInt(bps)) / 10_000n;
+/** Two amounts in base units are equal up to 2 units of rounding. */
+const close = (a: bigint, b: bigint) => (a > b ? a - b : b - a) <= 2n;
+
+test.describe.serial("money flow for one person", () => {
+  let me: Session;
+  let firstPayment = 0n;
+
+  test("README-1 claim a name", async ({ page }) => {
+    const name = `e2e${Date.now().toString(36).slice(-6)}`;
+    me = await claimNameUI(page, name);
+    const cfg = await config();
+    expect(me.accountId).toBe(`${name}.${cfg.root}`);
+    await expect(page.getByTestId("home")).toContainText(me.accountId);
+    // The savings account exists and has no access keys at all (so no full-access key).
+    const keys = await (await rpc()).viewAccessKeyList(me.vaultId);
+    expect(keys.length).toBe(0);
+    // Default plan from the first-run screen: Bills 30%, Savings 20%, Goal 10%, rest to Spend; Rainy day is a locked pot.
+    const o = await (await vaultOf(me)).overview();
+    const bps = Object.fromEntries(o.splits.map((r) => [o.pots.find((p) => p.id === r.pot_id)!.kind, Number(r.value)]));
+    expect(bps).toMatchObject({ bills: 3000, autosave: 2000, goal: 1000 });
+    expect(o.pots.some((p) => p.kind === "locked")).toBe(true);
+  });
+
+  test("README-2 get paid 100 USDT from USDT on TRON, split across pots", async ({ page, browser }) => {
+    firstPayment = await payFromTron(browser, me.name, "100");
+    expect(firstPayment).toBeGreaterThan(BigInt(toUnits("95")));
+    await waitForUsdt(me, firstPayment);
+    const o = await (await vaultOf(me)).overview();
+    expect(BigInt(o.totals.usdt)).toBe(firstPayment);
+    expect(close(BigInt(potBy(o, "bills").balances.usdt), share(firstPayment, 3000))).toBe(true);
+    expect(close(BigInt(potBy(o, "autosave").balances.usdt), share(firstPayment, 2000))).toBe(true);
+    expect(close(BigInt(potBy(o, "goal").balances.usdt), share(firstPayment, 1000))).toBe(true);
+    expect(close(BigInt(potBy(o, "flex").balances.usdt), share(firstPayment, 4000))).toBe(true);
+
+    await loginAs(page, me);
+    await page.goto("/home");
+    const whole = (u: bigint) => (Number(u / 10_000n) / 100).toFixed(2);
+    await expect(page.getByTestId("balance-usdt")).toContainText(whole(firstPayment));
+    await expect(page.getByTestId(`pot-card-${potBy(o, "bills").id}`)).toContainText(whole(BigInt(potBy(o, "bills").balances.usdt)));
+  });
+
+  test("README-3 change Bills to 40% and the next payment puts 40% in Bills", async ({ page, browser }) => {
+    const v = await vaultOf(me);
+    const before = await v.overview();
+    const bills = potBy(before, "bills");
+    await loginAs(page, me);
+    await page.goto("/plan");
+    await page.getByTestId("plan-edit").click();
+    await page.getByTestId(`plan-slider-${bills.id}`).fill("4000");
+    await page.getByTestId("plan-save").click();
+    await until(async () => (await v.overview()).splits.some((r) => r.pot_id === bills.id && r.value === "4000"), 60_000);
+    await expect(page.getByTestId("plan-preview")).toContainText("40");
+
+    const paid = await payFromTron(browser, me.name, "100");
+    await waitForUsdt(me, BigInt(before.totals.usdt) + paid);
+    const after = await v.overview();
+    const delta = BigInt(potBy(after, "bills").balances.usdt) - BigInt(bills.balances.usdt);
+    expect(close(delta, share(paid, 4000))).toBe(true);
+  });
+
+  test("README-4 a locked pot refuses withdrawals", async ({ page }) => {
+    const v = await vaultOf(me);
+    let o = await v.overview();
+    const rainy = potBy(o, "locked");
+    expect((await v.moveFunds(potBy(o, "flex").id, rainy.id, "usdt", toUnits("1"))).ok).toBe(true);
+    const unlock = BigInt(Date.now() + 30 * 86_400_000) * 1_000_000n;
+    expect((await v.lock(rainy.id, unlock.toString())).ok).toBe(true);
+
+    // The account itself refuses, with the friendly message the app shows.
+    const r = await v.withdraw(rainy.id, "usdt", toUnits("1"), (await config()).relayer!);
+    expect(r.ok).toBe(false);
+    const f = friendlyError(`${r.errorCode} ${r.errorMessage}`);
+    expect(f.code).toBe("E_LOCKED");
+    expect(f.title).toBe("This pot is locked.");
+
+    // The app shows the lock and offers no way out of the pot.
+    await loginAs(page, me);
+    await page.goto(`/pots/${rainy.id}`);
+    await expect(page.getByTestId("pot-locked")).toBeVisible();
+    await expect(page.getByTestId("pot-move-out")).toBeDisabled();
+    await page.goto("/withdraw");
+    await expect(page.getByRole("radio", { name: new RegExp(rainy.name) })).toBeDisabled();
+    o = await v.overview();
+    expect(BigInt(o.pots.find((p) => p.id === rainy.id)!.balances.usdt)).toBe(BigInt(toUnits("1")));
+  });
+
+  test("README-5 withdraw 1 USDT from Spend", async ({ page }) => {
+    const payee = await apiUser("payee");
+    const v = await vaultOf(me);
+    const before = BigInt(potBy(await v.overview(), "flex").balances.usdt);
+    await loginAs(page, me);
+    await page.goto("/withdraw");
+    await page.getByRole("radio", { name: /Spend/ }).click();
+    await page.getByTestId("withdraw-oiko").click();
+    await page.getByTestId("withdraw-address").fill(payee.name);
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByTestId("withdraw-amount").fill("1");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByTestId("withdraw-sentence")).toContainText(payee.name);
+    await page.getByTestId("withdraw-confirm").click();
+    await expect(page.getByText(/arrived|on its way/i).first()).toBeVisible({ timeout: 60_000 });
+    await until(async () => BigInt(potBy(await v.overview(), "flex").balances.usdt) === before - BigInt(toUnits("1")), 60_000);
+    await waitForUsdt(payee, BigInt(toUnits("1")));
+  });
+
+  test("README-6 agent with a 5 USDT cap: two payments pass, the third is refused, Disconnect cuts it off", async ({ page }) => {
+    const cfg = await config();
+    await loginAs(page, me);
+    await page.goto("/agents");
+    await page.getByTestId("agent-template-custom").click();
+    await page.getByLabel("Agent name").fill("Example agent");
+    await page.getByTestId("agent-scope-act").click();
+    await page.getByRole("switch", { name: "Pay people on its list" }).click();
+    await page.getByLabel("Who it can pay").fill(cfg.relayer!);
+    await page.getByLabel("Per payment").fill("2");
+    await page.getByLabel("Per day").fill("5");
+    await page.getByLabel("Per week").fill("5");
+    await page.getByTestId("agent-continue").click();
+    await page.getByTestId("agent-allow").click();
+    const mcp = JSON.parse((await page.getByTestId("agent-mcp").textContent()) ?? "{}");
+    const connection: string = mcp.mcpServers.oiko.env.OIKO_CONNECTION;
+    expect(connection).toMatch(/^oiko1?:/);
+
+    // The scripted example agent (examples/agents/scripted): reads, proposes, pays twice, third payment refused.
+    const out = spawnSync("pnpm", ["--silent", "example:agent"], { cwd: ROOT, env: { ...process.env, OIKO_CONNECTION: connection, OIKO_EXAMPLE_PAYEE: cfg.relayer! }, encoding: "utf8", timeout: 120_000 });
+    const text = `${out.stdout}\n${out.stderr}`;
+    expect(text.match(/✓ Paid/g)?.length ?? 0, text).toBe(2);
+    expect(text, text).toMatch(/✗ Refused: .*\[E_CAP_/);
+
+    // Disconnect deletes the agent's key; its reads are refused afterwards.
+    await page.keyboard.press("Escape");
+    await page.goto("/agents");
+    await page.locator('[data-testid^="agent-card-"][data-testid$="-disconnect"]').first().click();
+    const agent = new GatewayClient(decodeConnectionString(connection));
+    await until(async () => { try { await agent.get("/api/agent/overview"); return false; } catch { return true; } }, 60_000, 2000);
+    const keys = await (await rpc()).viewAccessKeyList(me.vaultId);
+    expect(keys.length).toBe(0);
+  });
+
+  test("README-7 a bill paid by an agent shows Paid", async ({ page }) => {
+    const cfg = await config();
+    const v = await vaultOf(me);
+    const o = await v.overview();
+    const day = new Date().getUTCDate();
+    expect((await v.addBill({ name: "Internet", amount: toUnits("3"), token: "usdt", due_day: Math.min(day, 28), payee: cfg.relayer!, pot_id: potBy(o, "bills").id })).ok).toBe(true);
+    const bill = (await v.bills()).find((b) => b.name === "Internet")!;
+    const key = generateKeyPair();
+    const exp = BigInt(Date.now() + 7 * 86_400_000) * 1_000_000n;
+    expect((await v.addAgent(key.publicKey, {
+      label: "Bill payer", agent_name: "Bill payer", agent_url: "https://example.com", scopes: ["read", "propose", "act"], allowed_actions: ["pay"],
+      allowlist: [{ type: "near", account_id: cfg.relayer! }], per_tx: toUnits("5"), daily: toUnits("5"), weekly: toUnits("5"), expires_at: exp.toString(),
+    } as never)).ok).toBe(true);
+    const agent = new GatewayClient({ api: BASE, vault: me.vaultId, sk: key.secretKey });
+    const r = await agent.run("act", { type: "pay_bill", bill_id: bill.id } as never);
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    await loginAs(page, me);
+    await page.goto("/bills");
+    await expect(page.getByTestId(`bill-row-${bill.id}`)).toContainText("Paid");
+    await v.revokeAgent(key.publicKey);
+  });
+
+  test("README-8 Earn is refused when the lending pool is 93% borrowed", async ({ page }) => {
+    const cfg = await config();
+    const big = 10n ** 24n;
+    const setUtil = (bps: bigint) => relayerCall(cfg.contracts.lending!, "set_state", { token_id: cfg.contracts.usdt, supplied: big.toString(), borrowed: ((big * bps) / 10_000n).toString(), apy_bps: 500 });
+    expect((await setUtil(9300n)).ok).toBe(true);
+    try {
+      const v = await vaultOf(me);
+      const bills = potBy(await v.overview(), "bills");
+      // The account checks utilization itself before every deposit.
+      const r = await v.earnOn(bills.id, "usdt", toUnits("1"));
+      expect(r.ok).toBe(false);
+      expect(friendlyError(`${r.errorCode} ${r.errorMessage}`).code).toBe("E_UTILIZATION");
+      // The app shows Earn as paused and won't offer the deposit (rates are cached for up to a minute).
+      await loginAs(page, me);
+      await until(async () => {
+        await page.goto(`/pots/${bills.id}`);
+        await page.getByTestId("pot-earn-toggle").click();
+        const paused = await page.getByText("Earn is paused for this stablecoin").isVisible({ timeout: 5000 }).catch(() => false);
+        return paused;
+      }, 90_000, 5000);
+      await expect(page.getByTestId("earn-sheet").getByRole("button", { name: /Continue|Start|Earn/ }).last()).toBeDisabled();
+    } finally {
+      await setUtil(5000n);
+    }
+  });
+
+  test("README-10 reduced motion: Home runs no looping animations", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await loginAs(page, me);
+    await page.goto("/home");
+    await expect(page.getByTestId("balance")).toBeVisible();
+    await page.waitForTimeout(1500);
+    const moving = await page.evaluate(() => document.getAnimations()
+      .filter((a) => a.playState === "running")
+      .map((a) => ({ name: (a as CSSAnimation).animationName ?? a.constructor.name, t: a.effect?.getComputedTiming() }))
+      .filter((a) => a.t && (a.t.iterations === Infinity || Number(a.t.duration) > 50)));
+    expect(moving).toEqual([]);
+  });
+
+  test("README-11 360px wide: no horizontal scroll on the main pages", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 780 });
+    await loginAs(page, me);
+    for (const path of ["/", "/start", `/pay/${me.name}`, "/home", "/plan", "/pots", "/bills", "/agents", "/rosca", "/withdraw", "/insights", "/settings"]) {
+      await page.goto(path);
+      await page.waitForLoadState("networkidle").catch(() => undefined);
+      const w = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+      expect(w.scroll, `${path} is ${w.scroll}px wide`).toBeLessThanOrEqual(w.client + 1);
+    }
+  });
+});
+
+test("README-9 ROSCA: create with 1-minute rounds and 3 people, start, pay, settle", async ({ page }) => {
+  test.setTimeout(300_000);
+  const cfg = await config();
+  const [org, m1, m2] = await Promise.all([apiUser("rosa"), apiUser("rosb"), apiUser("rosc")]);
+  for (const u of [org, m1, m2]) await fund(u, "20");
+  for (const u of [org, m1, m2]) await waitForUsdt(u, BigInt(toUnits("20")));
+
+  await loginAs(page, org);
+  await page.goto("/rosca/new");
+  await page.getByLabel("Group name").fill("Test circle");
+  await page.getByLabel("Each person puts in").fill("5");
+  await page.getByRole("radio", { name: "Every minute (test mode)" }).click();
+  await page.getByLabel("How many people").fill("3");
+  await page.getByRole("switch", { name: "Bond" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Start ROSCA" }).click();
+  await page.waitForURL(/\/rosca\/\d+$/, { timeout: 60_000 });
+  const id = Number(/\/rosca\/(\d+)$/.exec(page.url())![1]);
+  const code = await page.evaluate((k) => localStorage.getItem(k), `oiko-rosca-invite-${id}`);
+  expect(code).toBeTruthy();
+
+  for (const m of [m1, m2]) expect((await (await vaultOf(m)).ajoJoin(id, code!)).ok).toBe(true);
+  await page.reload();
+  await page.getByTestId("rosca-start").click();
+  await page.getByRole("button", { name: "Start the group" }).click();
+  await expect(page.getByTestId("rosca-pay")).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId("rosca-pay").click();
+  await page.getByRole("button", { name: "Pay", exact: true }).click();
+  await expect(page.getByTestId("rosca-pay")).toBeDisabled({ timeout: 60_000 });
+  for (const m of [m1, m2]) expect((await (await vaultOf(m)).ajoContribute(id, "usdt", toUnits("5"))).ok).toBe(true);
+
+  // Anyone may settle once the 1-minute round is over; the first person in the order receives 15 USDT.
+  const r = await rpc();
+  const circle = await r.view<{ order: string[]; round: number }>(cfg.contracts.ajo!, "get_circle", { id });
+  const first = [org, m1, m2].find((u) => u.vaultId === circle.order[0])!;
+  const before = BigInt((await (await vaultOf(first)).overview()).totals.usdt);
+  await until(async () => {
+    const c = await r.view<{ round: number }>(cfg.contracts.ajo!, "get_circle", { id });
+    if (c.round >= 1) return true;
+    await relayerCall(cfg.contracts.ajo!, "settle_round", { circle_id: id }, 200n);
+    return false;
+  }, 150_000, 5000);
+  await waitForUsdt(first, before + BigInt(toUnits("15")));
+  await page.reload();
+  await expect(page.getByTestId("rosca-pay")).toBeEnabled({ timeout: 30_000 });
+});
+
+test("README-12 banned-words check passes", () => {
+  // Exits non-zero (and execFileSync throws) when user-facing copy contains a banned word.
+  execFileSync("node", ["scripts/check-copy.mjs"], { cwd: ROOT, encoding: "utf8", stdio: "pipe" });
+});

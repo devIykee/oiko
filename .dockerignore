@@ -1,0 +1,14 @@
+**/node_modules
+**/.next
+**/target
+**/.turbo
+.git
+.vercel
+.oiko
+.env
+.env.*
+!.env.example
+coverage
+playwright-report
+test-results
+contracts/res/*.wasm

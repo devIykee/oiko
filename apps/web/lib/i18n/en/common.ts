@@ -23,6 +23,7 @@ export const common = {
   "common.copy": "Copy",
   "common.copied": "Copied",
   "common.share": "Share",
+  "common.downloadTxt": "Download as .txt",
   "common.retry": "Try again",
   "common.seeAll": "See all",
   "common.loading": "Loading",

@@ -10,3 +10,4 @@ export * from "./nep413";
 export * from "./errors";
 export * from "./insights";
 export * from "./agent";
+export * from "./caps";

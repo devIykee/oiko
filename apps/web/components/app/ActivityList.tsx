@@ -5,6 +5,9 @@ import { useEffect, useState } from "react";
 import { fmtDateTime } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { describeActivity, isMoneyActivity } from "./describe";
+import { useReceipts } from "@/lib/data";
+import { fmt } from "@/lib/format";
+import { matchReceipt } from "@/lib/receipts";
 
 /** Plain-English activity rows with who did it. New incoming rows flash once (1.2 s). */
 export function ActivityList({ items, pots, agents, explorerTx, limit, moneyOnly, emptyTitle, emptyBody }: { items: Activity[]; pots: Pot[]; agents: AgentView[]; explorerTx?: (h: string) => string; limit?: number; moneyOnly?: boolean; emptyTitle?: string; emptyBody?: string }) {
@@ -13,6 +16,7 @@ export function ActivityList({ items, pots, agents, explorerTx, limit, moneyOnly
   const [firstSeen, setFirstSeen] = useState<number | null>(null);
   const maxSeq = items.reduce((m, a) => Math.max(m, a.seq), 0);
   useEffect(() => { if (firstSeen === null && items.length) setFirstSeen(maxSeq); }, [firstSeen, items.length, maxSeq]);
+  const receipts = useReceipts().data?.receipts ?? [];
   const rows = items.filter((a) => a.kind !== "split_applied" && (!moneyOnly || isMoneyActivity(a))).slice(0, limit ?? items.length);
   if (!rows.length) return <div className="oi-card"><EmptyState icon="activity" title={emptyTitle ?? t("activity.emptyTitle")} body={emptyBody ?? t("activity.emptyBody")} /></div>;
   void explorerTx;
@@ -20,6 +24,9 @@ export function ActivityList({ items, pots, agents, explorerTx, limit, moneyOnly
     <GroupedList label={t("nav.activity")} data-testid="activity-list">
       {rows.map((a) => {
         const d = describeActivity(a, pots, agents, t);
+        // Incoming payments: show the fee the payer's route took (from the quote), e.g. "fee 0.20".
+        const rc = a.kind === "deposit_received" ? matchReceipt(receipts, { amount: a.amount, token: a.token, atMs: d.atMs }) : null;
+        if (rc && BigInt(rc.fee) > 0n) d.subtitle = [d.subtitle, t("act.fee", { fee: fmt(rc.fee) })].filter(Boolean).join(" · ");
         return (
           <ActivityRow key={a.seq} token={d.amount ? a.token : null} icon={d.icon} color={d.color} title={d.title} direction={d.direction} amount={d.amount}
             subtitle={[d.subtitle, fmtDateTime(d.atMs)].filter(Boolean).join(" · ")}

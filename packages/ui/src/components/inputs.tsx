@@ -120,10 +120,14 @@ export function CopyField({ label, value, display, mono = true, copyLabel = "Cop
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
+      if (!navigator.clipboard?.writeText) throw new Error("no async clipboard");
       await navigator.clipboard.writeText(value);
     } catch {
+      // Fallback (insecure origins, older WebViews, iOS): an off-screen read-only textarea + execCommand.
       const ta = document.createElement("textarea");
-      ta.value = value; document.body.appendChild(ta); ta.select();
+      ta.value = value; ta.readOnly = true;
+      Object.assign(ta.style, { position: "fixed", top: "0", left: "-9999px", opacity: "0" });
+      document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0, value.length);
       try { document.execCommand("copy"); } finally { ta.remove(); }
     }
     setCopied(true);

@@ -179,6 +179,10 @@ export function PayFlow({ name, display, recipient, fixed, invoiceId, onStatus, 
               <SuccessCheck />
               <h2 className="oi-h2">{doneTitle ?? t("pay.doneTitle", { name: display })}</h2>
               <p className="oi-muted" style={{ margin: 0 }}>{t("pay.doneBody", { amount: `${fromUnits(dep.amountOut)} ${dep.destinationToken.toUpperCase()}` })}</p>
+              <p className="oi-small oi-num" style={{ margin: 0 }} data-testid="pay-receipt-line">{t("pay.receiptLine", {
+                sent: `${fromUnits(dep.amountIn, decimals)} ${group?.symbol ?? dep.destinationToken.toUpperCase()}`,
+                fee: fromUnits(dep.fee), arrived: `${fromUnits(dep.amountOut)} ${dep.destinationToken.toUpperCase()}`,
+              })}</p>
             </div>
           ) : (
             <div className="oi-card oi-stack" data-testid="pay-deposit">

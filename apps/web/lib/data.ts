@@ -1,5 +1,6 @@
 "use client";
 // Data hooks. Vault reads go straight to the contract views (via @oiko/sdk); HTTP reads go to /api.
+import type { Receipt } from "./receipts";
 import { AjoClient, VaultClient, gatewayAuthHeader, type Activity, type Circle, type MonthStats, type Overview } from "@oiko/sdk";
 import { useEffect } from "react";
 import { api } from "./api";
@@ -65,6 +66,17 @@ export function useNameInfo(name: string | null) {
   return useQuery<NameInfoResp>(name ? `name:${name}` : null, () => fetchName(name!));
 }
 
+export function useReceipts() {
+  const { session } = useSession();
+  const v = session?.vaultId;
+  return useQuery<{ receipts: Receipt[] }>(v ? `receipts:${v}` : null, () => api(`/api/receipts?vault=${encodeURIComponent(v!)}`), { refreshMs: 60_000 });
+}
+
+export interface VerifiedBiller { accountId: string; name: string; category: string }
+export function useBillers() {
+  return useQuery<{ billers: VerifiedBiller[] }>("billers", () => api("/api/billers"));
+}
+
 export interface IntentGroup { id: string; label: string; chain: string; symbol: string; assetId: string; decimals: number }
 export function useIntentTokens() {
   return useQuery<{ groups: IntentGroup[] }>("intents:tokens", () => api("/api/intents/tokens"));
@@ -91,7 +103,7 @@ export function useCircle(id: number | null) {
   );
 }
 
-export interface AccessLogRow { at: string; method: string; path: string; status?: number; code?: string | null; tool?: string | null; txHash?: string | null; ok?: boolean; summary?: string }
+export interface AccessLogRow { at: string; method: string; path: string; status?: number; code?: string | null; tool?: string | null; txHash?: string | null; ok?: boolean; summary?: string; outcome?: "Read" | "Approved" | "Proposed" | "Blocked" | "Refused"; reason?: string | null }
 /** Agent access log (GET /api/agent/log), authenticated with NEP-413 by the owner's app key. */
 export function useAgentLog(publicKey: string | null) {
   const { session } = useSession();

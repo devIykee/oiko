@@ -1,0 +1,31 @@
+# Zero-config local mode: `cp .env.example .env && docker compose up` -> http://localhost:3000
+# chain: NEAR sandbox with every Oiko contract deployed (RPC on http://localhost:3030)
+# Ports can be moved with OIKO_WEB_PORT / OIKO_RPC_PORT (e.g. OIKO_WEB_PORT=3100 docker compose up).
+# web:   the Oiko app + API (relayer key and contract names come from the chain's shared /state volume)
+services:
+  chain:
+    build: { context: ., dockerfile: docker/chain.Dockerfile }
+    init: true
+    ports: ["${OIKO_RPC_PORT:-3030}:3030"]
+    volumes: [oiko-state:/state]
+
+  web:
+    build: { context: ., dockerfile: docker/web.Dockerfile }
+    init: true
+    depends_on:
+      chain: { condition: service_healthy }
+    ports: ["${OIKO_WEB_PORT:-3000}:3000"]
+    volumes: [oiko-state:/state:ro]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OIKO_NETWORK: local
+      OIKO_NODE_URL: http://chain:3030
+      OIKO_PUBLIC_NODE_URL: http://localhost:${OIKO_RPC_PORT:-3030}
+      OIKO_PUBLIC_URL: http://localhost:${OIKO_WEB_PORT:-3000}
+      OIKO_STATE_DIR: /state
+      ONECLICK_BASE_URL: mock
+
+volumes:
+  oiko-state:

@@ -151,8 +151,8 @@ function ConnectedAgent({ a, o }: { a: AgentView; o: Overview }) {
           <AgentAccessLog label={t("agents.log")} empty={log.data ? t("agents.logEmpty") : t("common.loading")}
             rows={(log.data ?? []).map((r) => ({
               at: r.at, atLabel: fmtDateTime(Date.parse(r.at)),
-              text: r.summary ?? `${r.tool ?? r.path}${r.status && r.status >= 400 ? ` · ${t("agents.refused")}` : ""}`,
-              detail: r.code ?? undefined,
+              text: <><strong className={`oi-outcome oi-outcome--${(r.outcome ?? "Read").toLowerCase()}`}>{r.outcome ?? (r.status && r.status >= 400 ? t("agents.refused") : "Read")}</strong> {r.summary ?? r.tool ?? r.path}</>,
+              detail: r.reason ?? undefined,
             }))} />
         )
       )}

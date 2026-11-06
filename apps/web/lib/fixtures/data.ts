@@ -31,7 +31,7 @@ const agents: AgentView[] = [
   },
   {
     public_key: "ed25519:3mQe8VwYb2LtR5uN9cXzHa1KjP7sD4fG6hT0oEiWqBnM", label: "Bill payer", agent_name: "Bill payer bot", agent_url: "",
-    scopes: ["read", "propose", "act"], allowed_actions: ["pay"], allowlist: [{ type: "near", account_id: "citypower.near" }, { type: "near", account_id: "fibrelink.near" }],
+    scopes: ["read", "propose", "act"], allowed_actions: ["pay"], allowlist: [{ type: "near", account_id: "metro-power-co.testnet" }, { type: "near", account_id: "brightline-fibre.testnet" }],
     per_tx: U(60), daily: U(80), weekly: U(120), expires_at: ns(NOW + 30 * DAY), spent_day: [Math.floor(NOW / DAY), U(45)], spent_week: [Math.floor(NOW / (7 * DAY)), U(101)],
     revoked: false, created_at: ns(NOW - 20 * DAY),
   },
@@ -47,8 +47,8 @@ const proposals: Proposal[] = [
 
 const thisMonthDay = (d: number) => Date.UTC(new Date(NOW).getUTCFullYear(), new Date(NOW).getUTCMonth(), d);
 const bills: Bill[] = [
-  { id: 1, name: "Electricity", amount: U(35), token: "usdt", due_day: Math.min(28, new Date(NOW).getUTCDate() + 2), payee: "citypower.near", pot_id: 1, last_paid_month: null, created_at: ns(NOW - 60 * DAY) },
-  { id: 2, name: "Internet", amount: U(25), token: "usdc", due_day: 5, payee: "fibrelink.near", pot_id: 1, last_paid_month: Number(new Date(NOW).toISOString().slice(0, 7).replace("-", "")), created_at: ns(NOW - 60 * DAY) },
+  { id: 1, name: "Electricity", amount: U(35), token: "usdt", due_day: Math.min(28, new Date(NOW).getUTCDate() + 2), payee: "metro-power-co.testnet", pot_id: 1, last_paid_month: null, created_at: ns(NOW - 60 * DAY) },
+  { id: 2, name: "Internet", amount: U(25), token: "usdc", due_day: 5, payee: "brightline-fibre.testnet", pot_id: 1, last_paid_month: Number(new Date(NOW).toISOString().slice(0, 7).replace("-", "")), created_at: ns(NOW - 60 * DAY) },
   { id: 3, name: "Rent share", amount: U(150), token: "usdt", due_day: 28, payee: "sam.oiko.testnet", pot_id: 1, last_paid_month: null, created_at: ns(NOW - 60 * DAY) },
 ];
 void thisMonthDay;
@@ -58,10 +58,10 @@ const act0 = (h: number, a: Omit<Activity, "seq" | "at">): Activity => ({ seq: s
 let activity: Activity[] = [
   act0(0.5, { kind: "deposit_received", by: "sync", token: "usdt", amount: U(200), pot_id: null, counterparty: "maya.oiko.testnet", note: null }),
   act0(0.5, { kind: "split_applied", by: "plan", token: "usdt", amount: U(200), pot_id: null, counterparty: null, note: null }),
-  act0(5, { kind: "agent_action", by: `agent:${agents[1]!.public_key}`, token: "usdt", amount: U(35), pot_id: 1, counterparty: "citypower.near", note: "pay" }),
+  act0(5, { kind: "agent_action", by: `agent:${agents[1]!.public_key}`, token: "usdt", amount: U(35), pot_id: 1, counterparty: "metro-power-co.testnet", note: "pay" }),
   act0(26, { kind: "moved", by: "owner", token: "usdc", amount: U(40), pot_id: 2, counterparty: "pot:0", note: null }),
   act0(30, { kind: "withdrawn", by: "owner", token: "usdc", amount: U(60), pot_id: 0, counterparty: "exchange deposit", note: null }),
-  act0(50, { kind: "bill_paid", by: "owner", token: "usdc", amount: U(25), pot_id: 1, counterparty: "fibrelink.near", note: "Internet" }),
+  act0(50, { kind: "bill_paid", by: "owner", token: "usdc", amount: U(25), pot_id: 1, counterparty: "brightline-fibre.testnet", note: "Internet" }),
   act0(74, { kind: "deposit_received", by: "sync", token: "usdc", amount: U(450), pot_id: null, counterparty: null, note: null }),
   act0(98, { kind: "locked", by: "owner", token: null, amount: null, pot_id: 3, counterparty: null, note: null }),
   act0(130, { kind: "agent_added", by: "owner", token: null, amount: null, pot_id: null, counterparty: "Bill payer bot", note: null }),
@@ -78,7 +78,7 @@ const sumB = (k: "balances" | "earn_supplied", f: (p: Pot) => boolean) => ({
   usdt: pots.filter(f).reduce((s, p) => s + BigInt(p[k].usdt), 0n).toString(),
 });
 
-let splits: Overview["splits"] = [{ pot_id: 1, mode: "percent", value: "3000" }, { pot_id: 2, mode: "percent", value: "2000" }, { pot_id: 4, mode: "percent", value: "1000" }];
+let splits: Overview["splits"] = [{ pot_id: 1, mode: "percent", value: "3000" }, { pot_id: 2, mode: "percent", value: "2000" }, { pot_id: 3, mode: "percent", value: "1000" }, { pot_id: 4, mode: "percent", value: "1000" }];
 
 function overview(): Overview {
   const all = sumB("balances", () => true), earn = sumB("earn_supplied", () => true);
@@ -185,6 +185,13 @@ export async function handle(path: string, method: string, body: unknown): Promi
     const taken = ["ada", "maya", "sam", "admin"].includes(name);
     return { name, available: !taken && /^[a-z0-9_-]{2,32}$/.test(name), accountId: `${name}.${root}`, vaultId: `vault.${name}.${root}`, exists: taken, suggestions: taken ? [`${name}1`, `${name}-ng`, `${name}_pay`] : [] };
   }
+  if (p.startsWith("/api/receipts")) return { receipts: [
+    { depositAddress: "TFixture1", amountIn: U(200.2), originDecimals: 6, amountOut: U(200), fee: U(0.2), token: "usdt", originSymbol: "USDT", createdAt: new Date(NOW - 0.6 * 3600_000).toISOString() },
+  ] };
+  if (p === "/api/billers") return { billers: [
+    { accountId: "brightline-fibre.testnet", name: "Brightline Fibre", category: "internet" },
+    { accountId: "metro-power-co.testnet", name: "Metro Power", category: "electricity" },
+  ] };
   if (p === "/api/intents/tokens") return { groups: [
     { id: "tron-usdt", label: "USDT on TRON", chain: "tron", symbol: "USDT", assetId: "nep141:tron-usdt", decimals: 6 },
     { id: "base-usdc", label: "USDC on Base", chain: "base", symbol: "USDC", assetId: "nep141:base-usdc", decimals: 6 },
@@ -229,9 +236,10 @@ export async function handle(path: string, method: string, body: unknown): Promi
   if (p === "/api/topup" || p === "/api/sync") return { txHash: null };
   if (p === "/api/stats") return { names: 42, source: "registry" };
   if (p.startsWith("/api/agent/log")) return { rows: [
-    { at: new Date(NOW - 5 * 3600_000).toISOString(), method: "POST", path: "/api/agent/submit", ok: true, summary: "Paid 35 USDT to citypower.near" },
-    { at: new Date(NOW - 5.1 * 3600_000).toISOString(), method: "GET", path: "/api/agent/bills", ok: true, summary: "Read bills" },
-    { at: new Date(NOW - 30 * 3600_000).toISOString(), method: "POST", path: "/api/agent/prepare", ok: false, summary: "Refused: over weekly limit" },
+    { at: new Date(NOW - 5 * 3600_000).toISOString(), method: "POST", path: "/api/agent/submit", status: 200, outcome: "Approved", summary: "Payment · 35.00 USDT to metro-power-co.testnet", reason: null },
+    { at: new Date(NOW - 5.1 * 3600_000).toISOString(), method: "GET", path: "/api/agent/bills", status: 200, outcome: "Read", summary: "Read bills", reason: null },
+    { at: new Date(NOW - 26 * 3600_000).toISOString(), method: "POST", path: "/api/agent/prepare", status: 403, code: "E_NOT_ALLOWLISTED", outcome: "Blocked", summary: "Payment · 50.00 USDT to urgent-refund-desk.testnet", reason: "Blocked: That recipient isn't on the agent's list." },
+    { at: new Date(NOW - 30 * 3600_000).toISOString(), method: "POST", path: "/api/agent/submit", status: 422, code: "E_CAP_WEEK", outcome: "Blocked", summary: "Payment · 90.00 USDT to brightline-fibre.testnet", reason: "Blocked: The agent has reached its weekly limit." },
   ] };
   // vault views (virtual paths)
   if (p === "vault:overview") return overview();
