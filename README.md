@@ -135,6 +135,7 @@ flowchart LR
 
 Oiko has no built-in AI. You connect the agent you already use (Claude, ChatGPT, Grok, your own code) and decide what it may do. The account's contract enforces those limits, not Oiko's servers.
 
+- **Autonomous setup:** An agent can create its own Oiko account with zero human interaction. Generate an ed25519 keypair, prove key possession via NEP-413, `POST /api/agent/create-account` → get a name + vault. No passkey needed. Discovery: `/llms.txt`, `/.well-known/oiko-agent.json`.
 - **Connect:** `npx -y oiko-mcp` (MCP over stdio), MCP over HTTP at `/api/mcp` (hosted assistants get a 24-hour link), or plain REST. Every request is signed with the agent's own key (NEP-413).
 - **Read, suggest, act:** read balances, pots, plan, bills, invoices and ROSCA groups; propose payments for you to approve; or pay and move money on its own within per-payment, daily and weekly caps, only to people on its list.
 - **Proactive:** `get_events` (or a signed webhook, or MCP notifications) tells the agent what happened: money in, bills due or missed, goals reached, Spend running low, invoices paid, its own cap at 80%, a weekly summary. Each event comes with suggested actions computed by code, which the agent can take, propose or pass on.
