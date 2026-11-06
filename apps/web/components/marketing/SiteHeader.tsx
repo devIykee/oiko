@@ -51,27 +51,29 @@ export function SiteHeader() {
             ))}
           </ul>
           <div className="ml-auto flex items-center gap-2">
-            <Link href="/home" className={pillClass("black", "sm", "h-10 px-5")}>Open app</Link>
+            <Link href="/home" prefetch={false} className={pillClass("black", "sm", "h-10 px-5")}>Open app</Link>
             <button type="button" className="flex size-10 items-center justify-center rounded-full bg-surface-2 text-ink lg:hidden" aria-expanded={open} aria-controls="mk-menu" aria-label={open ? "Close menu" : "Open menu"} onClick={() => setOpen((o) => !o)}>
               <Glyph d={open ? xmark : lineHorizontal3} size={16} />
             </button>
           </div>
         </nav>
-        {open ? (
-          <div id="mk-menu" className="fixed inset-x-0 bottom-0 top-16 overflow-y-auto overscroll-contain bg-surface lg:hidden">
-            <ul className="px-4 py-4">
-              {links.map((l) => (
-                <li key={l.href}>
-                  <Link href={l.href} onClick={() => setOpen(false)} className="flex h-14 items-center border-b border-line text-[22px] font-semibold tracking-[-0.02em]">{l.label}</Link>
-                </li>
-              ))}
-            </ul>
-            <div className="px-4 pb-8">
-              <Link href="/start" onClick={() => setOpen(false)} className={pillClass("accent", "lg", "w-full")}>Get your name</Link>
-            </div>
-          </div>
-        ) : null}
       </header>
+      {/* Outside <header>: the header's backdrop-filter makes it the containing block for fixed children, which
+          squeezed this panel into the 64 px header (height 0) and hid the menu on phones. */}
+      {open ? (
+        <div id="mk-menu" className="fixed inset-x-0 bottom-0 top-16 z-40 overflow-y-auto overscroll-contain bg-surface lg:hidden">
+          <ul className="px-4 py-4">
+            {links.map((l) => (
+              <li key={l.href}>
+                <Link href={l.href} onClick={() => setOpen(false)} className="flex h-14 items-center border-b border-line text-[22px] font-semibold tracking-[-0.02em]">{l.label}</Link>
+              </li>
+            ))}
+          </ul>
+          <div className="px-4 pb-8">
+            <Link href="/start" prefetch={false} onClick={() => setOpen(false)} className={pillClass("accent", "lg", "w-full")}>Get your name</Link>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
