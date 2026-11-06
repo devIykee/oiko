@@ -33,6 +33,9 @@ export const LIMITS = {
 } as const satisfies Record<string, { perIp: readonly [number, number]; perAccount: readonly [number, number] }>;
 
 export function checkLimits(kind: keyof typeof LIMITS, ip: string, account: string | null, now = Date.now()): boolean {
+  // Local sandbox mode (`pnpm local`, docker compose): a throwaway chain on the user's machine, so no request limits;
+  // the e2e suite alone signs up more accounts than the hourly per-IP limit allows.
+  if (process.env.OIKO_NETWORK === "local") return true;
   const l = LIMITS[kind];
   if (!allow(`${kind}:ip:${ip}`, l.perIp[0], l.perIp[1], now)) return false;
   if (account && !allow(`${kind}:acct:${account}`, l.perAccount[0], l.perAccount[1], now)) return false;

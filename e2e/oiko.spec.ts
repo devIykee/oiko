@@ -2,10 +2,11 @@
 // Run against `pnpm local` or `docker compose up`:  pnpm e2e
 import { expect, test, type Page } from "@playwright/test";
 import { execFileSync, spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GatewayClient, decodeConnectionString, friendlyError, generateKeyPair, toUnits, type Overview } from "../packages/sdk/src/index.ts";
 import {
-  BASE, apiUser, claimNameUI, config, fund, loginAs, payFromTron, relayerCall, rpc, until, vaultOf, waitForUsdt, type Session,
+  BASE, TRON_REFUND, apiUser, claimNameUI, config, fund, loginAs, payFromTron, relayerCall, rpc, until, vaultOf, waitForUsdt, type Session,
 } from "./helpers";
 
 const ROOT = join(__dirname, "..");
@@ -27,10 +28,10 @@ test.describe.serial("money flow for one person", () => {
     // The savings account exists and has no access keys at all (so no full-access key).
     const keys = await (await rpc()).viewAccessKeyList(me.vaultId);
     expect(keys.length).toBe(0);
-    // Default plan from the first-run screen: Bills 30%, Savings 20%, Goal 10%, rest to Spend; Rainy day is a locked pot.
+    // Default plan from the first-run screen: Bills 30%, Savings 20%, Rainy day 10% (locked pot), Goal 10%, rest (30%) to Spend.
     const o = await (await vaultOf(me)).overview();
     const bps = Object.fromEntries(o.splits.map((r) => [o.pots.find((p) => p.id === r.pot_id)!.kind, Number(r.value)]));
-    expect(bps).toMatchObject({ bills: 3000, autosave: 2000, goal: 1000 });
+    expect(bps).toMatchObject({ bills: 3000, autosave: 2000, locked: 1000, goal: 1000 });
     expect(o.pots.some((p) => p.kind === "locked")).toBe(true);
   });
 
@@ -43,7 +44,8 @@ test.describe.serial("money flow for one person", () => {
     expect(close(BigInt(potBy(o, "bills").balances.usdt), share(firstPayment, 3000))).toBe(true);
     expect(close(BigInt(potBy(o, "autosave").balances.usdt), share(firstPayment, 2000))).toBe(true);
     expect(close(BigInt(potBy(o, "goal").balances.usdt), share(firstPayment, 1000))).toBe(true);
-    expect(close(BigInt(potBy(o, "flex").balances.usdt), share(firstPayment, 4000))).toBe(true);
+    expect(close(BigInt(potBy(o, "locked").balances.usdt), share(firstPayment, 1000))).toBe(true);
+    expect(close(BigInt(potBy(o, "flex").balances.usdt), share(firstPayment, 3000))).toBe(true);
 
     await loginAs(page, me);
     await page.goto("/home");
@@ -78,6 +80,7 @@ test.describe.serial("money flow for one person", () => {
     expect((await v.moveFunds(potBy(o, "flex").id, rainy.id, "usdt", toUnits("1"))).ok).toBe(true);
     const unlock = BigInt(Date.now() + 30 * 86_400_000) * 1_000_000n;
     expect((await v.lock(rainy.id, unlock.toString())).ok).toBe(true);
+    const held = BigInt((await v.overview()).pots.find((p) => p.id === rainy.id)!.balances.usdt);
 
     // The account itself refuses, with the friendly message the app shows.
     const r = await v.withdraw(rainy.id, "usdt", toUnits("1"), (await config()).relayer!);
@@ -94,7 +97,7 @@ test.describe.serial("money flow for one person", () => {
     await page.goto("/withdraw");
     await expect(page.getByRole("radio", { name: new RegExp(rainy.name) })).toBeDisabled();
     o = await v.overview();
-    expect(BigInt(o.pots.find((p) => p.id === rainy.id)!.balances.usdt)).toBe(BigInt(toUnits("1")));
+    expect(BigInt(o.pots.find((p) => p.id === rainy.id)!.balances.usdt)).toBe(held);
   });
 
   test("README-5 withdraw 1 USDT from Spend", async ({ page }) => {
@@ -144,6 +147,9 @@ test.describe.serial("money flow for one person", () => {
     await page.keyboard.press("Escape");
     await page.goto("/agents");
     await page.locator('[data-testid^="agent-card-"][data-testid$="-disconnect"]').first().click();
+    // Disconnect asks first, then shows "Agent disconnected" until the sheet is closed.
+    await page.getByTestId("agent-disconnect-confirm").click();
+    await expect(page.getByTestId("agent-disconnect").getByText("Agent disconnected", { exact: true })).toBeVisible({ timeout: 60_000 });
     const agent = new GatewayClient(decodeConnectionString(connection));
     await until(async () => { try { await agent.get("/api/agent/overview"); return false; } catch { return true; } }, 60_000, 2000);
     const keys = await (await rpc()).viewAccessKeyList(me.vaultId);
@@ -268,6 +274,45 @@ test("README-9 ROSCA: create with 1-minute rounds and 3 people, start, pay, sett
   await waitForUsdt(first, before + BigInt(toUnits("15")));
   await page.reload();
   await expect(page.getByTestId("rosca-pay")).toBeEnabled({ timeout: 30_000 });
+});
+
+test("README-13 an invoice paid from USDT on TRON shows Paid and lands in the CSV export", async ({ page, browser }) => {
+  const me = await apiUser("inv");
+  await loginAs(page, me);
+  await page.goto("/invoices/new");
+  await page.getByTestId("invoice-client").fill("Northwind Studio");
+  await page.getByTestId("invoice-desc-0").fill("Logo design");
+  await page.getByTestId("invoice-price-0").fill("12");
+  await page.getByRole("radio", { name: "USDT" }).click();
+  await page.getByTestId("invoice-create").click();
+  await expect(page.getByTestId("invoice-sheet")).toBeVisible({ timeout: 60_000 });
+  const href = await page.getByTestId("invoice-view").getAttribute("href");
+  expect(href).toMatch(/^\/i\//);
+
+  // The client pays the public invoice page in a fresh browser (fixed amount, so no amount step).
+  const ctx = await browser.newContext({ baseURL: BASE });
+  const payer = await ctx.newPage();
+  try {
+    await payer.goto(href!);
+    await payer.getByTestId("invoice-pay-start").click();
+    await payer.locator('[data-testid^="pay-origin-"]', { hasText: /TRON/i }).first().click();
+    await payer.getByTestId("pay-refund").fill(TRON_REFUND);
+    await payer.getByTestId("pay-continue-3").click();
+    await payer.getByTestId("pay-simulate").click();
+    await expect(payer.getByTestId("pay-done")).toBeVisible({ timeout: 120_000 });
+  } finally {
+    await ctx.close();
+  }
+
+  await until(async () => {
+    await page.goto("/invoices");
+    return /paid/i.test((await page.getByTestId(/^invoice-row-/).first().textContent()) ?? "");
+  }, 120_000, 4000);
+  const dl = page.waitForEvent("download");
+  await page.getByTestId("invoices-export").click();
+  const csv = readFileSync(await (await dl).path(), "utf8");
+  expect(csv).toMatch(/Northwind Studio/);
+  expect(csv.toLowerCase()).toContain("paid");
 });
 
 test("README-12 banned-words check passes", () => {

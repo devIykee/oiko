@@ -7,7 +7,7 @@
 // Needs: Rust (contracts/rust-toolchain.toml), cargo-near (only if contracts/res/*.wasm are missing), Node 22, pnpm.
 // Settings written by the devnet (.oiko/local.env, .oiko/relayer.json) override any testnet values in apps/web/.env.local.
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -31,9 +31,27 @@ function run(cmd, argv, opts = {}) {
   return c;
 }
 
+/** A near-sandbox binary that an earlier contract build already downloaded (saves a ~90 MB download). */
+function existingSandboxBin() {
+  if (process.env.NEAR_SANDBOX_BIN_PATH) return process.env.NEAR_SANDBOX_BIN_PATH;
+  for (const profile of ["release", "debug"]) {
+    const build = join(ROOT, "contracts/target", profile, "build");
+    if (!existsSync(build)) continue;
+    for (const d of readdirSync(build).filter((d) => d.startsWith("near-sandbox-"))) {
+      const near = join(build, d, "out/.near");
+      if (!existsSync(near)) continue;
+      for (const v of readdirSync(near)) {
+        const bin = join(near, v, "near-sandbox");
+        if (existsSync(bin)) return bin;
+      }
+    }
+  }
+  return undefined;
+}
+
 async function startChain() {
   log("starting the NEAR sandbox and deploying contracts (first run compiles the launcher; a few minutes)…");
-  const c = run("cargo", ["run", "--quiet", "--release", "-p", "oiko-tests", "--bin", "devnet"], { cwd: join(ROOT, "contracts"), env: { ...process.env } });
+  const c = run("cargo", ["run", "--quiet", "--release", "-p", "oiko-tests", "--bin", "devnet"], { cwd: join(ROOT, "contracts"), env: { ...process.env, ...(existingSandboxBin() ? { NEAR_SANDBOX_BIN_PATH: existingSandboxBin() } : {}) } });
   await new Promise((resolve, reject) => {
     const onLine = (buf) => {
       const s = buf.toString();

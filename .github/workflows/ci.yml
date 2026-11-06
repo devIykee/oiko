@@ -13,6 +13,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node scripts/check-no-llm.mjs
       - run: node scripts/check-copy.mjs
+      - run: pnpm readme-check
       - run: pnpm test:unit
       - run: pnpm --filter @oiko/web typecheck
   contracts:
@@ -26,3 +27,44 @@ jobs:
       - run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/latest/download/cargo-near-installer.sh | sh
       - run: bash scripts/build-contracts.sh
       - run: cd contracts && cargo test --workspace
+  e2e:
+    # `pnpm local` (NEAR sandbox + every contract + the app) and the Playwright suite the README steps point at.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.93.0, targets: wasm32-unknown-unknown }
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: contracts }
+      - run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh | sh
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: bash scripts/build-contracts.sh
+      - name: Start local mode
+        run: |
+          pnpm local > local.log 2>&1 &
+          for i in $(seq 1 360); do curl -sf http://localhost:3000/api/config >/dev/null && exit 0; sleep 5; done
+          cat local.log; exit 1
+      - run: pnpm e2e
+      - if: failure()
+        run: tail -200 local.log
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: playwright-report, path: playwright-report, retention-days: 7 }
+  compose:
+    # The README's zero-config path: a fresh clone, no keys, `docker compose up`.
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.example .env && docker compose up -d --build
+      - run: |
+          for i in $(seq 1 120); do curl -sf http://localhost:3000/api/config && exit 0; sleep 5; done
+          docker compose logs --tail 200; exit 1
+      - run: docker compose logs web | grep "oiko ready at"
+      - if: always()
+        run: docker compose down -v

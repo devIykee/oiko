@@ -16,7 +16,8 @@ RUN bash scripts/build-contracts.sh \
  && cp "$(find target/release/build -path '*near-sandbox*/out/.near/*' -name near-sandbox -type f | head -1)" /out/near-sandbox \
  && cp res/*.wasm /out/res/
 
-FROM debian:bookworm-slim
+# near-sandbox 2.13 needs glibc >= 2.39 (bookworm has 2.36).
+FROM ubuntu:24.04
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out/ /app/
 ENV NEAR_SANDBOX_BIN_PATH=/app/near-sandbox \

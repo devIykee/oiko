@@ -17,12 +17,13 @@ Balances are USDC and USDT. USDC and USDT are stablecoins designed to track the 
 
 ### On the hosted demo (no install)
 
-1. Open https://oikodotnear.vercel.app/start, choose a name, pick "Keep me signed in on this browser" → you get `<name>.oiko.testnet` and a keyless savings account, with a default plan (Bills 30%, Savings 20%, Rainy day locked, one Goal).
-2. Open `/pay/<name>` in a private window, choose "USDT on TRON", enter 100, a refund address, then "Simulate payment (test mode)" → status goes Waiting → Received → Delivering → Done, and the 100 USDT appears on Home split across your pots.
-3. Try to withdraw from the locked pot → refused ("locked until …").
-4. Withdraw 1 USDT from Spend → it leaves the account.
-5. Agents → connect an agent with a cap → run it (see `examples/agents`) → payments within the cap pass, the next one is refused, Disconnect deletes its key.
-6. Invoices → New invoice (client, a line or two, USDC or USDT, due date) → Create and get link → copy the link → open it in a private window → Pay this invoice → choose where the money is, give a refund address → "Simulate payment (test mode)" → back in Invoices the status goes Pending → Paid, with the amount received, the fee and a transaction link → Export CSV (one row per line item, ISO dates, plain decimals; also under Settings → Export invoices).
+1. Open https://oikodotnear.vercel.app/start, choose a name, pick "Keep me signed in on this browser" → you get `<name>.oiko.testnet` and a keyless savings account, with a default plan (Bills 30%, Savings 20%, Rainy day 10% locked, one Goal 10%, Spend 30%). [e2e: README-1]
+2. Open `/pay/<name>` in a private window, choose "USDT on TRON", enter 100, a refund address, then "Simulate payment (test mode)" → status goes Waiting → Received → Delivering → Done, and the 100 USDT appears on Home split across your pots. [e2e: README-2]
+3. Plan → set Bills to 40% → get paid again → 40% of it lands in Bills. [e2e: README-3]
+4. Try to withdraw from the locked pot → refused ("This pot is locked."). [e2e: README-4]
+5. Withdraw 1 USDT from Spend → it leaves the account. [e2e: README-5]
+6. Agents → connect an agent with a cap → run it (see `examples/agents`) → payments within the cap pass, the next one is refused, Disconnect deletes its key. [e2e: README-6]
+7. Invoices → New invoice (client, a line or two, USDC or USDT, due date) → Create and get link → copy the link → open it in a private window → Pay this invoice → choose where the money is, give a refund address → "Simulate payment (test mode)" → back in Invoices the status goes Pending → Paid, with the amount received, the fee and a transaction link → Export CSV (one row per line item, ISO dates, plain decimals; also under Settings → Export invoices). [e2e: README-13]
 
 Note: the hosted demo pays for signups from a testnet relayer account. If signup says the account needs a top-up, the relayer is out of testnet NEAR (see `docs/STATUS.md`).
 
@@ -48,19 +49,37 @@ OIKO_API=https://oikodotnear.vercel.app pnpm smoke
 | revoke | revoke deletes the key from the account; the agent's reads are refused |
 | cleanup | the test sign-in account is deleted and its NEAR returned |
 
-### Run it yourself
+### Run it yourself (local, no keys, no testnet)
+
+Everything runs on your machine: a NEAR sandbox with every Oiko contract deployed, the built-in test-mode payment provider, and the app. Nothing needs an account, a key or test NEAR.
+
+With Docker:
 
 ```bash
-cp .env.example .env        # point it at testnet contracts below, add your own relayer account + key
-pnpm dev                    # http://localhost:3000
+cp .env.example .env
+docker compose up            # first run builds the contracts (~15-20 min); then "oiko ready at http://localhost:3000"
 ```
 
-A zero-config local sandbox mode (`docker compose up`) was planned but is **not finished** (see Honest limits).
+Without Docker (needs Rust from `contracts/rust-toolchain.toml`, `cargo-near`, Node 22 and pnpm):
+
+```bash
+pnpm install
+pnpm local                   # sandbox + contracts + app; prints "oiko ready at http://localhost:3000"
+pnpm e2e                     # in a second terminal: the Playwright suite behind every e2e-tagged step above (~3 min)
+```
+
+Port 3000 busy? `PORT=3100 pnpm local` and `OIKO_E2E_URL=http://localhost:3100 pnpm e2e` (Docker: `OIKO_WEB_PORT=3100 docker compose up`).
+
+The suite also covers: [e2e: README-7] a bill paid by an agent shows Paid; [e2e: README-8] Earn is refused when the lending pool is over 92% borrowed; [e2e: README-9] a 3-person ROSCA savings group with 1-minute rounds pays out; [e2e: README-10] reduced motion stops animations; [e2e: README-11] no sideways scrolling at 360 px.
+
+To run the app against NEAR testnet instead, set `OIKO_NETWORK=testnet`, the contract names from "What runs where" and your own relayer account and key in `apps/web/.env.local`, then `pnpm dev`.
 
 ## Run the tests
 
 ```bash
-pnpm test:unit        # 68 Vitest tests: SDK (NEP-413, amounts, insights), API server (gateway auth, relayer allow-list, 1Click mock), MCP, examples  (~2 s)
+pnpm test:unit        # 161 Vitest tests: SDK (NEP-413, amounts, caps, insights), API server (gateway auth, relayer allow-list, 1Click mock exactly-once, invoices, receipts), sign-in codes, MCP, examples  (~20 s)
+pnpm e2e              # 13 Playwright tests against `pnpm local` or `docker compose up`  (~3 min)
+pnpm readme-check     # fails if an [e2e: …] marker in "Try it" has no matching test
 pnpm test:contracts   # cargo test: unit + proptest invariants + near-workspaces sandbox integration (critical path, ROSCA cycle)  (~2-3 min after first build)
 node scripts/check-no-llm.mjs   # fails if any LLM SDK or LLM API host is in apps/, services/, packages/
 node scripts/check-copy.mjs     # banned-words test for user-facing copy
@@ -128,7 +147,7 @@ Summary: Oiko holds no keys over user money, and the savings account holds no ow
 - Payments from other chains are simulated on testnet (no Intents testnet). Mainnet code paths exist but no mainnet proof has been run.
 - Testnet uses mock tokens and a mock lending contract.
 - No audit. Contracts are deployed on testnet only.
-- Not finished: zero-config `docker compose` sandbox mode, Playwright e2e suite, Lighthouse reports, rescue sweeper UI, Invest (flagged off).
+- Not finished: Lighthouse reports, rescue sweeper UI, Invest (flagged off).
 - The hosted demo stores nonces and the agent access log in Postgres (Neon). Without `DATABASE_URL` (e.g. a fresh local run) they are kept in memory per server instance.
 - The agent connector has not been validated with users.
 - Not a bank; balances are not insured; yields are variable and can go to zero; not investment, legal or tax advice. Rules for stablecoin yield products are still forming in many places.

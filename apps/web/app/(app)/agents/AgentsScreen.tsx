@@ -2,7 +2,7 @@
 import { AgentAccessLog, AgentCard, Badge, Button, CopyField, EmptyState, GroupedList, ListRow, ProposalCard, ScopeList, SectionTitle, useToast } from "@oiko/ui";
 import type { AgentView, Overview, Proposal } from "@oiko/sdk";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ConfirmSheet } from "@/components/app/ConfirmSheet";
 import { ConnectFlow } from "@/components/app/ConnectFlow";
 import { CounterpartyBadge } from "@/components/app/CounterpartyBadge";
@@ -25,6 +25,14 @@ export function AgentsScreen() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [origin, setOrigin] = useState("");
   useEffect(() => { setOrigin(window.location.origin); }, []);
+  // Agents whose Disconnect sheet is open stay on screen after the key is deleted, so the "Agent disconnected" state
+  // (and its transaction link) is visible until the user closes it.
+  const [held, setHeld] = useState<Record<string, AgentView>>({});
+  const hold = useCallback((a: AgentView, on: boolean) => setHeld((h) => {
+    const n = { ...h };
+    if (on) n[a.public_key] = a; else delete n[a.public_key];
+    return n;
+  }), []);
 
   // Deep link from Bills: "Let my agent pay this".
   useEffect(() => {
@@ -41,7 +49,8 @@ export function AgentsScreen() {
   if (ov.error && !ov.data) return <div className="oi-col oi-page"><LoadError error={ov.error} onRetry={ov.refresh} /></div>;
   if (!ov.data) return <div className="oi-col"><PageSkeleton rows={4} /></div>;
   const o = ov.data;
-  const agents = o.agents.filter((a) => !a.revoked);
+  const live = o.agents.filter((a) => !a.revoked);
+  const agents = [...live, ...Object.values(held).filter((h) => !live.some((a) => a.public_key === h.public_key))];
 
   const templates: Array<{ id: TemplateId; icon: "insights" | "bills" | "savings" | "settings"; color: "blue" | "sun" | "mint" | "stone" }> = [
     { id: "coach", icon: "insights", color: "blue" },
@@ -62,7 +71,7 @@ export function AgentsScreen() {
         <SectionTitle id="connected">{t("agents.connected")}</SectionTitle>
         {agents.length === 0 ? (
           <div className="oi-card"><EmptyState icon="agents" color="violet" title={t("agents.emptyTitle")} body={t("agents.emptyBody")} /></div>
-        ) : agents.map((a) => <ConnectedAgent key={a.public_key} a={a} o={o} />)}
+        ) : agents.map((a) => <ConnectedAgent key={a.public_key} a={a} o={o} hold={hold} />)}
       </section>
 
       <section aria-labelledby="connect-new">
@@ -97,7 +106,7 @@ export function AgentsScreen() {
   );
 }
 
-function ConnectedAgent({ a, o }: { a: AgentView; o: Overview }) {
+function ConnectedAgent({ a, o, hold }: { a: AgentView; o: Overview; hold: (a: AgentView, on: boolean) => void }) {
   const t = useT();
   const toast = useToast();
   const { exec } = useMoney();
@@ -114,7 +123,7 @@ function ConnectedAgent({ a, o }: { a: AgentView; o: Overview }) {
 
   // Disconnect asks first, then shows a clear success state with the key-deleted transaction.
   const [confirmOff, setConfirmOff] = useState(false);
-  const disconnect = () => setConfirmOff(true);
+  const disconnect = () => { hold(a, true); setConfirmOff(true); };
 
   return (
     <AgentCard
@@ -165,7 +174,7 @@ function ConnectedAgent({ a, o }: { a: AgentView; o: Overview }) {
           onConfirm={() => (pending.kind === "approve" ? exec("approveProposal", pending.p.id) : exec("rejectProposal", pending.p.id))} />
       )}
       {confirmOff && (
-        <ConfirmSheet open onOpenChange={(v) => { if (!v) setConfirmOff(false); }} testId="agent-disconnect" variant="danger" stayOpen
+        <ConfirmSheet open onOpenChange={(v) => { if (!v) { setConfirmOff(false); hold(a, false); } }} testId="agent-disconnect" variant="danger" stayOpen
           title={t("agents.disconnectTitle", { name: a.agent_name })}
           sentence={t("agents.disconnectSentence", { name: a.agent_name })}
           confirmLabel={t("agents.disconnect")}
