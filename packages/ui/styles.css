@@ -115,7 +115,7 @@
 @media (max-width: 479px) { .oi-lr__coin { display: none !important; } }
 .oi-lr__chev { color: var(--ink-3); flex: none; }
 .oi-lr[data-selected="true"] { background: var(--accent-soft); }
-.oi-flash { animation: oi-flash 1.2s var(--ease-out) 1; }
+.oi-flash { animation: oi-flash 420ms var(--ease-out) 1; }
 @keyframes oi-flash { from { background: var(--success-soft); } to { background: transparent; } }
 @media (prefers-reduced-motion: reduce) { .oi-flash { animation: none; } }
 :root[data-low-data="1"] .oi-flash { animation: none; }

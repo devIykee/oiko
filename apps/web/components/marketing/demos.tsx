@@ -86,7 +86,7 @@ export function PayByNameDemo() {
       <div className="mt-3"><Chips label="Amount" options={[20, 50, 100] as const} value={amount} onChange={(v) => { setAmount(v); setStep(-1); }} render={(v) => `${v} ${token}`} /></div>
       <ol className="mt-5 space-y-2.5" aria-live="polite">
         {STEPS.map((s, i) => (
-          <li key={s} className={cx("flex items-center gap-2.5 text-[14px] transition-opacity", step >= i ? "opacity-100" : "opacity-40")}>
+          <li key={s} className={cx("flex items-center gap-2.5 text-[14px] transition-opacity", step >= i ? "opacity-100" : "opacity-70")}>
             <span className={cx("flex size-5 items-center justify-center rounded-full", step > i || step === 3 ? "bg-success text-white dark:text-[#0B0C0E]" : step === i ? "bg-accent text-accent-ink" : "bg-surface-2")}>
               {step > i || step === 3 ? <Glyph d={checkmarkAlt} size={10} /> : null}
             </span>

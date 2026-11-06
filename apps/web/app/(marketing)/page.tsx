@@ -283,7 +283,7 @@ function Developers() {
           <figcaption className="flex items-center gap-2 border-b border-[var(--mk-ink-line)] px-5 py-3 text-[13px] text-[var(--mk-ink-text-2)]">
             <Glyph d={I.chevronLeftSlashChevronRight} size={14} /> agent.ts
           </figcaption>
-          <pre className="overflow-x-auto p-5 text-[13px] leading-[1.7] md:text-[14px]"><code>{code.map(([k, t], i) => <span key={i} className={color[k]}>{t}</span>)}</code></pre>
+          <pre tabIndex={0} aria-label="Example agent request" className="overflow-x-auto p-5 text-[13px] leading-[1.7] outline-offset-2 md:text-[14px]"><code>{code.map(([k, t], i) => <span key={i} className={color[k]}>{t}</span>)}</code></pre>
         </figure>
       </div>
     </Section>

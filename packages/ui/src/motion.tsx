@@ -3,7 +3,7 @@
 import { LazyMotion, MotionConfig, domAnimation, useReducedMotion } from "motion/react";
 import { useEffect, useState, type ReactNode } from "react";
 
-export const dur = { instant: 0.1, fast: 0.16, base: 0.24, slow: 0.32, reveal: 0.56 } as const;
+export const dur = { instant: 0.1, fast: 0.16, base: 0.24, slow: 0.32, reveal: 0.42 } as const;
 export const ease = {
   out: [0.22, 1, 0.36, 1] as [number, number, number, number],
   in: [0.55, 0, 1, 0.45] as [number, number, number, number],
