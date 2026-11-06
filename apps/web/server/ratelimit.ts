@@ -30,6 +30,8 @@ export const LIMITS = {
   report: { perIp: [10, 3_600_000], perAccount: [5, 86_400_000] },
   invoice: { perIp: [90, 60_000], perAccount: [40, 60_000] },
   roscaCancel: { perIp: [10, 3_600_000], perAccount: [3, 3_600_000] },
+  // Tighter than browser signup: 2 per IP per hour, 1 per name per hour.
+  agentSignup: { perIp: [2, 3_600_000], perAccount: [1, 3_600_000] },
 } as const satisfies Record<string, { perIp: readonly [number, number]; perAccount: readonly [number, number] }>;
 
 export function checkLimits(kind: keyof typeof LIMITS, ip: string, account: string | null, now = Date.now()): boolean {

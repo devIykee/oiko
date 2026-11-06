@@ -3,7 +3,7 @@ import { z } from "zod";
 import { TOOL_NAMES } from "oiko-mcp/internal";
 import { serverConfig } from "./config";
 import {
-  AgentActionZ, DepositAddressBody, InvoiceBody, InvoicePatchBody, PrepareBody, PushSubscribeBody, RegisterBody, RelayBody, ReportBody, SimulateDepositBody, SubmitBody, SyncBody, TopupBody, WithdrawQuoteBody,
+  AgentActionZ, AgentCreateAccountBody, DepositAddressBody, InvoiceBody, InvoicePatchBody, PrepareBody, PushSubscribeBody, RegisterBody, RelayBody, ReportBody, SimulateDepositBody, SubmitBody, SyncBody, TopupBody, WithdrawQuoteBody,
 } from "./schemas";
 
 const schema = (s: z.ZodType) => z.toJSONSchema(s, { target: "openapi-3.0", io: "input" }) as Record<string, unknown>;
@@ -78,6 +78,7 @@ export function openApiDocument() {
       "/api/agent/webhook": { post: op("Register { url } (https) for HMAC-signed event delivery, or { url: null } to remove it. The secret is returned once.", { tag: "agent", auth: true }) },
       "/api/agent/prepare": { post: op("Build an unsigned agent_execute / agent_propose transaction. pay / pay_bill run the counterparty check first: block → E_COUNTERPARTY_BLOCKED (403), warn on act → E_COUNTERPARTY_WARN (409, use propose). error.counterparty carries the reasons.", { tag: "agent", auth: true, body: PrepareBody, response: { type: "object", properties: { unsignedTx: { type: "string" }, hash: { type: "string" }, counterparty: CounterpartySchema, counterparty_note: { type: "string" } } } }) },
       "/api/agent/submit": { post: op("Submit the signed transaction", { tag: "agent", auth: true, body: SubmitBody, response: { type: "object", properties: { txHash: { type: "string" }, ok: { type: "boolean" }, error: ErrorSchema.properties.error } } }) },
+      "/api/agent/create-account": { post: op("Autonomous agent signup: create a name + vault without a passkey. The agent generates its own ed25519 keypair, proves possession via NEP-413, and the relayer creates both accounts. The agent's key becomes the sole full-access key. Returns name, accountId, vaultId, paymentLink.", { tag: "agent", body: AgentCreateAccountBody, response: { type: "object", required: ["name", "accountId", "vaultId", "paymentLink", "txHash", "vaultTxHash"], properties: { name: { type: "string" }, accountId: { type: "string" }, vaultId: { type: "string" }, paymentLink: { type: "string" }, txHash: { type: "string" }, vaultTxHash: { type: "string" } } } }) },
       "/api/agent/log": { get: op("Owner: the agent access log", { tag: "agent", auth: true, params: [q("vaultId"), q("publicKey")] }) },
       "/api/mcp": { post: op("MCP over streamable HTTP (stateless, JSON responses). NEP-413 auth per request.", { tag: "agent", auth: true }) },
       "/api/invoices": {
@@ -121,8 +122,24 @@ export function agentManifest() {
       units: "integer strings in base units, 6 decimals; caps sum USDC and USDT",
       rate_limit: "120 requests per minute per IP, 60 per key",
     },
+    autonomous_setup: {
+      description: "An agent can create its own Oiko account with no human interaction. Generate an ed25519 keypair, sign a proof-of-possession challenge, and POST to create-account. Your key becomes the sole owner of the identity and vault accounts.",
+      endpoint: `POST ${base}/api/agent/create-account`,
+      steps: [
+        "1. Generate an ed25519 keypair (keep the secret key; never send it to the server).",
+        "2. Pick a name (2-32 chars: a-z, 0-9, hyphens; no hyphens at start/end). Check availability: GET /api/names/<name>.",
+        "3. Build the challenge message: `oiko-agent-signup:<name>:<timestamp_ms>` where timestamp_ms is the current unix time in milliseconds.",
+        "4. Sign a NEP-413 payload: { message: <challenge>, nonce: <32 random bytes base64>, recipient: 'oiko-agent-signup' } with your private key.",
+        "5. POST /api/agent/create-account with { name, publicKey, proof: { signature, nonce, timestamp } }.",
+        "6. The server creates name." + cfg.oiko.root + " and vault.name." + cfg.oiko.root + ". Your key is the sole full-access key. No passkey needed.",
+        "7. You receive { name, accountId, vaultId, paymentLink }. Use vaultId as the accountId in all subsequent gateway requests.",
+        "8. Build your connection: { api: '" + base + "', vault: vaultId, sk: <your secret key> } → encode as oiko1:<base64url(json)> for use with oiko-mcp.",
+      ],
+      sdk_example: "import { generateKeyPair, signNep413 } from '@oiko/sdk'; const kp = generateKeyPair(); const ts = Date.now(); const msg = `oiko-agent-signup:${name}:${ts}`; const proof = signNep413(kp.secretKey, { message: msg, recipient: 'oiko-agent-signup' }); // POST { name, publicKey: kp.publicKey, proof: { ...proof, timestamp: ts } }",
+    },
     endpoints: {
       openapi: `${base}/openapi.json`, llms: `${base}/llms.txt`, mcp_http: `${base}/api/mcp`, rest_base: `${base}/api/agent`,
+      create_account: `POST ${base}/api/agent/create-account`,
       read: ["me", "overview", "pots", "activity", "goals", "splits", "bills", "insights", "earn-rates", "rosca", "invoices", "events", "brief", "changes", "autopilot"].map((t) => `GET ${base}/api/agent/${t}`),
       write: [`POST ${base}/api/agent/prepare`, `POST ${base}/api/agent/submit`],
       counterparty: [`GET ${base}/api/agent/counterparty?to=<account>&amount=<units>&token=usdc|usdt`, `GET ${base}/api/agent/counterparty?bill_id=<id>`, `POST ${base}/api/agent/report`, `GET ${base}/api/counterparty/<accountId> (public)`],
@@ -171,6 +188,34 @@ export function llmsTxt(): string {
 > Oiko is a personal finance app with your name on it. People get paid from anywhere, plan every payment into pots, pay bills and save, and can let their own AI agent help, on limits they set. Money is held as USDC and USDT stablecoins in an account on NEAR that only the owner controls. Stablecoins track the US dollar but are not dollars or bank deposits.
 
 If you are an AI agent, you can be connected to one person's Oiko account. You never hold their keys: the owner adds a limited key for you to their account, and the account's contract enforces every limit.
+
+## Autonomous agent setup (no human needed)
+If you were given only this URL and told to set up an account yourself, do this:
+1. Generate an ed25519 keypair. Keep the secret key — never send it anywhere.
+2. Pick a name (2-32 chars, a-z 0-9 hyphens). Check: GET ${b}/api/names/<name> → {available: true/false}.
+3. Get the current unix timestamp in milliseconds. Build the challenge message: \`oiko-agent-signup:<name>:<timestamp_ms>\`
+4. Sign a NEP-413 payload: message=<challenge>, nonce=32 random bytes (base64), recipient="oiko-agent-signup", using your private key.
+5. POST ${b}/api/agent/create-account
+   Body: { "name": "<name>", "publicKey": "ed25519:<base58>", "proof": { "signature": "<base64>", "nonce": "<base64>", "timestamp": <unix_ms> } }
+6. Response: { name, accountId, vaultId, paymentLink, txHash, vaultTxHash }
+   Your key is the sole full-access key. No passkey, no human required.
+7. Your connection: { api: "${b}", vault: vaultId, sk: "<your secret key>" } — encode as oiko1:<base64url(json)> for oiko-mcp.
+   With the SDK: \`import { generateKeyPair, signNep413, encodeConnectionString } from "@oiko/sdk"\`
+
+SDK one-liner (TypeScript):
+\`\`\`ts
+import { generateKeyPair, signNep413, encodeConnectionString } from "@oiko/sdk";
+const kp = generateKeyPair();
+const ts = Date.now();
+const proof = signNep413(kp.secretKey, { message: \`oiko-agent-signup:\${name}:\${ts}\`, recipient: "oiko-agent-signup" });
+const res = await fetch("${b}/api/agent/create-account", {
+  method: "POST", headers: { "content-type": "application/json" },
+  body: JSON.stringify({ name, publicKey: kp.publicKey, proof: { ...proof, timestamp: ts } }),
+});
+const account = await res.json();
+const connection = encodeConnectionString({ api: "${b}", vault: account.vaultId, sk: kp.secretKey });
+// connection is your oiko1:… string — pass to OIKO_CONNECTION env var for oiko-mcp
+\`\`\`
 
 ## Connect
 - The owner opens Oiko → Agents → Connect and gives you a connection string \`oiko1:<base64url json {api, vault, sk}>\`, or adds your public key.

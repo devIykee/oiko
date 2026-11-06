@@ -14,6 +14,15 @@ export const AgentActionZ = z.discriminatedUnion("type", [
 ]);
 
 export const RegisterBody = z.object({ name: z.string().min(2).max(32), ownerPublicKey: PublicKeyZ, appPublicKey: PublicKeyZ });
+export const AgentCreateAccountBody = z.object({
+  name: z.string().min(2).max(32),
+  publicKey: PublicKeyZ,
+  proof: z.object({
+    signature: z.string().min(1),
+    nonce: z.string().min(1),
+    timestamp: z.number(),
+  }),
+});
 export const RelayBody = z.object({ signedDelegate: z.string().min(16).max(200_000) });
 export const TopupBody = z.object({ accountId: AccountIdZ });
 export const SyncBody = z.object({ vaultId: AccountIdZ });
