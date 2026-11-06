@@ -35,6 +35,7 @@ const M: Record<string, [string, string]> = {
   E_UTILIZATION: ["Earn is paused right now.", "The lending pool is too busy to take new money safely. Try again later."],
   E_BAD_ARGS: ["The request was malformed.", "Refresh the app and try again."],
   E_EARN_BUSY: ["Earn is still finishing your last move.", "Wait a few seconds for it to settle, then try again."],
+  E_NOT_YET: ["Not yet.", "This group can be cancelled once it has been forming for 10 minutes in test mode (7 days otherwise). Try again then."],
   E_EARN_PAUSED: ["Earn is paused right now.", "The lending pool isn't accepting money. Try again later."],
   E_NO_LENDING: ["Earn isn't available.", "This account wasn't set up with Earn."],
   E_EARN_INSUFFICIENT: ["Less is earning than that.", "Lower the amount to what this pot has earning."],

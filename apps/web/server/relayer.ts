@@ -190,3 +190,26 @@ export async function syncVaultUnchecked(vaultId: string): Promise<{ txHash: str
   if (!r.ok) txFail(r);
   return { txHash: r.txHash };
 }
+
+
+/**
+ * Cancels a ROSCA group that is still forming after its forming window (10 minutes on testnet builds, 7 days on
+ * mainnet). The ROSCA contract allows ANYONE to do this after the window and refunds every bond, so the relayer
+ * can do it for accounts on older account code that has no ajo_cancel method. Before the window only the
+ * organiser can cancel, and the contract refuses this call.
+ */
+export async function cancelExpiredCircle(circleId: number, ip: string): Promise<{ txHash: string }> {
+  const cfg = serverConfig();
+  const ajo = cfg.oiko.contracts.ajo;
+  if (!ajo) throw new ApiError("E_DISABLED", 404, "ROSCA savings is not available here.");
+  if (!checkLimits("roscaCancel", ip, String(circleId))) throw new ApiError("E_RATE_LIMIT", 429);
+  budget(cfg, 0n);
+  const r = await relayer().call(ajo, "cancel", { circle_id: circleId }, { gas: (150n * TGAS).toString() });
+  if (!r.ok) {
+    if (/E_NOT_ORGANISER/.test(r.errorMessage ?? r.errorCode ?? "")) {
+      throw new ApiError("E_NOT_YET", 409, "This group can be cancelled by anyone once it has been forming for a while (10 minutes in test mode, 7 days otherwise). Try again later.");
+    }
+    txFail(r);
+  }
+  return { txHash: r.txHash };
+}

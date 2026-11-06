@@ -11,6 +11,7 @@ import { ConfirmSheet } from "@/components/app/ConfirmSheet";
 import { PageHeader } from "@/components/app/PageHeader";
 import { LoadError, PageSkeleton } from "@/components/app/States";
 import { useMoney } from "@/lib/actions";
+import { api } from "@/lib/api";
 import { useCircle, useCircles } from "@/lib/data";
 import { useConfig } from "@/lib/config";
 import { fmtDate, fmtToken, nsToMs, parseUnits } from "@/lib/format";
@@ -195,7 +196,17 @@ function RoscaView({ c, inviteCode }: { c: Circle; inviteCode?: string }) {
         onConfirm={() => exec("ajoPostBond", c.id, c.token, c.bond_amount)} />}
       {sheet === "cancel" && <ConfirmSheet open onOpenChange={() => setSheet(null)} title={t("rosca.cancel")}
         sentence={t("rosca.cancelSentence", { name: c.name })} confirmLabel={t("rosca.cancel")} successText={t("rosca.cancelled")}
-        onConfirm={() => exec("ajoCancel", c.id)} />}
+        onConfirm={async () => {
+          // 1) Past the forming window (10 min test / 7 days), anyone may cancel and every bond is refunded: the
+          //    server does it, which also works for accounts created before the 2026-11-05 contract update.
+          // 2) Otherwise the organiser cancels through their own account (needs the updated account code).
+          try { await api("/api/rosca/cancel", { body: { circleId: c.id } }); return; }
+          catch (e) { if ((e as { code?: string })?.code !== "E_NOT_YET") throw e; }
+          try { await exec("ajoCancel", c.id); }
+          catch {
+            throw new Error("E_NOT_YET: This group can be cancelled once it has been forming for 10 minutes in test mode (7 days otherwise). Try again then.");
+          }
+        }} />}
       {sheet === "leave" && <ConfirmSheet open onOpenChange={() => setSheet(null)} title={t("rosca.leave")}
         sentence={t("rosca.leaveSentence", { name: c.name })} confirmLabel={t("rosca.leave")} successText={t("rosca.left")}
         onConfirm={() => exec("ajoLeave", c.id)} />}
