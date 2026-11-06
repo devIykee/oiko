@@ -107,7 +107,7 @@ brand/              logo (gabled "o"), renders, scripts
    - **Global, English only.** No naira, no country-specific names or examples (no Lagos, Tunde etc.), no Pidgin.
    - No hackathon branding on the website (README and SUBMISSION may mention it).
 3. **Design:**
-   - **Acorn is the only font everywhere** (founder decision). It has no tabular figures, so amounts sit in fixed-width boxes.
+   - **Fonts** (founder decisions): Acorn for headings, app UI, labels, buttons and amounts; **Chillax** (Fontshare, free licence, self-hosted in `apps/web/fonts`) for supporting text only: grey/muted copy, small print, list subtitles, quoted reasons (`globals.css`, from 2026-11-06). Acorn has no tabular figures, so amounts sit in fixed-width boxes.
    - Revolut-like patterns with Oiko's own brand. Flat colour, no gradients, except the dark-mode star layer, which is founder-requested.
    - Icons: framework7 glyphs, web3icons logos for chains and coins, simple-icons for share brands. No Lucide or emoji.
    - Dark mode = night sky (`apps/web/app/stars.css`), with stars only in the gaps around cards.

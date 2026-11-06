@@ -49,7 +49,7 @@
 
   /* type */
   --font-ui: var(--font-acorn, "Acorn"), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-display: var(--font-ui); /* one family: Acorn everywhere; display = bold + tight tracking */
+  --font-display: var(--font-ui); /* Acorn; display = bold + tight tracking. Supporting text uses Chillax (apps/web globals.css). */
   --fs-hero: clamp(48px, 8vw, 104px);
   --fs-section: clamp(36px, 5vw, 64px);
   --fs-h1: 32px;

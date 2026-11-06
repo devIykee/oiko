@@ -42,20 +42,25 @@ export function NameClaim() {
       <label htmlFor={inputId} className="sr-only">Choose your name</label>
       <div className="flex items-center gap-2 rounded-full bg-surface p-1.5 pl-5 shadow-[0_0_0_1px_var(--line)] focus-within:shadow-[0_0_0_2px_var(--focus)]">
         <div className="flex min-w-0 flex-1 items-baseline text-[17px] md:text-[19px]">
-          <input
-            id={inputId}
-            value={name}
-            onChange={(e) => setName(e.target.value.toLowerCase().replace(/\s/g, ""))}
-            placeholder="steve"
-            autoComplete="off"
-            autoCapitalize="none"
-            spellCheck={false}
-            maxLength={32}
-            aria-describedby={hintId}
-            className="w-0 min-w-[2ch] flex-1 bg-transparent font-semibold outline-none placeholder:text-ink-3"
-            style={{ maxWidth: `${Math.max(3, name.length + 1)}ch` }}
-          />
-          <span className="truncate text-ink-3">.{displayRoot(config)}</span>
+          {/* Auto-width: an invisible copy of the text sizes the grid cell, so the input hugs the name exactly. The
+              ".oiko…" suffix truncates first on narrow phones; very long names scroll inside the input. */}
+          <span className="inline-grid min-w-[1ch] max-w-[70%] shrink-0">
+            <span aria-hidden className="invisible col-start-1 row-start-1 overflow-hidden whitespace-pre font-semibold">{name || "steve"}</span>
+            <input
+              id={inputId}
+              value={name}
+              onChange={(e) => setName(e.target.value.toLowerCase().replace(/\s/g, ""))}
+              placeholder="steve"
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              maxLength={32}
+              size={1}
+              aria-describedby={hintId}
+              className="col-start-1 row-start-1 w-full min-w-0 bg-transparent font-semibold outline-none placeholder:text-ink-3"
+            />
+          </span>
+          <span className="min-w-0 truncate text-ink-3">.{displayRoot(config)}</span>
         </div>
         <button type="submit" className={pillClass("black", "md", "h-12 shrink-0 px-5 md:px-6")}>
           Get your name

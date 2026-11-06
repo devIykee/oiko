@@ -4,8 +4,9 @@ import type { ReactNode } from "react";
 import { THEME_SCRIPT } from "@/components/marketing/theme-script";
 import "./globals.css";
 
-// One family everywhere (founder, 2026-11-05): licensed Acorn (/fonts) for headlines, body, app UI, labels and numbers.
-// Acorn has no tabular figures, so money columns stay right-aligned in fixed containers instead of switching fonts.
+// Acorn (/fonts) for headlines, app UI, labels and numbers; Chillax (Fontshare, /fonts) for supporting text (founder,
+// 2026-11-06; see .oi-subtext rules in globals.css). Acorn has no tabular figures, so money columns stay right-aligned
+// in fixed containers instead of switching fonts.
 const acorn = localFont({
   src: [
     { path: "../fonts/Acorn-Regular.woff2", weight: "400", style: "normal" },
@@ -15,7 +16,21 @@ const acorn = localFont({
   ],
   variable: "--font-acorn",
   display: "swap",
-  // Metric-matched Arial fallback while Acorn loads, so swapping fonts does not shift layout (CLS).
+  // "Acorn Fallback" (globals.css) is Arial scaled per weight to Acorn's measured widths, so the text wraps the same
+  // before and after Acorn loads (no layout shift). Next's automatic fallback uses one size for all weights and runs
+  // 15-25% wider than Acorn, which re-wrapped the hero.
+  adjustFontFallback: false,
+  fallback: ["Acorn Fallback", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
+});
+
+// Supporting text only (muted lines, leads, small print). Two weights keep the extra download to about 42 KB.
+const chillax = localFont({
+  src: [
+    { path: "../fonts/Chillax-Regular.woff2", weight: "400", style: "normal" },
+    { path: "../fonts/Chillax-Medium.woff2", weight: "500", style: "normal" },
+  ],
+  variable: "--font-chillax",
+  display: "swap",
   adjustFontFallback: "Arial",
   fallback: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
 });
@@ -52,7 +67,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={acorn.variable}
+      className={`${acorn.variable} ${chillax.variable}`}
     >
       <head>
         {/* Applies the saved Light/Dark/Auto choice before first paint (no flash). */}

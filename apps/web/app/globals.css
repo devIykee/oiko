@@ -3,6 +3,35 @@
 @import "@oiko/ui/tokens.css";
 @import "./stars.css"; /* night sky (dark) */
 
+/* Fallback for Acorn while it loads: Arial (or its metric twins Liberation/Arimo/Nimbus Sans; Roboto on Android)
+   scaled to Acorn's measured widths per weight, with Acorn's vertical metrics, so lines wrap the same before and after
+   the swap. Overrides = Acorn metric / size-adjust. */
+@font-face {
+  font-family: "Acorn Fallback";
+  src: local("Arial"), local("ArialMT"), local("Liberation Sans"), local("Arimo"), local("Nimbus Sans"), local("NimbusSans-Regular"), local("Helvetica"), local("Roboto");
+  font-weight: 100 549;
+  size-adjust: 86.5%;
+  ascent-override: 112.3%;
+  descent-override: 26.5%;
+  line-gap-override: 27.6%;
+}
+@font-face {
+  font-family: "Acorn Fallback";
+  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), local("Arimo Bold"), local("Nimbus Sans Bold"), local("NimbusSans-Bold"), local("Helvetica Bold"), local("Roboto Bold");
+  font-weight: 550 1000;
+  size-adjust: 76.6%;
+  ascent-override: 126.8%;
+  descent-override: 29.9%;
+  line-gap-override: 31.2%;
+}
+
+/* Supporting text in Chillax: muted/grey copy, small print, list subtitles and quoted reasons, on the site and in the
+   app. Headings, buttons and amounts stay in Acorn. */
+:where(.text-ink-2, .text-ink-3, .oi-muted, .oi-small, .oi-micro, .oi-lr__sub, .oi-proposal__reason) {
+  font-family: var(--font-chillax), var(--font-ui);
+}
+:where(.text-ink-2, .text-ink-3, .oi-muted, .oi-small, .oi-micro, .oi-lr__sub, .oi-proposal__reason) :where(strong, b) { font-weight: 500; }
+
 /* Class-based dark variant that matches the token rules: forced [data-theme=dark], or system dark unless forced light. */
 @custom-variant dark {
   &:where([data-theme="dark"], [data-theme="dark"] *) {
