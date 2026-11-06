@@ -1,7 +1,7 @@
 "use client";
 // Data hooks. Vault reads go straight to the contract views (via @oiko/sdk); HTTP reads go to /api.
 import type { Receipt } from "./receipts";
-import { AjoClient, VaultClient, gatewayAuthHeader, type Activity, type Circle, type MonthStats, type Overview } from "@oiko/sdk";
+import { AjoClient, VaultClient, gatewayAuthHeader, type Activity, type Circle, type MonthStats, type Overview, type Proposal } from "@oiko/sdk";
 import { useEffect } from "react";
 import { api } from "./api";
 import { useConfig } from "./config";
@@ -30,6 +30,18 @@ export function useOverview() {
     vaultId && (rpc || isFixtureMode()) ? vaultKey(vaultId, "overview") : null,
     () => (isFixtureMode() ? fixtureFetch<Overview>("vault:overview", "GET") : new VaultClient(rpc!, vaultId!).overview()),
     { refreshMs: 15_000 },
+  );
+}
+
+/** Every money proposal, including approved / rejected / expired ones (for each agent's record). */
+export function useAllProposals() {
+  const { session } = useSession();
+  const { rpc } = useConfig();
+  const vaultId = session?.vaultId;
+  return useQuery<Proposal[]>(
+    vaultId && (rpc || isFixtureMode()) ? vaultKey(vaultId, "proposals:all") : null,
+    () => (isFixtureMode() ? fixtureFetch<Proposal[]>("vault:proposals:all", "GET") : new VaultClient(rpc!, vaultId!).proposals(true)),
+    { refreshMs: 60_000 },
   );
 }
 

@@ -11,3 +11,4 @@ export * from "./errors";
 export * from "./insights";
 export * from "./agent";
 export * from "./caps";
+export * from "./changes";

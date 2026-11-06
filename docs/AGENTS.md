@@ -51,9 +51,8 @@ The owner reviews everything in plain words and can change any limit before appr
 The stdio server signs every request and transaction locally with your key.
 
 ```bash
-# from this repo (the package is not on the npm registry yet)
-pnpm install && pnpm --filter oiko-mcp build
-OIKO_CONNECTION='oiko1:…' node packages/mcp/bin/oiko-mcp.mjs
+OIKO_CONNECTION='oiko1:…' npx -y oiko-mcp
+# or from this repo: pnpm install && pnpm --filter oiko-mcp build && OIKO_CONNECTION='oiko1:…' node packages/mcp/bin/oiko-mcp.mjs
 # or: OIKO_AGENT_KEY=ed25519:<secret> OIKO_VAULT_ID=vault.ada.oiko.testnet OIKO_API_URL=https://oikodotnear.vercel.app
 ```
 
@@ -130,6 +129,12 @@ MCP tool names (stdio and HTTP) and the matching REST paths. All reads need the 
 | `get_earn_rates` | `GET /api/agent/earn-rates` | — | `source, fetchedAt, assets[]: { token, supplyApr (percent string), utilizationBps, paused }` |
 | `get_rosca_groups` | `GET /api/agent/rosca` (`/api/agent/ajo` is an old alias) | — | `groups[]` (and the same list as `circles[]`): ROSCA savings groups with members, payout order, round, paid, defaults, bonds |
 | `get_invoices` | `GET /api/agent/invoices` | — | `invoices[]`: the owner's invoices (number, client, items, total, due date, status draft/open/pending/paid/refunded/cancelled/overdue, received after fees, transaction links). Read only: agents cannot create, edit or cancel invoices |
+| `get_events` | `GET /api/agent/events?since=` | `since`: the cursor from your last call (ISO time or unix ms) | `events[]` oldest first, `cursor`. See [Events](#events-proactive-agents) |
+| `get_month_brief` | `GET /api/agent/brief?month=yyyymm` | `month` (optional) | `money_in, money_out, saved, savings_rate_bps, vs_last_month, top_payees[], biggest_outflows[], upcoming_bills[], bill_shortfalls[], goals[], spend_now, facts[]` |
+| `get_my_changes` | `GET /api/agent/changes` | none | `changes[]`: your non-money proposals with `status` pending/approved/rejected/expired |
+| `get_autopilot` | `GET /api/agent/autopilot` | none | the owner's autopilot rules and your webhook status |
+| `propose_change` | `POST /api/agent/change` | `change`, `reason` (1–280) | the stored proposal: `{ id, status: "pending", summary, calls, expiresAt }`. See [Proposals for everything](#proposals-for-everything) |
+| `set_webhook` | `POST /api/agent/webhook` | `url` (https) or `null` | `{ url, secret, note }` (secret shown once) |
 | `propose` | prepare + submit with `kind: "propose"` | `action`, `reason` (1–280 chars), `signed_tx` (HTTP only) | stdio: `{ ok, txHash, proposalId, note }` |
 | `act` | prepare + submit with `kind: "act"` | `action`, `reason` (optional, not stored on-chain), `signed_tx` (HTTP only) | stdio: `{ ok, txHash, result }` |
 
@@ -142,19 +147,81 @@ MCP tool names (stdio and HTTP) and the matching REST paths. All reads need the 
 { "type": "save",     "to_pot": 4, "token": "usdc", "amount": "10000000" }                                    // Spend -> pot
 ```
 
-MCP errors come back as `isError: true` with text `{ "error": { "code", "message" } }`.
+MCP errors come back as `isError: true` with text `{ "error": { "code", "message", "how_to_fix" } }`.
+
+## Events (proactive agents)
+
+Oiko tells your agent what happened instead of waiting to be asked. Events are worked out from the account's current state on every request, so every server gives the same answer and nothing is lost if a delivery fails. Each event has a stable `id`, an `at` time (when it happened or became true), a `title`, `data`, and `suggested_actions` computed by code (no AI) from the account right now.
+
+| Type | When |
+|---|---|
+| `payment_received`, `plan_applied` | money arrived and the plan split it |
+| `bill_due_soon`, `bill_due_today`, `bill_missed` | 3 days before the due day, on it, the day after if unpaid |
+| `goal_reached`, `lock_released`, `spend_low` | a goal pot hit its target; a lock date passed; Spend fell below the owner's floor |
+| `invoice_paid`, `invoice_overdue` | from the owner's invoices |
+| `rosca_round_due`, `rosca_default` | this account hasn't paid the current round; a round was missed |
+| `cap_80` | you have used 80% of your weekly cap |
+| `weekly_summary` | every Monday 00:00 UTC, for the previous 7 days |
+| `autopilot_due` | an autopilot rule the owner turned on has something to do |
+
+A suggested action is `{ kind, action?, change?, reason, autopilot? }`:
+- `act`: you may do it now; it fits your permissions, allowlist and remaining caps.
+- `propose`: money, but outside what you may do alone; propose it.
+- `propose_change`: a non-money change; use `propose_change`.
+- `tell_owner`: nothing to sign; tell the owner.
+- `autopilot: "top_up_bills" | "sweep_spend" | "pay_bills_on_due_day"` means the owner agreed to it in advance in Agents → Autopilot.
+
+Example: Bills has 30.00 USDT, the 50.00 USDT electricity bill is due in 3 days, and you may move between pots →
+
+```json
+{ "id": "bill_due_soon:7:2026-11-14", "type": "bill_due_soon", "at": "2026-11-11T00:00:00.000Z", "title": "Electricity is due on 2026-11-14",
+  "suggested_actions": [{ "kind": "act", "action": { "type": "move", "from_pot": 0, "to_pot": 1, "token": "usdt", "amount": "20000000" },
+    "reason": "Bills has 30.00 USDT but Electricity needs 50.00." }] }
+```
+
+Delivery, three ways (all the same events):
+1. **Poll** `GET /api/agent/events?since=<cursor>` (or the MCP tool `get_events`). Store the returned `cursor` and pass it next time. Events older than 30 days are dropped.
+2. **Webhook**: `POST /api/agent/webhook {"url":"https://…"}` (or `set_webhook`). Oiko's cron POSTs `{ events, delivered_at }` with `X-Oiko-Timestamp` (unix ms) and `X-Oiko-Signature: sha256=<hex HMAC-SHA256(secret, "<timestamp>.<body>")>`. Verify the signature and reject timestamps more than 5 minutes old. Failed deliveries are retried on the next run; after 20 failures in a row the webhook switches off. Only public https URLs are accepted. The webhook is removed when you are disconnected.
+3. **MCP notifications**: the stdio server (`oiko-mcp`) polls every 60 s (`OIKO_EVENTS_POLL_SECONDS`, 0 = off) and sends each new event as `notifications/message` with logger `oiko-events`. The hosted MCP endpoint is stateless, so hosted agents call `get_events`.
+
+Events need only the `read` permission.
+
+## Proposals for everything
+
+Money moves are proposed on the account itself (`propose`). Everything else is a **change**, proposed with `propose_change` (`POST /api/agent/change`, needs `propose`). Oiko stores it, the owner sees it on Home with your reason in quotes, and when they tap Approve the app carries it out with the owner's own key. You never get write access to settings.
+
+```jsonc
+{ "type": "set_splits", "rules": [{ "pot_id": 1, "mode": "percent", "value": "3500" }] }   // Spend gets the rest
+{ "type": "create_pot", "name": "Holiday", "kind": "goal", "target": "800000000", "target_date": "2027-06-01" }
+{ "type": "update_pot", "pot_id": 4, "name": "New laptop", "target": "900000000" }
+{ "type": "lock", "pot_id": 3, "unlock_at": "2027-03-01" }      // lock, or extend a lock; never shorten
+{ "type": "earn", "pot_id": 2, "on": true }
+{ "type": "add_bill", "name": "Internet", "amount": "30000000", "token": "usdt", "due_day": 5, "payee": "brightline-fibre.testnet", "pot_id": 1 }
+{ "type": "remove_bill", "bill_id": 3 }
+{ "type": "add_schedule", "to_pot": 2, "token": "usdc", "amount": "10000000", "every_days": 7, "first_run": "2026-11-20" }
+{ "type": "remove_schedule", "schedule_id": 1 }
+{ "type": "draft_invoice", "client": { "name": "Acme" }, "items": [{ "description": "Design", "quantity": "7.5", "unitPrice": "40000000" }], "token": "usdc", "due_date": "2026-12-01" }
+```
+
+The change is checked against the account as it is when you propose it (`E_CHANGE_INVALID` with a plain reason otherwise) and again when the owner approves. Proposals expire after 7 days; at most 20 can wait per agent. `get_my_changes` shows what the owner decided. The owner's Agents page shows each agent's record: suggestions approved vs rejected.
+
+## Autopilot
+
+The owner can turn on rules in Agents → Autopilot: top up Bills after every payment, pay bills on their due day, sweep Spend above a set amount into a pot once a week, and a Spend-low alert. Rules never widen what you may do: when one is due, `get_events` returns it with `autopilot`-marked suggested actions, `act` if it fits your permissions and caps, otherwise `propose`. Oiko itself holds no key to your owner's money, so without a connected agent the rules do nothing.
 
 ### Moving money over REST
 
 1. `POST /api/agent/prepare` with body `{ "kind": "act" | "propose", "action": {…}, "reason": "…" }` (reason required for `propose`). Response: `{ unsignedTx, hash }` — base64 borsh `Transaction` (signer and receiver = the vault, your key, one function call, 100 Tgas, no deposit) and base64 `sha256` of those bytes.
 2. Sign `hash` with your ed25519 key and build a borsh `SignedTransaction`, base64-encoded (`signTransactionBytes(secretKey, bytes)` in `@oiko/sdk` does both).
-3. `POST /api/agent/submit` with `{ "signedTx": "…" }`. Response: `{ txHash, ok: true, value }` or `{ txHash, ok: false, error: { code, message, detail } }`. A refusal by the contract is a normal `200` with `ok: false`.
+3. `POST /api/agent/submit` with `{ "signedTx": "…" }`. Response: `{ txHash, ok: true, value }` or `{ txHash, ok: false, error: { code, message, detail, how_to_fix } }`. A refusal by the contract is a normal `200` with `ok: false`.
 
 The gateway accepts only one `agent_execute` or `agent_propose` call with no deposit, signed by the same key that signed the request. `prepare` may top up the vault's NEAR for gas from the Oiko relayer (rate limited, best effort).
 
 ## Errors
 
-Gateway (HTTP status, `{ error: { code, message } }`):
+Every refusal to an agent carries `how_to_fix`: the concrete next step, using your own limits where it helps, for example `"You've used 90.00 of your 100.00 weekly cap. It resets in about 40 h. Use propose now, or ask the owner to raise the weekly cap to at least 115.00."` Follow it instead of retrying the same call.
+
+Gateway (HTTP status, `{ error: { code, message, how_to_fix } }`):
 
 | Code | Status | Meaning |
 |---|---|---|
@@ -169,6 +236,8 @@ Gateway (HTTP status, `{ error: { code, message } }`):
 | `E_RATE_LIMIT` | 429 | Over 120 requests a minute per IP or 60 per key |
 | `E_NOT_FOUND` | 404 | Unknown read tool |
 | `E_DISABLED` | 404 | MCP over HTTP is turned off on this deployment |
+| `E_CHANGE_INVALID` | 400 | A proposed change doesn't fit the account (the message says why) |
+| `E_TOO_MANY_PROPOSALS` | 409 | 20 changes already waiting for the owner |
 
 Contract refusals (in `submit` results and MCP errors; full list in `contracts/ERRORS.md`): `E_CAP_PER_TX`, `E_CAP_DAY`, `E_CAP_WEEK`, `E_NOT_ALLOWLISTED`, `E_ACTION_NOT_ALLOWED`, `E_SCOPE`, `E_AGENT_REVOKED`, `E_AGENT_EXPIRED`, `E_LOCKED`, `E_INSUFFICIENT`, `E_NO_POT`, `E_NO_BILL`, `E_BILL_PAID`, `E_BAD_AMOUNT`, `E_BAD_INPUT`, `E_REASON_TOO_LONG`, `E_TOO_MANY_PROPOSALS`, `E_NOT_SELF`, `E_NOT_AGENT`. `E_TRANSFER_FAILED` appears in logs when the token transfer failed and the money went back to Spend (the spend is not counted against your caps).
 
@@ -194,6 +263,7 @@ A refusal is final. Explain it in plain words and, if it makes sense, offer a pr
 ## How to behave
 
 - Read first. Say amounts with the ticker; never use a currency sign.
+- Check `get_events` regularly and act on suggestions only within what the owner allowed.
 - Prefer `propose` for anything the owner should decide, with a short honest reason they will read.
 - Never try to move money out of a locked pot.
 - Earn rates are variable and can go to zero. Never promise a return.

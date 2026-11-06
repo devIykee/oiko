@@ -82,6 +82,16 @@ export const appSettings = pgTable("app_settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Non-money changes proposed by agents (plan, pots, locks, Earn, bills, schedules, draft invoices). One JSON document each. */
+export const agentChanges = pgTable("agent_changes", {
+  id: text("id").primaryKey(),
+  vaultId: text("vault_id").notNull(),
+  publicKey: text("public_key").notNull(),
+  status: text("status").notNull(),
+  data: jsonb("data").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("agent_changes_vault_idx").on(t.vaultId, t.createdAt)]);
+
 export const CREATE_SQL = `
 CREATE TABLE IF NOT EXISTS agent_access_log (id BIGSERIAL PRIMARY KEY, at TIMESTAMPTZ NOT NULL DEFAULT now(), vault_id TEXT NOT NULL,
   public_key TEXT NOT NULL, method TEXT NOT NULL, path TEXT NOT NULL, status INTEGER NOT NULL, code TEXT, tool TEXT, tx_hash TEXT);
@@ -106,4 +116,7 @@ CREATE TABLE IF NOT EXISTS invoices (id TEXT PRIMARY KEY, owner TEXT NOT NULL, n
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS invoices_owner_idx ON invoices (owner, created_at);
+CREATE TABLE IF NOT EXISTS agent_changes (id TEXT PRIMARY KEY, vault_id TEXT NOT NULL, public_key TEXT NOT NULL, status TEXT NOT NULL,
+  data JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS agent_changes_vault_idx ON agent_changes (vault_id, created_at);
 `;

@@ -2,7 +2,8 @@
 import { describeRow, factsOfAction, factsOfSignedTx, outcomeOf, reasonOf, type ActionFacts, type Outcome } from "./accessLog";
 import { parseGatewayAuthHeader, normalizePublicKey } from "@oiko/sdk";
 import { ApiError } from "./errors";
-import { authenticateAgent, authenticateOwner, logAccess, payReceiverOfSignedTx, prepare, readTool, submit, type GatewayRequest } from "./gateway";
+import { authenticateAgent, authenticateOwner, logAccess, payReceiverOfSignedTx, prepare, readTool, submit, type AuthedAgent, type GatewayRequest } from "./gateway";
+import { withHowToFix } from "./howToFix";
 import { clientIp, errorResponse, json, parseBody, readText } from "./http";
 import { checkLimits } from "./ratelimit";
 import { PrepareBody, SubmitBody } from "./schemas";
@@ -27,15 +28,16 @@ export async function agentRead(req: Request, tool: string): Promise<Response> {
   const url = new URL(req.url);
   const id = who(req);
   let status = 200, code: string | null = null;
+  let ctx: AuthedAgent | undefined;
   try {
     if (!checkLimits("gateway", clientIp(req), id?.publicKey ?? null)) throw new ApiError("E_RATE_LIMIT", 429);
-    const ctx = await authenticateAgent(gatewayRequest(req, ""), "read");
+    ctx = await authenticateAgent(gatewayRequest(req, ""), "read");
     const params = Object.fromEntries(url.searchParams.entries());
     return json(await readTool(ctx, tool, params));
   } catch (e) {
     status = e instanceof ApiError ? e.status : 500;
     code = e instanceof ApiError ? e.code : "E_INTERNAL";
-    return errorResponse(e);
+    return errorResponse(withHowToFix(e, ctx?.policy));
   } finally {
     if (id) await logAccess({ ...id, method: "GET", path: url.pathname + url.search, status, code, tool });
   }
@@ -47,18 +49,19 @@ export async function agentWrite(req: Request, op: "prepare" | "submit"): Promis
   const id = who(req);
   let status = 200, code: string | null = null, txHash: string | null = null, receiver: string | null = null;
   let facts: ActionFacts | undefined;
+  let ctx: AuthedAgent | undefined;
   try {
     if (!checkLimits("gateway", clientIp(req), id?.publicKey ?? null)) throw new ApiError("E_RATE_LIMIT", 429);
     const text = await readText(req);
     if (op === "prepare") {
       const b = parseBody(PrepareBody, text);
       facts = factsOfAction(b.action, b.kind === "act" ? "agent_execute" : "agent_propose");
-      const ctx = await authenticateAgent(gatewayRequest(req, text), b.kind);
+      ctx = await authenticateAgent(gatewayRequest(req, text), b.kind);
       return json(await prepare(ctx, b.kind, b.action, b.reason));
     }
     const b = parseBody(SubmitBody, text);
     facts = factsOfSignedTx(b.signedTx);
-    const ctx = await authenticateAgent(gatewayRequest(req, text), null);
+    ctx = await authenticateAgent(gatewayRequest(req, text), null);
     const r = await submit(ctx, b.signedTx);
     txHash = r.txHash;
     if (!r.ok) code = r.error?.code ?? null;
@@ -67,7 +70,7 @@ export async function agentWrite(req: Request, op: "prepare" | "submit"): Promis
   } catch (e) {
     status = e instanceof ApiError ? e.status : 500;
     code = e instanceof ApiError ? e.code : "E_INTERNAL";
-    return errorResponse(e);
+    return errorResponse(withHowToFix(e, ctx?.policy, facts));
   } finally {
     if (id) await logAccess({ ...id, method: "POST", path: url.pathname, status, code, tool: op, txHash, receiver: receiver ?? facts?.receiver ?? null, facts });
   }
@@ -92,5 +95,65 @@ export async function agentLog(req: Request): Promise<Response> {
     return json({ vaultId, storage: s.kind, ...(s.kind === "memory" ? { note: "In-memory log: it resets when the server restarts." } : {}), rows });
   } catch (e) {
     return errorResponse(e);
+  }
+}
+
+/** Agent auth for JSON endpoints that don't sign transactions: NEP-413 per request, or a hosted session bearer token. */
+async function authAgentAny(req: Request, text: string, scope: "read" | "propose"): Promise<AuthedAgent> {
+  const bearer = /^Bearer\s+(\S+)$/i.exec(req.headers.get("authorization")?.trim() ?? "")?.[1];
+  if (!bearer) return authenticateAgent(gatewayRequest(req, text), scope);
+  const { authenticateToken } = await import("./agentSession");
+  const ctx = await authenticateToken(bearer, null);
+  if (!ctx.policy.scopes.includes(scope)) throw new ApiError("E_SCOPE", 403, `This agent doesn't have the "${scope}" permission. The owner can change it in Agents.`);
+  return ctx;
+}
+
+/** POST /api/agent/change {change, reason}: propose a non-money change (needs the propose permission). */
+export async function agentChange(req: Request): Promise<Response> {
+  const id = who(req);
+  let status = 200, code: string | null = null, ctx: AuthedAgent | undefined;
+  try {
+    if (!checkLimits("gateway", clientIp(req), id?.publicKey ?? null)) throw new ApiError("E_RATE_LIMIT", 429);
+    const text = await readText(req);
+    const { ProposeChangeBody, proposeChange } = await import("./changes");
+    const b = parseBody(ProposeChangeBody, text);
+    ctx = await authAgentAny(req, text, "propose");
+    const { rpc } = await import("./near");
+    return json(await proposeChange(ctx, b.change, b.reason, { store: store(), now: () => Date.now(), overview: (v) => rpc().view(v, "get_overview") }));
+  } catch (e) {
+    status = e instanceof ApiError ? e.status : 500;
+    code = e instanceof ApiError ? e.code : "E_INTERNAL";
+    return errorResponse(withHowToFix(e, ctx?.policy));
+  } finally {
+    const w = ctx ?? id;
+    if (w) await logAccess({ vaultId: w.vaultId, publicKey: w.publicKey, method: "POST", path: "/api/agent/change", status, code, tool: "propose_change" });
+  }
+}
+
+/** POST /api/agent/webhook {url} registers (returns the signing secret once); {url: null} removes it. */
+export async function agentWebhook(req: Request): Promise<Response> {
+  const id = who(req);
+  let status = 200, code: string | null = null, ctx: AuthedAgent | undefined;
+  try {
+    if (!checkLimits("gateway", clientIp(req), id?.publicKey ?? null)) throw new ApiError("E_RATE_LIMIT", 429);
+    const text = await readText(req, 4096);
+    const { z } = await import("zod");
+    const b = parseBody(z.object({ url: z.string().max(500).nullable() }), text);
+    ctx = await authAgentAny(req, text, "read");
+    const { checkWebhookUrl, registerWebhook, webhookKey } = await import("./webhooks");
+    const { serverConfig } = await import("./config");
+    const s = store();
+    if (b.url === null) {
+      await s.deleteSetting(webhookKey(ctx.vaultId, ctx.publicKey));
+      return json({ ok: true, removed: true });
+    }
+    const url = checkWebhookUrl(b.url, serverConfig().network === "local");
+    return json(await registerWebhook(s, ctx.vaultId, ctx.publicKey, url, Date.now()));
+  } catch (e) {
+    status = e instanceof ApiError ? e.status : 500;
+    code = e instanceof ApiError ? e.code : "E_INTERNAL";
+    return errorResponse(withHowToFix(e, ctx?.policy));
+  } finally {
+    if (ctx) await logAccess({ vaultId: ctx.vaultId, publicKey: ctx.publicKey, method: "POST", path: "/api/agent/webhook", status, code, tool: "webhook" });
   }
 }

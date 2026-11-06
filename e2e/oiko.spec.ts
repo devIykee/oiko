@@ -178,6 +178,50 @@ test.describe.serial("money flow for one person", () => {
     await v.revokeAgent(key.publicKey);
   });
 
+  test("README-14 an agent suggests a plan change, the owner approves it, and the agent sees events and a refusal with how_to_fix", async ({ page }) => {
+    const v = await vaultOf(me);
+    const before = await v.overview();
+    const bills = potBy(before, "bills"), savings = potBy(before, "autosave");
+    const key = generateKeyPair();
+    const exp = BigInt(Date.now() + 7 * 86_400_000) * 1_000_000n;
+    expect((await v.addAgent(key.publicKey, {
+      label: "Coach", agent_name: "Coach", agent_url: "https://example.com", scopes: ["read", "propose", "act"], allowed_actions: ["save"],
+      allowlist: [], per_tx: toUnits("1"), daily: toUnits("5"), weekly: toUnits("5"), expires_at: exp.toString(),
+    } as never)).ok).toBe(true);
+    const agent = new GatewayClient({ api: BASE, vault: me.vaultId, sk: key.secretKey });
+
+    // Events: the payments from earlier tests show up, oldest first, with a cursor.
+    const ev = await agent.get<{ events: Array<{ type: string; id: string }>; cursor: string }>("/api/agent/events");
+    expect(ev.events.some((e) => e.type === "payment_received"), JSON.stringify(ev)).toBe(true);
+    expect((await agent.get<{ events: unknown[] }>(`/api/agent/events?since=${encodeURIComponent(ev.cursor)}`)).events).toEqual([]);
+    const brief = await agent.get<{ money_in: { units: string }; facts: string[] }>("/api/agent/brief");
+    expect(BigInt(brief.money_in.units) > 0n).toBe(true);
+
+    // Over the per-payment cap: refused by the account, with a concrete next step.
+    const r = await agent.run("act", { type: "save", to_pot: savings.id, token: "usdt", amount: toUnits("2") } as never);
+    expect(r.ok).toBe(false);
+    expect(r.error?.how_to_fix ?? "", JSON.stringify(r)).toMatch(/per-payment cap is 1\.00/);
+
+    // A non-money suggestion, approved by the owner on Home, carried out with the app key.
+    const rules = [{ pot_id: bills.id, mode: "percent", value: "3500" }, { pot_id: savings.id, mode: "percent", value: "2500" }];
+    const p = await agent.request<{ id: string; status: string; summary: string }>("POST", "/api/agent/change", { change: { type: "set_splits", rules }, reason: "Bills went up; this covers them." });
+    expect(p.status).toBe("pending");
+    expect(p.summary).toMatch(/35%/);
+    await loginAs(page, me);
+    await page.goto("/home");
+    await page.getByTestId(`change-${p.id}-approve`).click();
+    await page.getByTestId("change-confirm-confirm").click();
+    await until(async () => (await v.overview()).splits.some((x) => x.pot_id === bills.id && x.value === "3500"), 60_000);
+    await until(async () => (await agent.get<{ changes: Array<{ id: string; status: string }> }>("/api/agent/changes")).changes.find((c) => c.id === p.id)?.status === "approved", 30_000);
+
+    // Autopilot: the owner turns a rule on in Agents; the agent reads it.
+    await page.goto("/agents");
+    await page.getByTestId("autopilot-topup").click();
+    await page.getByTestId("autopilot-save").click();
+    await until(async () => (await agent.get<{ autopilot: { top_up_bills: { on: boolean } } }>("/api/agent/autopilot")).autopilot.top_up_bills.on, 30_000);
+    await v.revokeAgent(key.publicKey);
+  });
+
   test("README-8 Earn is refused when the lending pool is 93% borrowed", async ({ page }) => {
     const cfg = await config();
     const big = 10n ** 24n;

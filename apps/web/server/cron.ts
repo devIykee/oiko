@@ -27,7 +27,7 @@ const reminded = (g.__oikoReminded ??= new Set());
 
 export interface CronReport {
   vaultsScanned: number; schedulesRun: Array<{ vaultId: string; txHash: string; ok: boolean }>; roundsSettled: Array<{ circleId: number; txHash: string; ok: boolean }>;
-  reminders: number; notes: string[]; tookMs: number;
+  reminders: number; webhooks: { checked: number; sent: number }; notes: string[]; tookMs: number;
 }
 
 export function circleDue(c: Circle, nowNs: bigint): boolean {
@@ -39,7 +39,7 @@ export async function runCron(nowMs = Date.now(), maxMs = 50_000): Promise<CronR
   const cfg = serverConfig();
   const r = rpc();
   const started = Date.now();
-  const report: CronReport = { vaultsScanned: 0, schedulesRun: [], roundsSettled: [], reminders: 0, notes: [], tookMs: 0 };
+  const report: CronReport = { vaultsScanned: 0, schedulesRun: [], roundsSettled: [], reminders: 0, webhooks: { checked: 0, sent: 0 }, notes: [], tookMs: 0 };
   const nowNs = BigInt(nowMs) * 1_000_000n;
   const outOfTime = () => Date.now() - started > maxMs;
   const spend = () => spendBudget(cfg.limits.dailyBudget, GAS_COST_ESTIMATE);
@@ -107,6 +107,16 @@ export async function runCron(nowMs = Date.now(), maxMs = 50_000): Promise<CronR
     } catch (e) {
       report.notes.push(`ROSCA scan failed (${(e as Error).message.slice(0, 120)})`);
     }
+  }
+  // Agent event webhooks (events are derived from state, so a missed run just delivers later).
+  try {
+    const { deliverWebhooks } = await import("./agentEvents");
+    const { store } = await import("./store");
+    const w = await deliverWebhooks(store(), r, nowMs, outOfTime);
+    report.webhooks = { checked: w.checked, sent: w.sent };
+    report.notes.push(...w.notes);
+  } catch (e) {
+    report.notes.push(`webhooks failed (${(e as Error).message.slice(0, 120)})`);
   }
   report.tookMs = Date.now() - started;
   return report;

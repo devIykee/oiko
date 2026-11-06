@@ -195,6 +195,8 @@ Full spec in `docs/ROADMAP.md` §1:
 
 Update `oiko-mcp` (new tools + notifications), bump its version, and have the founder publish (G6).
 
+**Status 2026-11-06: done, except publishing.** Events are derived from state on every request (`apps/web/server/events.ts`), with no event store; webhooks are delivered by cron (`webhooks.ts`, `agentEvents.ts`). Changes: `server/changes.ts` + `packages/sdk/src/changes.ts`; owner endpoints `/api/owner/*`; Home shows them; Agents has Autopilot and each agent's approved/rejected record. `how_to_fix`: `server/howToFix.ts`. Tests: `server/__tests__/proactive.test.ts`, MCP tests, e2e README-14. Not done: autopilot without a connected agent (Oiko holds no key to run it, by design); "counterparty warning on a recent payee" event. **Founder:** publish `oiko-mcp` 0.2.0 (`packages/mcp/oiko-mcp-0.2.0.tgz` is built; see G6).
+
 ### Phase 4: Polish, performance, docs, submission
 
 - **Lighthouse** mobile on `/`, `/pay/<name>`, `/home`: performance, accessibility and best practices ≥ 90 each. Store reports in `docs/lighthouse/`. Landing JS < 150 KB gzipped. CLS < 0.02.

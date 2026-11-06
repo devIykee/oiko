@@ -51,7 +51,18 @@ Auth: header `Authorization: NEP413 <base64(json)>` where json = `{ accountId (v
 | POST | `/api/agent/submit` | propose/act | `{ signedTx: base64 }` → `{ txHash, ok, error? }` |
 | GET | `/api/agent/counterparty?to=&amount=&token=` or `?bill_id=` | read | counterparty check for a payment: `{ receiver, verdict: "allow"\|"warn"\|"block", score, reasons: [{code, severity, message, evidence?}], checkedAt, sources, on_allowlist, decision: {act, propose, message} }` |
 | POST | `/api/agent/report` | read | `{ receiver, reason, evidence }` → `{ ok, receiver, stored, note }` — shared blocklist, one report per account per receiver |
+| GET | `/api/agent/events?since=` | read | `{ events: [{ id, type, at, title, data, suggested_actions }], cursor }`, oldest first (docs/AGENTS.md#events-proactive-agents) |
+| GET | `/api/agent/brief?month=yyyymm` | read | deterministic month summary with `facts[]` |
+| GET | `/api/agent/changes` | read | this agent's change proposals |
+| GET | `/api/agent/autopilot` | read | `{ autopilot, webhook }` |
+| POST | `/api/agent/change` | propose (NEP-413 or session bearer) | `{ change, reason }` → stored proposal `{ id, status, summary, calls, expiresAt, … }` |
+| POST | `/api/agent/webhook` | read (NEP-413 or session bearer) | `{ url }` → `{ url, secret, note }`; `{ url: null }` → `{ ok, removed }` |
 | GET | `/api/agent/log?vaultId=&publicKey=` | owner (NEP-413 by owner app key) | access log rows |
+| GET | `/api/owner/changes` | owner | `{ changes: [ …proposal, calls, problem ] }` (every agent, newest first) |
+| POST | `/api/owner/changes/:id` | owner | `{ decision: "approve" \| "reject", txHashes }` → the proposal. The app runs `calls` with its key before recording an approval; `draft_invoice` is saved as a draft here |
+| GET/POST | `/api/owner/autopilot` | owner | `{ autopilot }`; POST body `{ top_up_bills, sweep_spend, pay_bills_on_due_day, spend_floor }` |
+
+Agent errors carry `error.how_to_fix` (and `submit` failures `error.how_to_fix`).
 
 `/api/agent/prepare` runs the counterparty check for `pay` and `pay_bill` (docs/COUNTERPARTY.md): `block` → 403 `E_COUNTERPARTY_BLOCKED` (act and propose), `warn` on `act` → 409 `E_COUNTERPARTY_WARN` with `error.next = "propose"`. Both errors carry `error.counterparty` (the full result). A successful prepare for a payment includes `counterparty` in the response.
 

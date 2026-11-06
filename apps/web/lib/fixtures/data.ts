@@ -241,14 +241,37 @@ export async function handle(path: string, method: string, body: unknown): Promi
     { at: new Date(NOW - 26 * 3600_000).toISOString(), method: "POST", path: "/api/agent/prepare", status: 403, code: "E_NOT_ALLOWLISTED", outcome: "Blocked", summary: "Payment · 50.00 USDT to urgent-refund-desk.testnet", reason: "Blocked: That recipient isn't on the agent's list." },
     { at: new Date(NOW - 30 * 3600_000).toISOString(), method: "POST", path: "/api/agent/submit", status: 422, code: "E_CAP_WEEK", outcome: "Blocked", summary: "Payment · 90.00 USDT to brightline-fibre.testnet", reason: "Blocked: The agent has reached its weekly limit." },
   ] };
+  if (p === "/api/owner/changes") return { changes: fixtureChanges.map((c) => ({ ...c, calls: c.status === "pending" ? [{ method: "setSplits", args: [(c.change as { rules: unknown }).rules] }] : [], problem: null })) };
+  if (p.startsWith("/api/owner/changes/")) {
+    const c = fixtureChanges.find((x) => x.id === decodeURIComponent(p.slice(19)));
+    if (c) Object.assign(c, { status: b.decision === "approve" ? "approved" : "rejected", decidedAt: new Date().toISOString(), txHashes: b.txHashes ?? [] });
+    return { ...c, calls: [], problem: null };
+  }
+  if (p === "/api/owner/autopilot") {
+    if (method === "POST") fixtureAutopilot = { ...b, updatedAt: new Date().toISOString() };
+    return { autopilot: fixtureAutopilot };
+  }
   // vault views (virtual paths)
   if (p === "vault:overview") return overview();
   if (p === "vault:activity") return structuredClone(activity);
+  if (p === "vault:proposals:all") return [...structuredClone(overview().proposals), { ...structuredClone(overview().proposals[0]!), id: 3, status: "approved" }];
   if (p === "vault:stats") return structuredClone(stats);
   if (p === "ajo:circles") return structuredClone(circles);
   if (p.startsWith("ajo:circle:")) return structuredClone(circles.find((c) => c.id === Number(p.slice(11))) ?? null);
   throw Object.assign(new Error(`fixture: no handler for ${method} ${p}`), { code: "E_NOT_FOUND" });
 }
+
+// Agent change proposals and autopilot (owner endpoints), for screenshots.
+const fixtureChanges: Array<Record<string, unknown> & { id: string; status: string; change: unknown }> = [{
+  id: "chg_fixture1", publicKey: "ed25519:7xKfPq3d9aQmZ1Bv5yR8nTcWuE2hJ6sL4oD0gNpXyAbC", agentName: "Claude (Money coach)",
+  change: { type: "set_splits", rules: [{ pot_id: 1, mode: "percent", value: "3500" }, { pot_id: 2, mode: "percent", value: "2000" }, { pot_id: 3, mode: "percent", value: "1000" }, { pot_id: 4, mode: "percent", value: "1000" }] },
+  reason: "Your bills went up by 45.00 this month. 35% to Bills covers them without touching Spend.",
+  summary: "Change your plan to: Bills 35%, Savings 20%, Rainy day 10%, Laptop 10%, Spend gets the rest (25%).",
+  status: "pending", createdAt: new Date(NOW - 2 * 3600_000).toISOString(), expiresAt: new Date(NOW + 6 * 86_400_000).toISOString(), decidedAt: null, txHashes: [], invoiceId: null,
+}];
+let fixtureAutopilot: Record<string, unknown> = {
+  top_up_bills: { on: true }, sweep_spend: { on: false, above: U(300), to_pot: 2, weekday: 5 }, pay_bills_on_due_day: { on: true }, spend_floor: null, updatedAt: null,
+};
 
 const ok = (value?: unknown) => ({ txHash: "fx" + Math.random().toString(36).slice(2, 10), ok: true, value, logs: [] as string[] });
 const pushAct = (a: Omit<Activity, "seq" | "at">) => { activity = [{ seq: 200 + activity.length, at: ns(Date.now()), ...a }, ...activity]; };

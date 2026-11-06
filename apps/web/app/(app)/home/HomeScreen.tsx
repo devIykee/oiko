@@ -13,6 +13,7 @@ import { isLocked, potColor, potGlyph, potName } from "@/components/app/potmeta"
 import { useMoney } from "@/lib/actions";
 import { useConfig } from "@/lib/config";
 import { useActivity, useOverview } from "@/lib/data";
+import { useChanges, useDecideChange, type ChangeView } from "@/lib/owner";
 import { fmt, fmtDate, fmtTotal, nsToMs, total } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
@@ -25,9 +26,25 @@ export function HomeScreen() {
   const { oiko } = useConfig();
   const ov = useOverview();
   const act = useActivity(20);
-  const { exec } = useMoney();
+  const { exec, execOptional } = useMoney();
+  const changes = useChanges();
+  const decide = useDecideChange();
   const [moveOpen, setMoveOpen] = useState(false);
   const [pending, setPending] = useState<{ p: Proposal; kind: "approve" | "reject" } | null>(null);
+  const [pendingChange, setPendingChange] = useState<{ c: ChangeView; kind: "approve" | "reject" } | null>(null);
+  const openChanges = (changes.data ?? []).filter((c) => c.status === "pending");
+
+  /** Approve = run the change with the app key (one call per step), then record it with the tx hashes. */
+  const runChange = async (c: ChangeView) => {
+    const hashes: string[] = [];
+    let last;
+    for (const call of c.calls) {
+      last = await execOptional(call.method, ...call.args);
+      hashes.push(last.txHash);
+    }
+    await decide(c.id, "approve", hashes);
+    return last;
+  };
 
   if (ov.error && !ov.data) return <div className="oi-col oi-page"><LoadError error={ov.error} onRetry={ov.refresh} /></div>;
   if (!ov.data) return <div className="oi-col"><PageSkeleton balance rows={3} /></div>;
@@ -77,10 +94,16 @@ export function HomeScreen() {
       </section>
 
       {/* 2. Things that need you. */}
-      {o.proposals.length > 0 && (
+      {(o.proposals.length > 0 || openChanges.length > 0) && (
         <section aria-labelledby="waiting" className="oi-home-sec">
           <SectionTitle id="waiting">{t("home.waiting")}</SectionTitle>
           <div className="oi-stack-sm">
+            {openChanges.map((c) => (
+              <ProposalCard key={c.id} testId={`change-${c.id}`} agentName={c.agentName} agentLabel={t("home.changeLabel")}
+                sentence={c.problem ? <>{c.summary} <span className="oi-muted">{t("home.changeProblem", { problem: c.problem })}</span></> : c.summary} reason={c.reason}
+                approveLabel={t("home.approve")} rejectLabel={t("home.reject")}
+                onApprove={() => { if (!c.problem) setPendingChange({ c, kind: "approve" }); }} onReject={() => setPendingChange({ c, kind: "reject" })} />
+            ))}
             {o.proposals.map((p) => (
               <ProposalCard key={p.id} testId={`proposal-${p.id}`} agentName={p.agent_name} agentLabel={t("home.proposalLabel")}
                 sentence={actionSentence(p.action, o.pots, o.bills, t)} reason={p.reason}
@@ -131,6 +154,21 @@ export function HomeScreen() {
           variant={pending.kind === "approve" ? "black" : "danger"}
           successText={pending.kind === "approve" ? t("home.approved") : t("home.rejected")}
           onConfirm={() => (pending.kind === "approve" ? exec("approveProposal", pending.p.id) : exec("rejectProposal", pending.p.id))}
+        />
+      )}
+      {pendingChange && (
+        <ConfirmSheet
+          open={!!pendingChange}
+          onOpenChange={(v) => { if (!v) setPendingChange(null); }}
+          testId="change-confirm"
+          title={pendingChange.kind === "approve" ? t("home.approveTitle") : t("home.rejectTitle")}
+          sentence={pendingChange.kind === "approve"
+            ? t("home.changeApproveSentence", { summary: pendingChange.c.summary, agent: pendingChange.c.agentName })
+            : t("home.changeRejectSentence", { agent: pendingChange.c.agentName })}
+          confirmLabel={pendingChange.kind === "approve" ? t("home.approve") : t("home.reject")}
+          variant={pendingChange.kind === "approve" ? "black" : "danger"}
+          successText={pendingChange.kind === "approve" ? t("home.changeDone") : t("home.rejected")}
+          onConfirm={async () => { if (pendingChange.kind === "approve") return runChange(pendingChange.c); await decide(pendingChange.c.id, "reject"); }}
         />
       )}
     </div>

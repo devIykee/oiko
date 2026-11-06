@@ -1,5 +1,5 @@
 import { GatewayClient, type AgentConnection } from "@oiko/sdk";
-import type { AgentActionInput, OikoBackend, ReadTool } from "./tools";
+import type { AgentActionInput, ConfigChangeInput, OikoBackend, ReadTool } from "./tools";
 
 /** Backend for the stdio server: talks to the Oiko HTTP gateway, signing every request and transaction locally. */
 export class GatewayBackend implements OikoBackend {
@@ -15,10 +15,16 @@ export class GatewayBackend implements OikoBackend {
   report(receiver: string, reason: string, evidence: string) {
     return this.client.report(receiver, reason, evidence);
   }
+  proposeChange(change: ConfigChangeInput, reason: string) {
+    return this.client.request("POST", "/api/agent/change", { change, reason });
+  }
+  setWebhook(url: string | null) {
+    return this.client.request("POST", "/api/agent/webhook", { url });
+  }
   async run(kind: "propose" | "act", action: AgentActionInput, reason?: string) {
     // GatewayClient.run checks the counterparty first and refuses to sign on block (and on warn for act).
     const r = await this.client.run(kind, action, reason);
-    if (!r.ok) throw Object.assign(new Error(r.error?.message ?? "That didn't go through."), { code: r.error?.code ?? "E_TX_FAILED", txHash: r.txHash });
+    if (!r.ok) throw Object.assign(new Error(r.error?.message ?? "That didn't go through."), { code: r.error?.code ?? "E_TX_FAILED", txHash: r.txHash, how_to_fix: r.error?.how_to_fix });
     return { ok: true, txHash: r.txHash, ...(kind === "propose" ? { proposalId: r.value, note: "The owner will see this in Oiko and can approve or reject it." } : { result: r.value }) };
   }
 }

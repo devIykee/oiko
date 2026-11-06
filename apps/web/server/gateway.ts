@@ -7,7 +7,8 @@ import {
 } from "@oiko/sdk";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { encodeTransaction } from "near-api-js";
-import { outcomeOf, type ActionFacts } from "./accessLog";
+import { factsOfSignedTx, outcomeOf, type ActionFacts } from "./accessLog";
+import { howToFix } from "./howToFix";
 import { serverConfig } from "./config";
 import { agentDecision, checkCounterparty, type CheckInput, type CounterpartyResult } from "./counterparty";
 import { ApiError } from "./errors";
@@ -241,6 +242,40 @@ export async function readTool(ctx: AuthedAgent, tool: string, params: Record<st
       const { agentInvoices, invoiceDeps } = await import("./invoicesHttp");
       return agentInvoices(v, invoiceDeps());
     }
+    case "events": {
+      const { loadEvents } = await import("./agentEvents");
+      const { eventsSince } = await import("./events");
+      const r2 = eventsSince(await loadEvents(v, ctx.policy, r, store(), nowMs), params.since);
+      return {
+        _help: "Things that happened or became true, oldest first. Pass cursor back as ?since= next time. Each event has deterministic suggested_actions computed by Oiko from the account right now: act (do it within your caps), propose (money, owner approves), propose_change (non-money, owner approves), tell_owner. autopilot marks a rule the owner turned on in advance. You decide what to do.",
+        ...r2,
+      };
+    }
+    case "brief": {
+      const { monthBrief } = await import("./brief");
+      const month = params.month && /^\d{6}$/.test(params.month) ? Number(params.month) : monthOfMs(nowMs);
+      let from = month;
+      for (let i = 0; i < 2; i++) from = prevMonth(from);
+      const [stats, acts, o] = await Promise.all([
+        r.view<import("@oiko/sdk").MonthStats[]>(v, "get_month_stats", { from_month: from, to_month: month }),
+        r.view<import("@oiko/sdk").Activity[]>(v, "get_activity", { from_seq: null, limit: 200 }),
+        ov(),
+      ]);
+      return monthBrief(month, stats, acts, o, nowMs, ctx.policy);
+    }
+    case "changes": {
+      const { listChanges } = await import("./changes");
+      const rows = await listChanges(v, { store: store(), now: () => nowMs, overview: () => ov() }, { publicKey: ctx.publicKey });
+      return { _help: "Your non-money proposals (plan, pots, locks, Earn, bills, schedules, draft invoices) and whether the owner approved them. Propose new ones with propose_change.", changes: rows };
+    }
+    case "autopilot": {
+      const { getAutopilot } = await import("./agentEvents");
+      const { webhookStatus } = await import("./webhooks");
+      return {
+        _help: "Autopilot rules the owner turned on. When one is due, get_events returns an autopilot_due (or bill_due_today) event whose suggested_actions carry autopilot: <rule>; run them with act inside your caps. If you can't act, propose instead.",
+        autopilot: await getAutopilot(store(), v), webhook: await webhookStatus(store(), v, ctx.publicKey),
+      };
+    }
     case "earn-rates":
       return { _help: "Variable lending rates today (supplyApr is a percent). Rates change and can go to zero.", ...(await earnRates()) };
     case "rosca":
@@ -354,10 +389,10 @@ export async function submit(ctx: AuthedAgent, signedTx: string, r: NearRpc = rp
     const out = parseOutcome(await r.sendTx(b64encode(b64decode(signedTx))), txHash);
     if (out.ok) return { txHash: out.txHash, ok: true, value: out.value };
     const f = friendlyError(out.errorMessage ?? out.errorCode ?? "");
-    return { txHash: out.txHash, ok: false, error: { code: f.code, message: `${f.title} ${f.next}`, detail: out.errorMessage } };
+    return { txHash: out.txHash, ok: false, error: { code: f.code, message: `${f.title} ${f.next}`, detail: out.errorMessage, how_to_fix: howToFix(f.code, ctx.policy, factsOfSignedTx(signedTx)) } };
   } catch (e) {
     const f = friendlyError((e as Error).message);
-    return { txHash, ok: false, error: { code: f.code, message: `${f.title} ${f.next}`, detail: (e as Error).message.slice(0, 300) } };
+    return { txHash, ok: false, error: { code: f.code, message: `${f.title} ${f.next}`, detail: (e as Error).message.slice(0, 300), how_to_fix: howToFix(f.code, ctx.policy, factsOfSignedTx(signedTx)) } };
   }
 }
 

@@ -24,6 +24,7 @@ Balances are USDC and USDT. USDC and USDT are stablecoins designed to track the 
 5. Withdraw 1 USDT from Spend → it leaves the account. [e2e: README-5]
 6. Agents → connect an agent with a cap → run it (see `examples/agents`) → payments within the cap pass, the next one is refused, Disconnect deletes its key. [e2e: README-6]
 7. Invoices → New invoice (client, a line or two, USDC or USDT, due date) → Create and get link → copy the link → open it in a private window → Pay this invoice → choose where the money is, give a refund address → "Simulate payment (test mode)" → back in Invoices the status goes Pending → Paid, with the amount received, the fee and a transaction link → Export CSV (one row per line item, ISO dates, plain decimals; also under Settings → Export invoices). [e2e: README-13]
+8. Let a connected agent suggest a plan change (`propose_change`, or `POST /api/agent/change`) → it shows on Home under "Waiting for you" with the agent's reason → Approve → your plan changes. The same agent reads what happened with `get_events` and gets a `how_to_fix` on every refusal. [e2e: README-14]
 
 Note: the hosted demo pays for signups from a testnet relayer account. If signup says the account needs a top-up, the relayer is out of testnet NEAR (see `docs/STATUS.md`).
 

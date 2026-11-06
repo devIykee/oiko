@@ -36,12 +36,12 @@ export function factsOfSignedTx(signedTx: string): ActionFacts {
 
 // Policy refusals (the agent's limits or Oiko's payee check) read as "Blocked"; everything else that failed is "Refused".
 const BLOCK = /^(E_COUNTERPARTY_|E_NOT_ALLOWLISTED|E_ACTION_NOT_ALLOWED|E_CAP_|E_SCOPE|E_AGENT_)/;
-const READ_TOOLS = new Set(["overview", "me", "pots", "plan", "bills", "activity", "insights", "rosca", "counterparty", "invoices"]);
+const READ_TOOLS = new Set(["overview", "me", "pots", "plan", "bills", "activity", "insights", "rosca", "counterparty", "invoices", "events", "brief", "changes", "autopilot", "webhook"]);
 
 export function outcomeOf(row: { tool?: string | null; status: number; code?: string | null; method?: string | null; path?: string | null }): Outcome {
   if (row.status >= 400 || row.code) return row.code && BLOCK.test(row.code) ? "Blocked" : "Refused";
   if (row.tool === "prepare") return "Approved"; // passed the checks; nothing on chain yet
-  if (row.method === "agent_propose" || row.tool === "propose") return "Proposed";
+  if (row.method === "agent_propose" || row.tool === "propose" || row.tool === "propose_change") return "Proposed";
   if (row.method === "agent_execute" || row.tool === "act" || row.tool === "submit") return "Approved";
   if (row.tool && READ_TOOLS.has(row.tool)) return "Read";
   return row.method === "GET" || row.path?.includes("#") ? "Read" : "Approved";
@@ -55,6 +55,7 @@ export function reasonOf(outcome: Outcome, code?: string | null): string | null 
 
 const TOOL_LABEL: Record<string, string> = {
   prepare: "Prepared", submit: "Sent", act: "Act", propose: "Suggest", report: "Reported a payee", mcp: "MCP request",
+  propose_change: "Suggested a change", events: "Read events", brief: "Read the month brief", webhook: "Set up event delivery",
 };
 const TYPE_LABEL: Record<string, string> = { pay: "Payment", pay_bill: "Bill payment", move: "Move between pots", save: "Save" };
 

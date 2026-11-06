@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { encodeConnectionString, decodeConnectionString, keyPairFromSeed, parseGatewayAuthHeader, verifyNep413, parseGatewayMessage, sha256Hex } from "@oiko/sdk";
-import { createOikoMcpServer, GatewayBackend, TOOL_NAMES, type OikoBackend } from "../src";
+import { createOikoMcpServer, GatewayBackend, pollOnce, TOOL_NAMES, type OikoBackend } from "../src";
 import { connectionFromEnv } from "../src/env";
 
 async function connect(backend: OikoBackend) {
@@ -15,7 +15,7 @@ async function connect(backend: OikoBackend) {
 
 describe("Oiko MCP tools", () => {
   it("exposes exactly the documented tools with descriptions", async () => {
-    const client = await connect({ canSign: true, read: async () => ({}), run: async () => ({}), report: async () => ({}) });
+    const client = await connect({ canSign: true, read: async () => ({}), run: async () => ({}), report: async () => ({}), proposeChange: async () => ({}), setWebhook: async () => ({}) });
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([...TOOL_NAMES].sort());
     for (const t of tools) expect((t.description ?? "").length).toBeGreaterThan(40);
@@ -28,6 +28,8 @@ describe("Oiko MCP tools", () => {
       canSign: true,
       read: async (tool, params) => { calls.push([tool, params]); return { tool }; },
       report: async () => ({ ok: true }),
+      proposeChange: async (change, reason) => { calls.push(["change", change, reason]); return { id: "chg_1" }; },
+      setWebhook: async () => ({}),
       run: async (kind, action) => { if (kind === "act") throw Object.assign(new Error("That's over the agent's per-payment limit."), { code: "E_AGENT_PER_TX" }); return { ok: true, action }; },
     });
     const r = await client.callTool({ name: "get_activity", arguments: { limit: 5 } });
@@ -41,6 +43,46 @@ describe("Oiko MCP tools", () => {
     expect(ok.isError).toBeFalsy();
     const invalid = await client.callTool({ name: "act", arguments: { action: { type: "pay", token: "eur", amount: "1", to: "x.near" } } });
     expect(invalid.isError).toBe(true);
+  });
+  it("routes events, the brief and change proposals, and passes how_to_fix on refusals", async () => {
+    const calls: unknown[] = [];
+    const client = await connect({
+      canSign: false,
+      read: async (tool, params) => { calls.push([tool, params]); return {}; },
+      report: async () => ({}), setWebhook: async () => ({}),
+      proposeChange: async (change) => { calls.push(["change", change.type]); if (change.type === "lock") throw Object.assign(new Error("A lock can't be shortened."), { code: "E_CHANGE_INVALID", details: { how_to_fix: "Pick a later date." } }); return { id: "chg_1" }; },
+      run: async () => { throw Object.assign(new Error("Over the cap."), { code: "E_CAP_WEEK", how_to_fix: "Ask the owner to raise the weekly cap to at least 60.00." }); },
+    });
+    await client.callTool({ name: "get_events", arguments: { since: "2026-11-01T00:00:00.000Z" } });
+    await client.callTool({ name: "get_month_brief", arguments: { month: "202611" } });
+    const ok = await client.callTool({ name: "propose_change", arguments: { change: { type: "set_splits", rules: [{ pot_id: 1, mode: "percent", value: "3000" }] }, reason: "Bills went up." } });
+    expect(ok.isError).toBeFalsy();
+    const bad = await client.callTool({ name: "propose_change", arguments: { change: { type: "lock", pot_id: 2, unlock_at: "2026-12-01" }, reason: "Keep it safe." } });
+    expect(JSON.parse((bad.content as Array<{ text: string }>)[0]!.text).error.how_to_fix).toBe("Pick a later date.");
+    const capped = await client.callTool({ name: "act", arguments: { action: { type: "save", to_pot: 1, token: "usdt", amount: "1" } } });
+    expect(JSON.parse((capped.content as Array<{ text: string }>)[0]!.text).error.how_to_fix).toMatch(/weekly cap/);
+    const invalid = await client.callTool({ name: "propose_change", arguments: { change: { type: "lock", pot_id: 2, unlock_at: "soon" }, reason: "x" } });
+    expect(invalid.isError).toBe(true);
+    expect(calls).toEqual([["events", { since: "2026-11-01T00:00:00.000Z" }], ["brief", { month: "202611" }], ["change", "set_splits"], ["change", "lock"]]);
+  });
+  it("event poller: first poll sets the cursor, later polls notify each new event", async () => {
+    const server = createOikoMcpServer({ canSign: true, read: async () => ({}), run: async () => ({}), report: async () => ({}), proposeChange: async () => ({}), setWebhook: async () => ({}) });
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test", version: "1" });
+    const got: unknown[] = [];
+    client.fallbackNotificationHandler = async (n) => { got.push(n); };
+    await Promise.all([server.connect(a), client.connect(b)]);
+    const ev = { id: "payment_received:7", type: "payment_received", at: "2026-11-06T10:00:00.000Z", title: "100.00 USDT arrived", suggested_actions: [] };
+    const reads: unknown[] = [];
+    const backend = { read: async (_t: string, p?: Record<string, string>) => { reads.push(p); return p?.since ? { events: [ev], cursor: ev.at } : { events: [ev], cursor: ev.at }; } };
+    const c1 = await pollOnce(server, backend as never, null);
+    expect(got).toHaveLength(0);
+    const c2 = await pollOnce(server, backend as never, c1);
+    expect(reads).toEqual([{}, { since: ev.at }]);
+    expect(c2).toBe(ev.at);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(got).toHaveLength(1);
+    expect(JSON.stringify(got[0])).toContain("payment_received:7");
   });
 });
 

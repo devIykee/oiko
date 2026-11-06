@@ -20,7 +20,42 @@ export const AgentActionSchema = z.discriminatedUnion("type", [
 ]);
 export type AgentActionInput = z.infer<typeof AgentActionSchema>;
 
-export type ReadTool = "overview" | "pots" | "activity" | "goals" | "splits" | "bills" | "insights" | "earn-rates" | "rosca" | "counterparty" | "invoices";
+export type ReadTool = "overview" | "pots" | "activity" | "goals" | "splits" | "bills" | "insights" | "earn-rates" | "rosca" | "counterparty" | "invoices"
+  | "events" | "brief" | "changes" | "autopilot";
+
+const PotId = z.number().int().nonnegative();
+const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe("A date, yyyy-mm-dd (UTC).");
+/** Non-money changes the owner approves in the app (stored by Oiko, carried out with the owner's own key). */
+export const ConfigChangeSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("set_splits").describe("Replace the owner's plan (how every incoming payment is split). Spend gets whatever is left; don't include it."),
+    rules: z.array(z.object({ pot_id: PotId, mode: z.enum(["percent", "fixed"]), value: z.string().regex(/^\d{1,39}$/).describe("percent: basis points (2500 = 25%). fixed: units.") })).max(20),
+  }),
+  z.object({
+    type: z.literal("create_pot").describe("Create a Savings (autosave), Goal or Bills pot."),
+    name: z.string().min(1).max(32), kind: z.enum(["autosave", "goal", "bills"]), target: U128.nullable().default(null), target_date: Day.nullable().default(null),
+  }),
+  z.object({ type: z.literal("update_pot").describe("Rename a pot or change its goal target/date."), pot_id: PotId, name: z.string().min(1).max(32).optional(), target: U128.nullable().optional(), target_date: Day.nullable().optional() }),
+  z.object({ type: z.literal("lock").describe("Lock a pot until a date, or extend its lock. A lock can never be shortened."), pot_id: PotId, unlock_at: Day }),
+  z.object({ type: z.literal("earn").describe("Turn Earn on (supply the pot's balance to lending; rates vary and can go to zero) or off."), pot_id: PotId, on: z.boolean() }),
+  z.object({
+    type: z.literal("add_bill").describe("Add a monthly bill."),
+    name: z.string().min(1).max(40), amount: U128, token: Token, due_day: z.number().int().min(1).max(28), payee: z.string().min(2).max(64), pot_id: PotId,
+  }),
+  z.object({ type: z.literal("remove_bill"), bill_id: z.number().int().nonnegative() }),
+  z.object({
+    type: z.literal("add_schedule").describe("Save a fixed amount from Spend into a pot on a schedule."),
+    to_pot: PotId, token: Token, amount: U128, every_days: z.union([z.literal(1), z.literal(7), z.literal(14), z.literal(30)]), first_run: Day,
+  }),
+  z.object({ type: z.literal("remove_schedule"), schedule_id: z.number().int().nonnegative() }),
+  z.object({
+    type: z.literal("draft_invoice").describe("Draft an invoice; the owner reviews and sends it themselves."),
+    client: z.object({ name: z.string().min(1).max(120), email: z.string().email().max(200).nullable().optional() }),
+    items: z.array(z.object({ description: z.string().min(1).max(200), quantity: z.string().regex(/^\d{1,9}(\.\d{1,4})?$/), unitPrice: U128 })).min(1).max(50),
+    token: Token, due_date: Day, note: z.string().max(1000).nullable().optional(),
+  }),
+]);
+export type ConfigChangeInput = z.infer<typeof ConfigChangeSchema>;
 
 /** What a tool host needs: read endpoints and a way to run propose/act. */
 export interface OikoBackend {
@@ -31,12 +66,17 @@ export interface OikoBackend {
   readonly canSign: boolean;
   /** Files a report about a bad receiver (shared blocklist). */
   report(receiver: string, reason: string, evidence: string): Promise<unknown>;
+  /** Proposes a non-money change for the owner to approve. */
+  proposeChange(change: ConfigChangeInput, reason: string): Promise<unknown>;
+  /** Registers (url) or removes (null) a webhook for events. */
+  setWebhook(url: string | null): Promise<unknown>;
 }
 
 const ok = (data: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] });
 const fail = (e: unknown) => {
-  const err = e as { code?: string; message?: string };
-  return { isError: true, content: [{ type: "text" as const, text: JSON.stringify({ error: { code: err.code ?? "E_UNKNOWN", message: err.message ?? String(e) } }, null, 2) }] };
+  const err = e as { code?: string; message?: string; howToFix?: string; how_to_fix?: string; details?: { how_to_fix?: string } };
+  const fix = err.howToFix ?? err.how_to_fix ?? err.details?.how_to_fix;
+  return { isError: true, content: [{ type: "text" as const, text: JSON.stringify({ error: { code: err.code ?? "E_UNKNOWN", message: err.message ?? String(e), ...(fix ? { how_to_fix: fix } : {}) } }, null, 2) }] };
 };
 async function wrap(fn: () => Promise<unknown>) {
   try {
@@ -61,6 +101,36 @@ export function registerOikoTools(server: McpServer, backend: OikoBackend): void
   read("get_earn_rates", "Earn rates", "Today's variable lending rates and pool utilization. Rates change and can go to zero; never promise a return.", "earn-rates");
   read("get_invoices", "Invoices", "The owner's invoices to their clients, read only: number, client, line items, total, due date, status (draft, open, pending, paid, refunded, cancelled, overdue), amount received after fees and transaction links. You cannot create, change or cancel invoices.", "invoices");
   read("get_rosca_groups", "ROSCA savings groups", "ROSCA savings groups the account is in: rotating savings where members contribute each round and one member receives the pot. Shows members, payout order, current round and who has paid.", "rosca");
+
+  read("get_my_changes", "My suggested changes", "Your non-money proposals (plan, pots, locks, Earn, bills, schedules, draft invoices) and whether the owner approved, rejected or let them expire.", "changes");
+  read("get_autopilot", "Autopilot rules", "Rules the owner turned on in advance (top up Bills on every payment, sweep Spend into savings weekly, pay bills on their due day) and your webhook status. When one is due, get_events returns it with autopilot-marked suggested actions to run with act.", "autopilot");
+
+  server.registerTool("get_events", {
+    title: "What happened",
+    description: `Events since your last check, oldest first: payments in, plan applied, bills due in 3 days / today / missed, goals reached, Spend low, locks released, invoices paid or overdue, ROSCA rounds due or missed, your weekly limit at 80%, a weekly summary, and autopilot rules due. Each has suggested_actions computed by Oiko (act, propose, propose_change or tell_owner); you decide. Save the returned cursor and pass it as since next time. ${AMOUNTS}`,
+    inputSchema: { since: z.string().max(40).optional().describe("The cursor from your last get_events call (ISO time or unix ms). Leave empty the first time.") },
+    annotations: READ_HINT,
+  }, ({ since }) => wrap(() => backend.read("events", since ? { since } : {})));
+
+  server.registerTool("get_month_brief", {
+    title: "Month brief",
+    description: `A deterministic summary of a month: money in, out, saved, savings rate, change vs last month, biggest payees and payments, upcoming bills and any Bills shortfall, goal progress, plus plain facts to explain in your own words. ${AMOUNTS}`,
+    inputSchema: { month: z.string().regex(/^\d{6}$/).optional().describe("yyyymm (UTC). Defaults to this month.") }, annotations: READ_HINT,
+  }, ({ month }) => wrap(() => backend.read("brief", month ? { month } : {})));
+
+  server.registerTool("propose_change", {
+    title: "Suggest a change",
+    description: "Suggest a non-money change for the owner to approve in the app: their plan (split percentages), a new pot or goal, renaming a pot or changing a goal, locking or extending a lock (never shortening), Earn on or off, adding or removing a bill or savings schedule, or drafting an invoice for them to review. Nothing changes until they approve. Give a short, honest reason they will read. Needs the 'propose' permission.",
+    inputSchema: { change: ConfigChangeSchema, reason: z.string().min(1).max(280).describe("One or two plain sentences: why this helps the owner.") },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  }, ({ change, reason }) => wrap(() => backend.proposeChange(change as ConfigChangeInput, reason)));
+
+  server.registerTool("set_webhook", {
+    title: "Get events pushed",
+    description: "Have Oiko POST new events to your https URL, signed with HMAC-SHA256 (the secret is returned once). Pass url: null to stop. Polling get_events works too.",
+    inputSchema: { url: z.string().url().max(500).nullable().describe("Your https endpoint, or null to remove it.") },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  }, ({ url }) => wrap(() => backend.setWebhook(url)));
 
   server.registerTool("get_activity", {
     title: "Activity", description: `Recent activity, newest first: money in, splits, moves, payments, who did each one. ${AMOUNTS}`,
@@ -117,4 +187,7 @@ export function registerOikoTools(server: McpServer, backend: OikoBackend): void
   }, (args) => wrap(() => backend.run("act", args.action as AgentActionInput, args.reason, args.signed_tx)));
 }
 
-export const TOOL_NAMES = ["get_overview", "get_pots", "get_activity", "get_goals", "get_splits", "get_bills", "get_insights", "get_earn_rates", "get_rosca_groups", "get_invoices", "check_counterparty", "report_counterparty", "propose", "act"] as const;
+export const TOOL_NAMES = [
+  "get_overview", "get_pots", "get_activity", "get_goals", "get_splits", "get_bills", "get_insights", "get_earn_rates", "get_rosca_groups", "get_invoices",
+  "get_events", "get_month_brief", "get_my_changes", "get_autopilot", "check_counterparty", "report_counterparty", "propose", "propose_change", "act", "set_webhook",
+] as const;

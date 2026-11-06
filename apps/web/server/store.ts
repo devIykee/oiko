@@ -1,10 +1,11 @@
 // Persistence: Postgres via drizzle when DATABASE_URL is set; otherwise an in-memory fallback.
 // NOTE: the in-memory store is per process. On serverless hosts it resets on cold start and is not shared between
 // instances, so nonce replay protection and the access log are best-effort there. Set DATABASE_URL for production.
-import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, like, lt, sql } from "drizzle-orm";
 import { serverConfig } from "./config";
+import type { ChangeProposal } from "./changes";
 import type { Invoice } from "./invoices";
-import { agentAccessLog, appSettings, counterpartyCodeHashes, counterpartyReports, CREATE_SQL, invoices, mockOneclickSwaps, pushSubscriptions, usedNonces } from "./db/schema";
+import { agentAccessLog, agentChanges, appSettings, counterpartyCodeHashes, counterpartyReports, CREATE_SQL, invoices, mockOneclickSwaps, pushSubscriptions, usedNonces } from "./db/schema";
 
 export interface AccessLogRow {
   at: string; vaultId: string; publicKey: string; method: string; path: string; status: number; code: string | null; tool: string | null; txHash: string | null;
@@ -54,6 +55,14 @@ export interface Store {
   /** Operator settings (app_settings). null when unset. */
   getSetting<T>(key: string): Promise<T | null>;
   setSetting<T>(key: string, value: T): Promise<void>;
+  deleteSetting(key: string): Promise<void>;
+  /** Settings whose key starts with `prefix` (at most 1000). */
+  listSettings<T>(prefix: string): Promise<Array<{ key: string; value: T }>>;
+  /** Agent change proposals (non-money). Insert or replace. */
+  putChange(p: ChangeProposal): Promise<void>;
+  getChange(id: string): Promise<ChangeProposal | null>;
+  /** Newest first. */
+  listChanges(vaultId: string, limit: number): Promise<ChangeProposal[]>;
 }
 
 export class MemoryStore implements Store {
@@ -68,6 +77,16 @@ export class MemoryStore implements Store {
   private settings = new Map<string, unknown>();
   async getSetting<T>(key: string) { return (this.settings.has(key) ? structuredClone(this.settings.get(key)) : null) as T | null; }
   async setSetting<T>(key: string, value: T) { this.settings.set(key, structuredClone(value)); }
+  async deleteSetting(key: string) { this.settings.delete(key); }
+  async listSettings<T>(prefix: string) {
+    return [...this.settings.entries()].filter(([k]) => k.startsWith(prefix)).slice(0, 1000).map(([key, value]) => ({ key, value: structuredClone(value) as T }));
+  }
+  private changes = new Map<string, ChangeProposal>();
+  async putChange(p: ChangeProposal) { this.changes.set(p.id, structuredClone(p)); }
+  async getChange(id: string) { const c = this.changes.get(id); return c ? structuredClone(c) : null; }
+  async listChanges(vaultId: string, limit: number) {
+    return [...this.changes.values()].filter((c) => c.vaultId === vaultId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit).map((c) => structuredClone(c));
+  }
   async useNonce(nonce: string, _pk: string, expiresAt: number) {
     const now = Date.now();
     if (this.nonces.size > 10_000) for (const [k, exp] of this.nonces) if (exp < now) this.nonces.delete(k);
@@ -244,6 +263,31 @@ class PgStore implements Store {
   async setSetting<T>(key: string, value: T) {
     const db = await this.db();
     await db.insert(appSettings).values({ key, value, updatedAt: new Date() }).onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: new Date() } });
+  }
+  async deleteSetting(key: string) {
+    const db = await this.db();
+    await db.delete(appSettings).where(eq(appSettings.key, key));
+  }
+  async listSettings<T>(prefix: string) {
+    const db = await this.db();
+    const esc = prefix.replace(/[\\%_]/g, (c) => `\\${c}`);
+    const rows = await db.select().from(appSettings).where(like(appSettings.key, `${esc}%`)).limit(1000);
+    return rows.map((r: typeof appSettings.$inferSelect) => ({ key: r.key, value: r.value as T }));
+  }
+  async putChange(p: ChangeProposal) {
+    const db = await this.db();
+    const v = { vaultId: p.vaultId, publicKey: p.publicKey, status: p.status, data: p };
+    await db.insert(agentChanges).values({ id: p.id, ...v, createdAt: new Date(p.createdAt) }).onConflictDoUpdate({ target: agentChanges.id, set: v });
+  }
+  async getChange(id: string) {
+    const db = await this.db();
+    const rows = await db.select().from(agentChanges).where(eq(agentChanges.id, id)).limit(1);
+    return (rows[0]?.data as ChangeProposal | undefined) ?? null;
+  }
+  async listChanges(vaultId: string, limit: number) {
+    const db = await this.db();
+    const rows = await db.select().from(agentChanges).where(eq(agentChanges.vaultId, vaultId)).orderBy(desc(agentChanges.createdAt)).limit(limit);
+    return rows.map((r: typeof agentChanges.$inferSelect) => r.data as ChangeProposal);
   }
   async listInvoices(owner: string) {
     const db = await this.db();

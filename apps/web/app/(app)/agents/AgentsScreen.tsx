@@ -12,7 +12,9 @@ import { capUsage, consentItems, templateDraft, type Draft, type TemplateId } fr
 import { actionSentence } from "@/components/app/describe";
 import { explain, useMoney } from "@/lib/actions";
 import { useConfig } from "@/lib/config";
-import { useAgentLog, useOverview } from "@/lib/data";
+import { AutopilotCard } from "@/components/app/AutopilotCard";
+import { useAgentLog, useAllProposals, useOverview } from "@/lib/data";
+import { useChanges } from "@/lib/owner";
 import { fmt, fmtDate, fmtDateTime, nsToMs, shortKey } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
@@ -74,6 +76,8 @@ export function AgentsScreen() {
         ) : agents.map((a) => <ConnectedAgent key={a.public_key} a={a} o={o} hold={hold} />)}
       </section>
 
+      {live.length > 0 && <AutopilotCard o={o} />}
+
       <section aria-labelledby="connect-new">
         <SectionTitle id="connect-new">{t("agents.connectNew")}</SectionTitle>
         <GroupedList label={t("agents.connectNew")}>
@@ -120,6 +124,13 @@ function ConnectedAgent({ a, o, hold }: { a: AgentView; o: Overview; hold: (a: A
   const proposals = o.proposals.filter((p) => p.public_key === a.public_key);
   const { session } = useSession();
   const items = useMemo(() => consentItems(a, t).filter((i) => i.allowed), [a, t]);
+  // Track record: money proposals (on the account) plus suggested changes, approved vs rejected.
+  const all = useAllProposals();
+  const changes = useChanges();
+  const record = useMemo(() => {
+    const mine = [...(all.data ?? []).filter((p) => p.public_key === a.public_key).map((p) => p.status), ...(changes.data ?? []).filter((c) => c.publicKey === a.public_key).map((c) => c.status)];
+    return { approved: mine.filter((s) => s === "approved").length, rejected: mine.filter((s) => s === "rejected").length };
+  }, [all.data, changes.data, a.public_key]);
 
   // Disconnect asks first, then shows a clear success state with the key-deleted transaction.
   const [confirmOff, setConfirmOff] = useState(false);
@@ -140,6 +151,7 @@ function ConnectedAgent({ a, o, hold }: { a: AgentView; o: Overview; hold: (a: A
       disconnectLabel={t("agents.disconnect")}
     >
       <ScopeList label={t("agents.permissions")} items={items} />
+      {(record.approved > 0 || record.rejected > 0) && <p className="oi-small oi-muted" style={{ margin: 0 }} data-testid="agent-record">{t("agents.record", record)}</p>}
       {proposals.map((p) => {
         const bill = p.action.type === "pay_bill" ? o.bills.find((b) => p.action.type === "pay_bill" && b.id === p.action.bill_id) : undefined;
         const payee = p.action.type === "pay" ? p.action.to : bill?.payee;

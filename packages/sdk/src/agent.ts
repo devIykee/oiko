@@ -22,7 +22,7 @@ export function decodeConnectionString(s: string): AgentConnection {
 }
 
 export class GatewayError extends Error {
-  constructor(public readonly code: string, message: string, public readonly status: number, public readonly detail?: string) {
+  constructor(public readonly code: string, message: string, public readonly status: number, public readonly detail?: string, public readonly howToFix?: string) {
     super(message);
     this.name = "GatewayError";
   }
@@ -36,7 +36,7 @@ export interface CounterpartyCheck {
   decision?: { act: "allowed" | "refused"; propose: "allowed" | "refused"; message: string };
 }
 export interface RunResult {
-  txHash: string; ok: boolean; error?: { code: string; message: string; detail?: string }; value?: unknown;
+  txHash: string; ok: boolean; error?: { code: string; message: string; detail?: string; how_to_fix?: string }; value?: unknown;
   /** Present when the counterparty check ran (pay / pay_bill). */
   counterparty?: CounterpartyCheck;
   /** false when the wrapper refused before signing anything. */
@@ -58,12 +58,12 @@ export class GatewayClient {
       headers: { authorization: auth, ...(body === undefined ? {} : { "content-type": "application/json" }) },
       body: body === undefined ? undefined : text,
     });
-    const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: { code: string; message: string; detail?: string } };
+    const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: { code: string; message: string; detail?: string; how_to_fix?: string } };
     // A submitted transaction that the account refused is a normal result (ok: false), not a transport error.
     if (res.ok && json.ok === false) return json as T;
     if (!res.ok || json.error) {
       const code = json.error?.code ?? `HTTP_${res.status}`;
-      throw new GatewayError(code, json.error?.message ?? `${friendlyError(code).title} ${friendlyError(code).next}`, res.status, json.error?.detail);
+      throw new GatewayError(code, json.error?.message ?? `${friendlyError(code).title} ${friendlyError(code).next}`, res.status, json.error?.detail, json.error?.how_to_fix);
     }
     return json as T;
   }
