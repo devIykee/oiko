@@ -1,5 +1,5 @@
 /*
- * Oiko design tokens (spec: docs/BUILD_PROMPT.md section 10).
+ * Oiko design tokens.
  * Light is default; dark via prefers-color-scheme unless [data-theme="light"],
  * or forced via [data-theme="dark"] on <html>.
  *

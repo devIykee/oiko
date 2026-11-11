@@ -3,6 +3,7 @@
 Oiko: **Personal finance meets personal intelligence.** Get paid from anywhere, plan every bit, and let your own AI agent help, on limits you set.
 
 - Live demo (NEAR testnet): **https://oikodotnear.vercel.app**
+- Demo video: **[oiko-demo.mp4](https://github.com/devIykee/oiko/releases/download/demo-video/oiko-demo.mp4)** ([release page](https://github.com/devIykee/oiko/releases/tag/demo-video))
 - MCP package: **[oiko-mcp](https://www.npmjs.com/package/oiko-mcp)** on npm
 - Built at NEAR HACKATHON 2026 (tracks: 08 Real-World Money `RWM` primary, 06 AI Security & Defense `SEC`, 07 Agent Economy `AGT`, 01 Unstoppable DeFi `DFI`)
 

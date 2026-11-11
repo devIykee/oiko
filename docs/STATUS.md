@@ -30,7 +30,7 @@ Lighthouse mobile, see `docs/lighthouse/README.md` for the reports.
 1. **Publish `oiko-mcp` 0.2.0** (2FA in your own terminal): `npm publish ./packages/mcp/oiko-mcp-0.2.0.tgz --access public`.
 2. **Cron:** GitHub variable `OIKO_APP_URL=https://oikodotnear.vercel.app` and secret `CRON_SECRET` (same value as in Vercel). Without them schedules, ROSCA settlement and agent webhooks don't run on their own.
 3. **Fonts licence check, then make the repo public:** Acorn (supplied by you) and Chillax (Fontshare free licence) are in `apps/web/fonts`. Then `gh repo edit devIykee/oiko --visibility public --accept-visibility-change-consequences`.
-4. **Submission** (`docs/SUBMISSION.md`): demo video, X post with @NEARProtocol and #NEARHackathon, a mainnet NEAR account for the payout, submit by 2026-11-14 23:59 UTC. Mainnet deployment is optional under the rules (testnet projects are eligible).
+4. **Submission:** demo video, X post with @NEARProtocol and #NEARHackathon, a mainnet NEAR account for the payout, submit by 2026-11-14 23:59 UTC. Mainnet deployment is optional under the rules (testnet projects are eligible).
 
 ## Not finished
 

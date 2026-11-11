@@ -126,8 +126,8 @@ export function useAgentLog(publicKey: string | null) {
   );
 }
 
-/** True when this account runs an older version of the account code than the one Oiko publishes today (see
- *  HANDOFF G7: accounts made before 2026-11-05 lack newer ROSCA methods and safety fixes). */
+/** True when this account runs an older version of the account code than the one Oiko publishes today.
+ *  Accounts made before 2026-11-05 lack newer ROSCA methods and safety fixes. */
 export function useOlderVersion(): boolean {
   const { session } = useSession();
   const { config, rpc } = useConfig();

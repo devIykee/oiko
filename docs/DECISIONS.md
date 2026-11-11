@@ -289,7 +289,7 @@ All decimals are 6 unless marked.
 
 Source: the human, in chat. Removed Pidgin and the language toggle, removed the naira reference line and `/api/rates/ngn`, removed all country-specific wording. "Ajo" is renamed "ROSCA savings" in user-facing copy; the contract (`ajo.<root>`) and method names keep `ajo` so the frozen interface does not change.
 
-## Backend / SDK decisions (2026-10-31, backend agent)
+## Backend / SDK decisions (2026-10-31)
 
 - **SDK** (`packages/sdk`) uses `near-api-js@7.4.0` for borsh tx/delegate building (`actions.*` incl. `useGlobalContract`, `addFunctionCallAccessKey` with allowance, `deleteKey`, `signedDelegate`). `SignedDelegate` and `Action` are **type-only** exports at runtime in 7.4.0; plain borsh-shaped objects are used instead (verified byte-identical re-encoding in tests). `UseGlobalContract(CodeHash)` bytes are unit-tested as `[10, 0, <32 bytes>]` (nearcore enum order).
 - **NEP-413** is implemented with @noble/curves + @noble/hashes + borsh (sync API required by the frozen SDK) and tested byte-for-byte against near-api-js `KeyPairSigner.signNep413Message`. Signature and nonce are base64.
@@ -306,7 +306,7 @@ Source: the human, in chat. Removed Pidgin and the language toggle, removed the 
 - **Cron**: `GET|POST /api/cron` with `Authorization: Bearer $CRON_SECRET` (open in local mode when unset). Runs `run_schedules` on vaults with a due schedule, `settle_round` on due ROSCA rounds (`get_circles` ids start at 1, max 50/page), and bill reminders via Web Push (3 days before and on the day) when VAPID keys are set. Owner push subscription: `POST /api/push/subscribe` (NEP-413 by the owner's key; additive endpoint).
 - **Goal ETA** counts as inflows: `moved` rows whose note is `to pot <id>` (the vault records moves on the source pot) plus rows with `pot_id = <id>` and kind `split_applied`/`schedule_ran`/`deposit_received`.
 
-## Requests to contracts (from the backend agent)
+## Backend requirements for the contracts
 
 1. **Registry `list_names(from_index: u64, limit: u32) -> [{ name, account_id, vault_id, created_at }]`** (or any paged enumeration). `/api/cron` needs it to find vaults with due schedules; until it exists cron logs "registry.list_names unavailable" and only settles ROSCA rounds.
 2. **Per-pot inflow activity rows**: today split allocations and `schedule_ran` are only events, so per-pot inflows aren't visible in `get_activity`. Recording `split_applied` (pot_id = target, amount) and `schedule_ran` (pot_id = to_pot) rows would make goal ETAs and per-pot history accurate. Alternatively record `moved` with `pot_id = to_pot` and `counterparty = "pot:<from>"`.
@@ -315,7 +315,7 @@ Source: the human, in chat. Removed Pidgin and the language toggle, removed the 
 
 ## Contract deviations
 
-Contracts agent, 2026-10-31. Toolchain: Rust 1.93.0 (`contracts/rust-toolchain.toml`), `near-sdk =5.29.1`, `near-workspaces 0.23.0`. We use 0.23 rather than 0.24 because 0.24 needs rustc 1.95. near-workspaces 0.23 runs sandbox 2.13.4, and global contracts work there. Build with `scripts/build-contracts.sh`. Error codes are listed in `contracts/ERRORS.md`.
+2026-10-31. Toolchain: Rust 1.93.0 (`contracts/rust-toolchain.toml`), `near-sdk =5.29.1`, `near-workspaces 0.23.0`. We use 0.23 rather than 0.24 because 0.24 needs rustc 1.95. near-workspaces 0.23 runs sandbox 2.13.4, and global contracts work there. Build with `scripts/build-contracts.sh`. Error codes are listed in `contracts/ERRORS.md`.
 
 ### Additions and signature differences
 - **Vault `ajo_create(name, token, amount_per_round, period_ns, max_members, bond_amount?, shuffle, invite_code_hash) -> Promise`** and **`ajo_start(circle_id)`** were added. The ajo makes the *caller* the organiser and first member, so the vault has to make these calls itself. Both are in the app key's method list.

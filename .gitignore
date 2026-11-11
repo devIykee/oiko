@@ -18,3 +18,11 @@ contracts/res/*.wasm
 .oiko/
 .env*
 *.tgz
+
+# Local-only working notes (kept on the maintainer's machine, not published)
+HANDOFF.md
+docs/BUILD_PROMPT.md
+docs/PLAN.md
+docs/SUBMISSION.md
+apps/web/AGENTS.md
+video/AGENTS.md
