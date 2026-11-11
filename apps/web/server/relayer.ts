@@ -8,7 +8,8 @@ import {
 import { serverConfig, type ServerConfig } from "./config";
 import { ApiError } from "./errors";
 import { relayer, rpc } from "./near";
-import { checkLimits, GAS_COST_ESTIMATE, spendBudget } from "./ratelimit";
+import { checkLimits, checkSharedLimits, GAS_COST_ESTIMATE, spendBudget } from "./ratelimit";
+import { store as sharedStore } from "./store";
 
 export interface DelegatePolicy {
   root: string; usdc: string; usdt: string; trustedHashes: Set<string>; maxTransfer: bigint; currentHeight?: number;
@@ -148,7 +149,7 @@ export async function registerName(input: { name: string; ownerPublicKey: string
     throw new ApiError("E_BAD_REQUEST", 400, "Keys must be ed25519 public keys like ed25519:… .");
   }
   if (owner === app) throw new ApiError("E_BAD_REQUEST", 400, "The sign-in key and the app key must be different.");
-  if (!checkLimits("register", ip, name)) throw new ApiError("E_RATE_LIMIT", 429);
+  if (!checkLimits("register", ip, name) || !(await checkSharedLimits("register", ip, name, sharedStore()))) throw new ApiError("E_RATE_LIMIT", 429);
   const reg = new RegistryClient(rpc(), cfg.oiko.contracts.registry);
   if (!(await reg.isAvailable(name))) throw new ApiError("E_NAME_TAKEN", 409);
   const funding = await accountFunding(cfg);
@@ -165,7 +166,7 @@ export async function topup(accountId: string, ip: string): Promise<{ txHash?: s
   const suffix = `.${cfg.oiko.root}`;
   const underRoot = accountId.endsWith(suffix) && (isVaultId(accountId, cfg.oiko) || NAME_RE.test(accountId.slice(0, -suffix.length)));
   if (!underRoot) throw new ApiError("E_BAD_REQUEST", 400, "Only Oiko accounts can be topped up.");
-  if (!checkLimits("topup", ip, accountId)) throw new ApiError("E_RATE_LIMIT", 429);
+  if (!checkLimits("topup", ip, accountId) || !(await checkSharedLimits("topup", ip, accountId, sharedStore()))) throw new ApiError("E_RATE_LIMIT", 429);
   const acc = await rpc().viewAccount(accountId);
   if (!acc) throw new ApiError("E_NOT_FOUND", 404);
   const available = BigInt(acc.amount) - BigInt(acc.storage_usage) * STORAGE_PRICE_PER_BYTE;
@@ -202,7 +203,7 @@ export async function cancelExpiredCircle(circleId: number, ip: string): Promise
   const cfg = serverConfig();
   const ajo = cfg.oiko.contracts.ajo;
   if (!ajo) throw new ApiError("E_DISABLED", 404, "ROSCA savings is not available here.");
-  if (!checkLimits("roscaCancel", ip, String(circleId))) throw new ApiError("E_RATE_LIMIT", 429);
+  if (!checkLimits("roscaCancel", ip, String(circleId)) || !(await checkSharedLimits("roscaCancel", ip, String(circleId), sharedStore()))) throw new ApiError("E_RATE_LIMIT", 429);
   budget(cfg, 0n);
   const r = await relayer().call(ajo, "cancel", { circle_id: circleId }, { gas: (150n * TGAS).toString() });
   if (!r.ok) {

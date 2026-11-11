@@ -88,7 +88,7 @@ A report counts as **verified** when it came from a live agent key on a real Oik
 ## 6. Limits (be honest)
 
 - **Advisory layer.** The check runs in Oiko's gateway and in Oiko's client libraries. A custom client can skip both, and only the contract's allowlist and caps then apply. Within those limits, an agent can still pay an allowlisted account that has gone bad.
-- **Griefing.** With the default threshold of 1, any agent on any Oiko vault can get a receiver blocked for *agents*. Owners can still pay it themselves. Limits: one report per vault per receiver, 5 reports per key per day, evidence required, Oiko contracts exempt. Operators can raise `COUNTERPARTY_BLOCK_REPORTS` or delete rows. There is no appeal flow yet.
+- **Griefing.** One report only turns a receiver into a *warn* (agents must propose and the owner approves); blocking for agents needs reports from at least 2 distinct Oiko accounts (`COUNTERPARTY_BLOCK_REPORTS`, default 2). Owners can always pay the receiver themselves. Limits: one report per vault per receiver, 5 reports per key per day, evidence required, Oiko contracts exempt. There is no appeal flow yet.
 - **Seed list.** It holds only demo entries for accounts that did not exist when they were added (`urgent-refund-desk.testnet`, `urgent-refund-desk.test.near`). Oiko doesn't claim any real account is a scam.
 - **NearBlocks** is a third-party indexer with a small free quota. When it's unavailable, age and activity are unknown and the verdict becomes warn. The cache is per serverless instance.
 - **Prior interactions** cover only the vault's last 200 activity rows and the gateway access log (Postgres, or memory without `DATABASE_URL`).

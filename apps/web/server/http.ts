@@ -20,7 +20,9 @@ export async function handle(fn: () => Promise<Response | unknown>): Promise<Res
 }
 export function clientIp(req: Request): string {
   const h = req.headers;
-  return (h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown").slice(0, 64);
+  // Prefer headers the hosting edge sets itself (Vercel overwrites these; a caller can't choose them). The
+  // forwarded-for chain is only a fallback for other hosts (security review S-1).
+  return (h.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || h.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown").slice(0, 64);
 }
 export async function readText(req: Request, max = 64 * 1024): Promise<string> {
   const t = await req.text();

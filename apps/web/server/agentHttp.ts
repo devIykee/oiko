@@ -2,7 +2,7 @@
 import { describeRow, factsOfAction, factsOfSignedTx, outcomeOf, reasonOf, type ActionFacts, type Outcome } from "./accessLog";
 import { parseGatewayAuthHeader, normalizePublicKey } from "@oiko/sdk";
 import { ApiError } from "./errors";
-import { authenticateAgent, authenticateOwner, logAccess, payReceiverOfSignedTx, prepare, readTool, submit, type AuthedAgent, type GatewayRequest } from "./gateway";
+import { authenticateAgent, authenticateOwner, logAccess, verifiedAgentOf, payReceiverOfSignedTx, prepare, readTool, submit, type AuthedAgent, type GatewayRequest } from "./gateway";
 import { withHowToFix } from "./howToFix";
 import { clientIp, errorResponse, json, parseBody, readText } from "./http";
 import { checkLimits } from "./ratelimit";
@@ -29,6 +29,7 @@ export async function agentRead(req: Request, tool: string): Promise<Response> {
   const id = who(req);
   let status = 200, code: string | null = null;
   let ctx: AuthedAgent | undefined;
+  let failure: unknown = null;
   try {
     if (!checkLimits("gateway", clientIp(req), id?.publicKey ?? null)) throw new ApiError("E_RATE_LIMIT", 429);
     ctx = await authenticateAgent(gatewayRequest(req, ""), "read");
@@ -37,9 +38,12 @@ export async function agentRead(req: Request, tool: string): Promise<Response> {
   } catch (e) {
     status = e instanceof ApiError ? e.status : 500;
     code = e instanceof ApiError ? e.code : "E_INTERNAL";
+    failure = e;
     return errorResponse(withHowToFix(e, ctx?.policy));
   } finally {
-    if (id) await logAccess({ ...id, method: "GET", path: url.pathname + url.search, status, code, tool });
+    // Only proven identities reach the log (security review S-3): a verified agent, or a refusal after its signature verified.
+    const proven = ctx ? { vaultId: ctx.vaultId, publicKey: ctx.publicKey } : verifiedAgentOf(failure);
+    if (proven) await logAccess({ ...proven, method: "GET", path: url.pathname + url.search, status, code, tool });
   }
 }
 
@@ -50,6 +54,7 @@ export async function agentWrite(req: Request, op: "prepare" | "submit"): Promis
   let status = 200, code: string | null = null, txHash: string | null = null, receiver: string | null = null;
   let facts: ActionFacts | undefined;
   let ctx: AuthedAgent | undefined;
+  let failure: unknown = null;
   try {
     if (!checkLimits("gateway", clientIp(req), id?.publicKey ?? null)) throw new ApiError("E_RATE_LIMIT", 429);
     const text = await readText(req);
@@ -70,9 +75,11 @@ export async function agentWrite(req: Request, op: "prepare" | "submit"): Promis
   } catch (e) {
     status = e instanceof ApiError ? e.status : 500;
     code = e instanceof ApiError ? e.code : "E_INTERNAL";
+    failure = e;
     return errorResponse(withHowToFix(e, ctx?.policy, facts));
   } finally {
-    if (id) await logAccess({ ...id, method: "POST", path: url.pathname, status, code, tool: op, txHash, receiver: receiver ?? facts?.receiver ?? null, facts });
+    const proven = ctx ? { vaultId: ctx.vaultId, publicKey: ctx.publicKey } : verifiedAgentOf(failure);
+    if (proven) await logAccess({ ...proven, method: "POST", path: url.pathname, status, code, tool: op, txHash, receiver: receiver ?? facts?.receiver ?? null, facts });
   }
 }
 

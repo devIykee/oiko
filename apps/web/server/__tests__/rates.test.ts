@@ -41,3 +41,19 @@ describe("cron", () => {
     expect(circleDue({ ...(c as object), status: "forming" } as never, 5000n)).toBe(false);
   });
 });
+
+describe("shared limits across instances (review S-1)", () => {
+  it("two server instances sharing one store give out the limit once, not once each", async () => {
+    const { checkSharedLimits } = await import("../ratelimit");
+    const { MemoryStore } = await import("../store");
+    const shared = new MemoryStore();
+    const t = 1_800_000_000_000;
+    let ok = 0;
+    for (let i = 0; i < 6; i++) if (await checkSharedLimits("register", "9.9.9.9", `name${i}`, shared, t)) ok++;
+    expect(ok).toBe(5); // 5 per IP per hour, however many instances answer
+    expect(await checkSharedLimits("register", "8.8.8.8", "carol", shared, t)).toBe(true);
+    expect(await checkSharedLimits("register", "8.8.8.8", "carol", shared, t)).toBe(true);
+    expect(await checkSharedLimits("register", "8.8.8.8", "carol", shared, t)).toBe(false); // 2 per account per hour
+    expect(await checkSharedLimits("register", "8.8.8.8", "carol", shared, t + 3_600_000)).toBe(true); // next window
+  });
+});

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { gatewayAuthHeader, keyPairFromSeed, signNep413, b64encode, utf8, type AgentView } from "@oiko/sdk";
-import { authenticateAgent, authenticateOwner, checkAgentTx, remainingCaps, type GatewayDeps } from "../gateway";
+import { authenticateAgent, authenticateOwner, checkAgentTx, remainingCaps, verifiedAgentOf, type GatewayDeps } from "../gateway";
 import { MemoryStore } from "../store";
 import { ApiError } from "../errors";
 import { act } from "@oiko/sdk";
@@ -124,5 +124,21 @@ describe("caps and submitted transactions", () => {
     expect(c(mk(agent.secretKey, VAULT, "usdc.oiko.test.near", "agent_execute"))).toBe("E_AUTH");
     expect(c(mk(stranger.secretKey, VAULT, VAULT, "agent_execute"))).toBe("E_AUTH");
     expect(c(mk(agent.secretKey, VAULT, VAULT, "agent_propose"))).toBe("E_SCOPE"); // policy has no "propose"
+  });
+});
+
+describe("access log only records proven identities (review S-3)", () => {
+  async function verifiedOf(p: Promise<unknown>) {
+    try { await p; return "OK"; } catch (e) { return verifiedAgentOf(e); }
+  }
+  it("a policy refusal after a valid signature carries the verified identity", async () => {
+    agents.set(agent.publicKey, policy({ scopes: ["read"] }));
+    expect(await verifiedOf(authenticateAgent(req("POST", "/api/agent/prepare"), "act", deps))).toEqual({ vaultId: VAULT, publicKey: agent.publicKey });
+  });
+  it("a stranger's key, a key not on that vault, or a bad signature carries no identity", async () => {
+    expect(await verifiedOf(authenticateAgent(req("GET", "/api/agent/me", "", stranger.secretKey), "read", deps))).toBeNull();
+    keys.delete(`${VAULT}|${agent.publicKey}`);
+    expect(await verifiedOf(authenticateAgent(req("GET", "/api/agent/me"), "read", deps))).toBeNull();
+    expect(await verifiedOf(authenticateAgent({ method: "GET", path: "/api/agent/me", body: "", authorization: "NEP413 garbage" }, "read", deps))).toBeNull();
   });
 });

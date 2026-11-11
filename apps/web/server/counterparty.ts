@@ -349,6 +349,6 @@ export function defaultCounterpartyDeps(env: Record<string, string | undefined> 
     store: store(),
     isOikoAccount: (id) => ours.has(id),
     firstTimeThreshold: decimalToUnits(env.COUNTERPARTY_FIRST_TIME_THRESHOLD || "10"),
-    blockReports: Math.max(1, Number(env.COUNTERPARTY_BLOCK_REPORTS || 1) || 1),
+    blockReports: Math.max(1, Number(env.COUNTERPARTY_BLOCK_REPORTS || 2) || 2),
   };
 }

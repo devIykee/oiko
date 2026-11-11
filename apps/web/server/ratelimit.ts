@@ -63,3 +63,22 @@ export function resetLimitsForTests(): void {
   buckets.clear();
   g.__oikoBudget = undefined;
 }
+
+/**
+ * Shared limits for actions that spend the relayer's NEAR (security review S-1). checkLimits() is per server
+ * instance; this one holds across every instance by claiming numbered slots in the store's replay table (Postgres
+ * when DATABASE_URL is set): `limit` slots per caller per window, each claimable once. Run it after checkLimits.
+ */
+export async function checkSharedLimits(kind: keyof typeof LIMITS, ip: string, account: string | null, store: { useNonce(n: string, pk: string, exp: number): Promise<boolean> }, now = Date.now()): Promise<boolean> {
+  const l = LIMITS[kind];
+  const claim = async (who: string, [limit, windowMs]: readonly [number, number]) => {
+    const win = Math.floor(now / windowMs);
+    for (let i = 0; i < limit; i++) {
+      if (await store.useNonce(`rl:${kind}:${who}:${win}:${i}`, "ratelimit", (win + 1) * windowMs)) return true;
+    }
+    return false;
+  };
+  if (!(await claim(`ip:${ip}`, l.perIp))) return false;
+  if (account && !(await claim(`acct:${account}`, l.perAccount))) return false;
+  return true;
+}

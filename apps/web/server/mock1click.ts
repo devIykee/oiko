@@ -10,6 +10,7 @@ import { ApiError } from "./errors";
 import { relayer } from "./near";
 import { syncVaultUnchecked } from "./relayer";
 import { store } from "./store";
+import { GAS_COST_ESTIMATE, spendBudget } from "./ratelimit";
 
 export type OneClickStatus = "PENDING_DEPOSIT" | "KNOWN_DEPOSIT_TX" | "PROCESSING" | "SUCCESS" | "INCOMPLETE_DEPOSIT" | "REFUNDED" | "FAILED";
 export interface TokenResponse { assetId: string; decimals: number; blockchain: string; symbol: string; price: number; priceUpdatedAt: string; contractAddress?: string }
@@ -179,6 +180,8 @@ export type Minter = (s: MockSwap) => Promise<{ mintTxHash: string; syncTxHash: 
 
 /** Mints the quoted amountOut of the destination mock token to the vault, then syncs the vault. */
 export const relayerMinter: Minter = async (s) => {
+  // The mint is a relayer transaction too, so it counts against the daily budget (security review S-5).
+  if (!spendBudget(serverConfig().limits.dailyBudget, GAS_COST_ESTIMATE)) throw new ApiError("E_BUDGET", 503);
   const q = s.quoteResponse.quoteRequest;
   const token = q.destinationAsset.replace(/^nep141:/, "");
   const r = await relayer().call(token, "mint", { account_id: q.recipient, amount: s.quoteResponse.quote.amountOut }, { gas: (30n * TGAS).toString() });

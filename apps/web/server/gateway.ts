@@ -78,7 +78,20 @@ export function requiredScope(path: string, kind?: "propose" | "act"): Scope {
 /** Agent auth: the key must still be on the vault (view_access_key) and the vault's policy must allow the scope. */
 export async function authenticateAgent(req: GatewayRequest, scope: Scope | null, deps: GatewayDeps = defaultDeps()): Promise<AuthedAgent> {
   const { auth, publicKey } = await verifyRequest(req, deps);
-  return authorizeAgentKey(auth.accountId, publicKey, scope, deps);
+  try {
+    return await authorizeAgentKey(auth.accountId, publicKey, scope, deps);
+  } catch (e) {
+    // The signature verified and the key is on this vault, but the policy refused (revoked, expired, scope...):
+    // the identity is proven, so the refusal may be written to that vault's access log. Anything earlier is unproven.
+    if (e instanceof ApiError && e.code !== "E_AUTH" && e.code !== "E_KEY_GONE") (e as ApiError & { verified?: VerifiedAgent }).verified = { vaultId: auth.accountId, publicKey };
+    throw e;
+  }
+}
+
+export interface VerifiedAgent { vaultId: string; publicKey: string }
+/** The proven agent identity behind a failed request, if any (see authenticateAgent). Unverified requests are never logged. */
+export function verifiedAgentOf(e: unknown): VerifiedAgent | null {
+  return (e as { verified?: VerifiedAgent } | null)?.verified ?? null;
 }
 
 /** The on-chain half of agent auth, run on EVERY request (NEP-413 or bearer session): the key must still exist on the
