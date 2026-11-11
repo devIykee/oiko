@@ -5,7 +5,7 @@
 - **Contracts** on NEAR testnet: registry `oiko.testnet` and ROSCA `ajo.oiko.testnet` (both **keyless since 2026-11-05**, so nobody can change them), mock USDC/USDT and lending, vault code as a Global Contract (`72sdtZyfMEdLh2RSqSjBAPt73PpsHCr24irGCi9yahex`). `pnpm test:contracts` passes (unit, proptest invariants, sandbox integration incl. a 3-member ROSCA cycle).
 - **Hosted app** https://oikodotnear.vercel.app (auto-deploys from `main`), Postgres (Neon) for nonces, access log, invoices, agent change proposals and settings.
 - **Product:** landing, sign-up (passkey or browser key), pay by name from other chains (test-mode 1Click), plan, bills, pots, locks, Earn with a utilization guard, ROSCA savings, invoices with CSV export, insights, activity with CSV export, move to another device, agents.
-- **Agents:** MCP (`npx -y oiko-mcp`, 0.1.0 published; 0.2.0 built, not yet published) and MCP over HTTP with hosted 24-hour links; REST with NEP-413. Read, propose and act within caps the contract enforces; counterparty check before every payment; Disconnect deletes the key.
+- **Agents:** MCP (`npx -y oiko-mcp`, 0.2.0 published 2026-11-11 with all 20 tools) and MCP over HTTP with hosted 24-hour links; REST with NEP-413. Read, propose and act within caps the contract enforces; counterparty check before every payment; Disconnect deletes the key.
 - **Proactive agents (Phase 3):** events (`/api/agent/events`, signed webhooks delivered by cron, MCP notifications) with deterministic suggested actions; proposals for non-money changes approved on Home; opt-in autopilot rules; month brief; `how_to_fix` on every refusal; each agent's approved/rejected record.
 - **Local mode:** `pnpm local` or `docker compose up` with no keys and no testnet; `pnpm e2e` (14 Playwright tests, ~3 min) passes against both. CI runs checks, unit tests, contracts, e2e and a fresh-clone compose run.
 - **Checks:** 179 unit tests, typecheck, production build, `check-no-llm`, `check-copy`, `readme-check`.
@@ -27,10 +27,10 @@ Lighthouse mobile, see `docs/lighthouse/README.md` for the reports.
 
 ## Needs the founder
 
-1. **Publish `oiko-mcp` 0.2.0** (2FA in your own terminal): `npm publish ./packages/mcp/oiko-mcp-0.2.0.tgz --access public`.
-2. **Cron:** GitHub variable `OIKO_APP_URL=https://oikodotnear.vercel.app` and secret `CRON_SECRET` (same value as in Vercel). Without them schedules, ROSCA settlement and agent webhooks don't run on their own.
-3. **Fonts licence check, then make the repo public:** Acorn (supplied by you) and Chillax (Fontshare free licence) are in `apps/web/fonts`. Then `gh repo edit devIykee/oiko --visibility public --accept-visibility-change-consequences`.
-4. **Submission:** demo video, X post with @NEARProtocol and #NEARHackathon, a mainnet NEAR account for the payout, submit by 2026-11-14 23:59 UTC. Mainnet deployment is optional under the rules (testnet projects are eligible).
+Done already: `oiko-mcp` 0.2.0 published (2026-11-11); repo public; cron variables set (`.github/workflows/cron.yml` runs on schedule, recent runs green).
+
+1. **Fonts licence check:** the repo is public; confirm the Acorn licence (supplied by you) covers a public repo. Chillax uses the Fontshare free licence.
+2. **Submission:** demo video, X post with @NEARProtocol and #NEARHackathon, a mainnet NEAR account for the payout, submit by 2026-11-14 23:59 UTC. Mainnet deployment is optional under the rules (testnet projects are eligible).
 
 ## Not finished
 
