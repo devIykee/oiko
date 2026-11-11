@@ -4,9 +4,14 @@ Before submitting (deadline 2026-11-14 23:59 UTC): make the repo public, post on
 
 ## X post (under 280 characters; attach the demo video)
 
-I built Oiko at NEAR HACKATHON: personal finance meets personal intelligence. Get paid by name from anywhere, your plan splits every payment, and your own AI agent helps within limits your account enforces. @NEARProtocol #NEARHackathon https://oikodotnear.vercel.app
+Your money should work as hard as you do.
 
-(266 characters. The rules require: say you built it at NEAR HACKATHON, tag @NEARProtocol and #NEARHackathon, attach the demo video; the post must be public.)
+I built Oiko at NEAR HACKATHON: get paid by name from anywhere, your plan splits every payment the moment it lands, and your AI agent helps, never past the limits you set.
+
+@NEARProtocol #NEARHackathon
+https://oikodotnear.vercel.app
+
+(268 characters as X counts them, the link as 23. The rules require: say you built it at NEAR HACKATHON, tag @NEARProtocol and #NEARHackathon, attach the demo video; the post must be public.)
 
 ## 2-minute demo script
 
