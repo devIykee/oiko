@@ -178,7 +178,7 @@ Summary: Oiko holds no keys over user money, and the savings account holds no ow
 
 Next.js 16, React 19, Tailwind CSS 4, motion, Radix Dialog, qrcode, zod, near-api-js 7, @noble/curves + @noble/hashes, bs58, drizzle-orm + postgres (optional), web-push, @modelcontextprotocol/sdk, framework7-icons (MIT), web3icons, Acorn (headings and UI, licensed by the author), Chillax (supporting text, Fontshare free licence); Rust near-sdk 5.29.1, near-contract-standards, near-workspaces, proptest, cargo-near; Vitest, Playwright, @resvg/resvg-js, opentype.js, svgo. Hosted on Vercel.
 
-Code was written during the hackathon window with AI coding assistance (Claude Code). Grok was used as a real agent to test the demo end to end. The product itself has no built-in AI (`node scripts/check-no-llm.mjs`). Libraries above are used under their own licences.
+Tools: Claude Code and Grok were used during development and testing. The product itself has no built-in AI (`node scripts/check-no-llm.mjs`). Libraries above are used under their own licences.
 
 ## License
 
