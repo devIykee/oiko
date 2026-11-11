@@ -4,9 +4,9 @@ Before submitting (deadline 2026-11-14 23:59 UTC): make the repo public, post on
 
 ## X post (under 280 characters; attach the demo video)
 
-Built at #NEARHackathon: Oiko. Personal finance meets personal intelligence. Get paid by name from anywhere, your plan splits every payment, and your own AI agent helps on limits your account enforces, with scam checks before it pays. @NEARProtocol https://oikodotnear.vercel.app
+I built Oiko at NEAR HACKATHON: personal finance meets personal intelligence. Get paid by name from anywhere, your plan splits every payment, and your own AI agent helps within limits your account enforces. @NEARProtocol #NEARHackathon https://oikodotnear.vercel.app
 
-(279 characters. The rules ask for the video attached, a mention that it was built at NEAR HACKATHON, @NEARProtocol and #NEARHackathon.)
+(266 characters. The rules require: say you built it at NEAR HACKATHON, tag @NEARProtocol and #NEARHackathon, attach the demo video; the post must be public.)
 
 ## 2-minute demo script
 
@@ -28,14 +28,24 @@ Built at #NEARHackathon: Oiko. Personal finance meets personal intelligence. Get
 | 07 `AGT` | Agent Economy | any outside agent manages money over MCP (stdio + HTTP) or REST, within budgets the contract enforces |
 | 01 `DFI` | Unstoppable DeFi | Earn on Rhea lending with an on-chain utilization guard (refuses above 92%) |
 
+## "What did you build" (form field, 20-2,000 characters)
+
+Oiko is a personal finance app on NEAR stablecoins. You claim a name (steve.oiko.testnet) and share a pay link; anyone can pay it from other chains through NEAR Intents 1Click, and every payment is split by your plan into pots (Spend, Bills, Savings, Goals, Locked). Money sits in a separate account with no owner keys and no upgrade or admin method, so locks and limits are enforced by the contract, not by us. Oiko has no built-in AI: you connect the agent you already use (MCP via npx oiko-mcp, MCP over HTTP, or REST signed with NEP-413). It can read, propose or act only within per-payment, daily and weekly caps and an allowlist enforced on-chain, with a counterparty check (allow/warn/block) before it pays anyone, events and suggested actions so it can be proactive, and one-tap revoke that deletes its key. Also: bills, invoices with an accountant-ready CSV, Earn on lending with an on-chain utilization guard, and ROSCA savings groups with contract-enforced order and bonds. Live on NEAR testnet (1Click is simulated there because Intents has no testnet); the README has a hosted path, a one-command local mode (docker compose up) and 14 Playwright tests behind every step.
+
+## Form notes
+
+- Track ids on the form: `realworld` (Real-World Money), `security` (AI Security & Defense), `agents` (Agent Economy), `defi` (Unstoppable DeFi).
+- Leave the optional "Website" field empty: the submission API treats a `website` value as a spam trap. The demo link is already in the X post and the text above.
+- NEAR wallet address: a mainnet account you control (e.g. `yourname.near`). No wallet connection is needed.
+- One submission per project; edits go through nearhackathon.com/request-changes.
+
 ## Submission JSON template
 
 ```json
 {
   "project_name": "Oiko",
   "tagline": "Personal finance meets personal intelligence.",
-  "tracks": ["RWM", "SEC", "AGT", "DFI"],
-  "primary_track": "RWM",
+  "tracks": ["realworld", "security", "agents", "defi"],
   "repo_url": "https://github.com/devIykee/oiko",
   "demo_url": "https://oikodotnear.vercel.app",
   "video_url": "<FILL: demo video URL>",
