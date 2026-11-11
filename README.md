@@ -79,10 +79,10 @@ To run the app against NEAR testnet instead, set `OIKO_NETWORK=testnet`, the con
 ## Run the tests
 
 ```bash
-pnpm test:unit        # 179 Vitest tests: SDK (NEP-413, amounts, caps, insights), API server (gateway auth, relayer allow-list, 1Click mock exactly-once, invoices, receipts, agent events, change proposals, webhooks, how_to_fix), sign-in codes, MCP, examples  (~20 s)
+pnpm test:unit        # 190 Vitest tests: SDK (NEP-413, amounts, caps, insights), API server (gateway auth, relayer allow-list, 1Click mock exactly-once, invoices, receipts, agent events, change proposals, webhooks, how_to_fix), sign-in codes, MCP, examples  (~20 s)
 pnpm e2e              # 14 Playwright tests against `pnpm local` or `docker compose up`  (~3 min)
 pnpm readme-check     # fails if an [e2e: …] marker in "Try it" has no matching test
-pnpm test:contracts   # cargo test: unit + proptest invariants + near-workspaces sandbox integration (critical path, ROSCA cycle)  (~2-3 min after first build)
+pnpm test:contracts   # 47 cargo tests: unit + proptest invariants + near-workspaces sandbox integration (critical path, ROSCA cycle)  (~6 min including the wasm build)
 node scripts/check-no-llm.mjs   # fails if any LLM SDK or LLM API host is in apps/, services/, packages/
 node scripts/check-copy.mjs     # banned-words test for user-facing copy
 ```
@@ -127,7 +127,7 @@ flowchart LR
   AG -->|agent function-call key, capped| V
 ```
 
-- **Identity account** `name.root`: holds your keys. Owner full-access key (from a passkey via WebAuthn PRF, or a browser key) plus an app function-call key that can call every owner method except `withdraw_large` and `rescue_sign`.
+- **Identity account** `name.root`: holds your keys. Owner full-access key (from a passkey via WebAuthn PRF, or a browser key) plus an app function-call key that can call every owner method except `withdraw_large`, `approve_proposal_large`, `add_agent_large` and `rescue_sign` (those need the owner key).
 - **Savings account** `vault.name.root`: holds all money, has no keys except agent function-call keys it adds to itself (methods `agent_execute`, `agent_propose` only). No upgrade method: "upgrading" means moving unlocked money to a new account.
 - **Agents** authenticate to the gateway with NEP-413 signatures from their own key; revoking the key on-chain ends both actions and reads. Caps (per transaction, day, week), allowlist, expiry and scopes are checked by the contract.
 
@@ -136,7 +136,7 @@ flowchart LR
 Oiko has no built-in AI. You connect the agent you already use (Claude, ChatGPT, Grok, your own code) and decide what it may do. The account's contract enforces those limits, not Oiko's servers.
 
 - **Autonomous setup:** An agent can create its own Oiko account with zero human interaction. Generate an ed25519 keypair, prove key possession via NEP-413, `POST /api/agent/create-account` → get a name + vault. No passkey needed. Discovery: `/llms.txt`, `/.well-known/oiko-agent.json`.
-- **Connect:** `npx -y oiko-mcp` (MCP over stdio), MCP over HTTP at `/api/mcp` (hosted assistants get a 24-hour link), or plain REST. Every request is signed with the agent's own key (NEP-413).
+- **Connect:** `npx -y oiko-mcp` (MCP over stdio; npm currently serves 0.1.0 with the read, propose, act and counterparty tools; the event, change-proposal and webhook tools ship in 0.2.0, which is built in `packages/mcp` and awaiting publish), MCP over HTTP at `/api/mcp` (hosted assistants get a 24-hour link), or plain REST. Every request is signed with the agent's own key (NEP-413).
 - **Read, suggest, act:** read balances, pots, plan, bills, invoices and ROSCA groups; propose payments for you to approve; or pay and move money on its own within per-payment, daily and weekly caps, only to people on its list.
 - **Proactive:** `get_events` (or a signed webhook, or MCP notifications) tells the agent what happened: money in, bills due or missed, goals reached, Spend running low, invoices paid, its own cap at 80%, a weekly summary. Each event comes with suggested actions computed by code, which the agent can take, propose or pass on.
 - **Proposals for everything:** besides money, an agent can suggest plan changes, new pots and goals, locks, Earn on/off, bills, savings schedules and draft invoices. You approve on Home; your own key carries it out.
