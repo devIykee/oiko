@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="assets/gsap.min.js"></script>
+    <link rel="stylesheet" href="film.css" />
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute">
+      <defs>
+        <path id="p-mark" fill-rule="evenodd" d="M11.05 1.94q.95-.74 1.9 0l7.95 6.2Q22 9 22 10.4V13a10 10 0 0 1-20 0v-2.6Q2 9 3.1 8.14Zm1.42 5.72q-.47-.37-.94 0l-4.26 3.31q-.47.37-.47.97V13a5.2 5.2 0 0 0 10.4 0v-1.06q0-.6-.47-.97Z" />
+        <path id="p-word" fill-rule="evenodd" d="M26.63-55.67q2.57-2.01 5.14 0l21.62 16.86q3.01 2.35 3.01 6.15v7.07a27.2 27.2 0 0 1-54.4 0v-7.07q0-3.8 3-6.15Zm3.04 16.99q-.47-.37-.94 0l-11.57 9.02q-.47.37-.47.97v3.1a12.51 12.51 0 0 0 25.02 0v-3.1q0-.6-.47-.97ZM73.09 0H58.88v-52.1h14.21zM60.15-60.18q-2.35-2.17-2.35-5.4 0-3.22 2.35-5.42 2.34-2.19 5.86-2.19 3.51 0 5.86 2.19 2.34 2.2 2.34 5.42 0 3.23-2.34 5.4-2.35 2.17-5.86 2.17t-5.86-2.17M90.75 0H76.54v-73.19h14.21v56.2q1.03-11.13 5.1-19.75 4.08-8.62 10.82-13.16t14.89-3.52v14.94q-3.71-1.07-8.18.1t-8.42 4.3L125.86 0h-16.7L95.78-22.71Q90.75-12.55 90.75 0m56.29 1.61q-12.21 0-19.7-7.74-7.5-7.74-7.5-19.99 0-12.26 7.5-19.92t19.7-7.67q12.160 0 19.68 7.69t7.52 19.9q0 12.25-7.52 19.99t-19.68 7.74m-12.21-27.73q0 6.54 3.23 10.69t8.98 4.15q5.71 0 8.91-4.17t3.2-10.67q0-6.45-3.2-10.57t-8.91-4.13q-5.76 0-8.98 4.13t-3.23 10.57" />
+        <g id="p-lock">
+          <path d="M26 44V32a24 24 0 0 1 48 0v12" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="round" />
+          <rect x="12" y="44" width="76" height="52" rx="14" fill="currentColor" />
+          <circle cx="50" cy="66" r="8" fill="rgba(0,0,0,0.35)" /><rect x="46.5" y="68" width="7" height="16" rx="3.5" fill="rgba(0,0,0,0.35)" />
+        </g>
+        <g id="p-key" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="30" cy="50" r="18" />
+          <path d="M48 50h44M76 50v16M90 50v12" />
+        </g>
+        <path id="p-home" d="M12 3 2.5 11h3V21h5v-6h3v6h5V11h3Z" />
+      </defs>
+    </svg>
+
+    <div id="root" data-composition-id="main" data-start="0" data-duration="78.03" data-width="1920" data-height="1080" data-motion-blur="on" data-motion-blur-shutter="180">
+      <!-- 1 · payday -->
+      <div id="s1" class="clip scene" data-scene="1" data-start="0" data-duration="2.716" data-track-index="0">
+        <div class="bg"><div class="blob" style="left: -200px; top: -200px; width: 800px; height: 800px; background: #fff3b8"></div><div class="blob" style="right: -300px; bottom: -300px; width: 900px; height: 900px; background: #ff9d1f"></div></div>
+        <div class="cam">
+          <div id="s1-coins"></div>
+          <div id="s1-num" class="big3d num">$1,200</div>
+          <div id="s1-conf"></div>
+          <div class="notif" id="notif">
+            <div class="ic">$</div>
+            <div>
+              <div class="t1 body"><span>BANK</span><span>now</span></div>
+              <div class="t2 num">+$1,200.00</div>
+              <div class="t3 body">Salary received. Happy payday!</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2 · nine days later -->
+      <div id="s2" class="clip scene" data-scene="2" data-start="2.356" data-duration="3.337" data-track-index="1">
+        <div class="bg"><div class="blob" style="left: -200px; bottom: -300px; width: 900px; height: 900px; background: #7a0b1f"></div></div>
+        <div class="cam">
+          <div id="s2-txs" data-layout-ignore>
+            <div class="tx"><span>Streaming</span><b>−$15.99</b></div>
+            <div class="tx"><span>Delivery</span><b>−$23.40</b></div>
+            <div class="tx"><span>Ride home</span><b>−$18.00</b></div>
+            <div class="tx"><span>"Free" trial</span><b>−$9.99</b></div>
+            <div class="tx"><span>Delivery</span><b>−$31.75</b></div>
+            <div class="tx"><span>Cloud storage</span><b>−$2.99</b></div>
+            <div class="tx"><span>Late fee</span><b>−$35.00</b></div>
+            <div class="tx"><span>Delivery</span><b>−$27.10</b></div>
+            <div class="tx"><span>Gym (unused)</span><b>−$40.00</b></div>
+            <div class="tx"><span>Transfer</span><b>−$400.00</b></div>
+          </div>
+          <div id="s2-num" class="big3d num">$1,200</div>
+          <div id="s2-cal" class="abs"><div class="top">DAY</div><div class="d num" id="s2-day">1</div></div>
+          <div id="s2-gone" class="abs pill">−$1,159. Gone.</div>
+        </div>
+      </div>
+
+      <!-- 3 · the suspects -->
+      <div id="s3" class="clip scene" data-scene="3" data-start="5.333" data-duration="3.868" data-track-index="0">
+        <div class="bg"><div class="wall"></div><div class="floor"></div></div>
+        <div class="cam">
+          <div class="cone" id="s3-cone" style="width: 1700px; margin-left: -850px"></div>
+          <div class="sus" id="sus1" style="left: 170px">
+            <div class="shadow sh"></div>
+            <div class="bodyb" style="background: #8a72ff; border-radius: 46% 54% 40% 60% / 60% 50% 50% 40%"></div>
+            <div class="face"><i class="eye"><b></b></i><i class="eye"><b></b></i><b class="mouth flat"></b></div>
+            <div class="plac" style="color: var(--violet)"><div class="nm">Subscriptions</div><div class="am num">−$86</div></div>
+            <div class="hand" style="left: -14px; background: #8a72ff"></div><div class="hand" style="right: -14px; background: #8a72ff"></div>
+            <div class="tagn">1</div>
+          </div>
+          <div class="sus" id="sus2" style="left: 740px">
+            <div class="shadow sh"></div>
+            <div class="bodyb" style="background: #ff9a3d; border-radius: 30% 30% 46% 46% / 22% 22% 60% 60%"></div>
+            <div class="face"><i class="eye"><b></b></i><i class="eye"><b></b></i><b class="mouth o"></b></div>
+            <div class="plac" style="color: #c2560e"><div class="nm">Takeout</div><div class="am num">−$312</div></div>
+            <div class="hand" style="left: -14px; background: #ff9a3d"></div><div class="hand" style="right: -14px; background: #ff9a3d"></div>
+            <div class="tagn">2</div>
+          </div>
+          <div class="sus" id="sus3" style="left: 1310px">
+            <div class="shadow sh"></div>
+            <div class="bodyb" style="background: #ff6b8e; border-radius: 60% 40% 55% 45% / 50% 60% 40% 50%"></div>
+            <div class="face"><i class="eye"><b></b></i><i class="eye"><b></b></i><b class="mouth"></b></div>
+            <div class="plac" style="color: var(--rose)"><div class="nm">One "quick" transfer</div><div class="am num">−$400</div></div>
+            <div class="hand" style="left: -14px; background: #ff6b8e"></div><div class="hand" style="right: -14px; background: #ff6b8e"></div>
+            <div class="tagn">3</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 · the plan was in your head -->
+      <div id="s4" class="clip scene" data-scene="4" data-start="8.841" data-duration="4.182" data-track-index="1">
+        <div class="bg"><div class="floor"></div></div>
+        <div class="cam">
+          <div class="tb" id="tb1" style="left: 470px; top: 760px; width: 46px; height: 46px"></div>
+          <div class="tb" id="tb2" style="left: 520px; top: 680px; width: 76px; height: 76px"></div>
+          <div id="cloud" class="abs">
+            <div class="puff" style="left: 0; top: 150px; width: 300px; height: 300px"></div>
+            <div class="puff" style="left: 150px; top: 20px; width: 360px; height: 360px"></div>
+            <div class="puff" style="left: 420px; top: 60px; width: 340px; height: 340px"></div>
+            <div class="puff" style="left: 520px; top: 200px; width: 280px; height: 280px"></div>
+            <div class="puff" style="left: 110px; top: 60px; width: 600px; height: 440px; border-radius: 120px; box-shadow: none"></div>
+            <div class="in">
+              <h3>The plan</h3>
+              <div class="prow"><span>Bills</span><span>30%</span></div>
+              <div class="prow"><span>Savings</span><span>20%</span></div>
+              <div class="prow"><span>Rainy day</span><span>10%</span></div>
+              <div class="prow"><span>Fun</span><span>whatever's left</span></div>
+            </div>
+          </div>
+          <div id="runners"></div>
+        </div>
+      </div>
+
+      <!-- 5 · reveal -->
+      <div id="s5" class="clip scene" data-scene="5" data-start="12.663" data-duration="3.103" data-track-index="0">
+        <div class="bg"><div class="ray" id="ray5"></div></div>
+        <div class="cam">
+          <div class="ring" id="r1"></div><div class="ring" id="r2"></div><div class="ring" id="r3"></div>
+          <svg id="s5-logo" class="abs" viewBox="2 -73.19 172.24 74.8" fill="#fff"><use href="#p-word" /></svg>
+          <div id="s5-sparks"></div>
+          <div id="s5-sub" class="abs body">a home for your money</div>
+        </div>
+      </div>
+
+      <!-- 6 · claim a name, get paid from anywhere -->
+      <div id="s6" class="clip scene" data-scene="6" data-start="15.406" data-duration="3.243" data-track-index="1">
+        <div class="bg"><div class="dots" id="dots6"></div></div>
+        <div class="cam">
+          <div id="paycard" class="ui">
+            <div class="av">S</div>
+            <div class="who">Pay <span id="pc-name"></span></div>
+            <div class="url body">oiko · pay/steve</div>
+            <div class="claimed pill" id="pc-claimed">steve is yours ✓</div>
+            <div class="amtbox"><div class="lbl body">Received today</div><div class="n num"><span id="pc-amt">0</span></div></div>
+            <div class="rows body">
+              <div class="prow2" id="pr1"><span><i style="background: #ef4444"></i>USDT · TRON</span><b>+100.00</b></div>
+              <div class="prow2" id="pr2"><span><i style="background: #2563eb"></i>USDC · Base</span><b>+250.00</b></div>
+              <div class="prow2" id="pr3"><span><i style="background: #f0b90b"></i>USDT · BNB</span><b>+40.00</b></div>
+              <div class="prow2" id="pr4"><span><i style="background: #9945ff"></i>USDC · Solana</span><b>+75.00</b></div>
+            </div>
+          </div>
+          <div class="chainc" id="cc1" style="left: 190px; top: 300px; background: #ef4444">USDT<small>TRON</small></div>
+          <div class="chainc" id="cc2" style="left: 1540px; top: 280px; background: #2563eb">USDC<small>Base</small></div>
+          <div class="chainc" id="cc3" style="left: 240px; top: 700px; background: #f0b90b">USDT<small>BNB</small></div>
+          <div class="chainc" id="cc4" style="left: 1500px; top: 720px; background: #9945ff">USDC<small>Solana</small></div>
+        </div>
+      </div>
+
+      <!-- 7 · every payment splits itself -->
+      <div id="s7" class="clip scene" data-scene="7" data-start="18.289" data-duration="4.92" data-track-index="0">
+        <div class="bg"><div class="floor"></div></div>
+        <div class="cam">
+          <div id="s7-pay" class="abs pill num">+100.00 USDT <small class="body">just landed</small></div>
+          <div id="s7-bar" class="abs"><div style="width: 30%; background: var(--blue)"></div><div style="width: 20%; background: var(--mint)"></div><div style="width: 10%; background: var(--violet)"></div><div style="width: 10%; background: var(--orange)"></div><div style="width: 30%; background: var(--ink)"></div></div>
+          <div id="s7-drops"></div>
+          <div class="jar" data-jar="Bills|#3d5afe|#6e86ff" id="j1" style="left: 150px; top: 520px"></div>
+          <div class="jar" data-jar="Savings|#0e8a5f|#2bd47d" id="j2" style="left: 490px; top: 520px"></div>
+          <div class="jar" data-jar="Rainy day|#5b3fe0|#8a72ff|lock" id="j3" style="left: 830px; top: 520px"></div>
+          <div class="jar" data-jar="Goal|#e0701a|#ff9a3d" id="j4" style="left: 1170px; top: 520px"></div>
+          <div class="jar" data-jar="Spend|#16181d|#5e636e" id="j5" style="left: 1510px; top: 520px"></div>
+        </div>
+      </div>
+
+      <!-- 8 · locked stays locked -->
+      <div id="s8" class="clip scene" data-scene="8" data-start="22.849" data-duration="4.518" data-track-index="1">
+        <div class="bg"><div class="blob" style="right: 100px; top: 100px; width: 800px; height: 800px; background: #a08bff; opacity: 0.6"></div><div class="floor"></div></div>
+        <div class="cam">
+          <div id="lockcard" class="ui">
+            <div class="nm">Rainy day</div>
+            <div class="bal num">120.00 <small>USDT</small></div>
+            <div class="until pill body">Locked until 1 Mar 2027</div>
+            <div class="btn" id="wbtn">Withdraw</div>
+          </div>
+          <div class="shadow" style="left: 1100px; top: 850px; width: 460px; height: 60px"></div>
+          <div class="jar" data-jar="|#5b3fe0|#b3a4ff" id="bigjar"></div>
+          <div class="chain" id="chain8"></div>
+          <svg id="biglock" class="abs" viewBox="0 0 100 100"><use href="#p-lock" /></svg>
+          <div class="cursor" id="cur8"></div>
+          <div class="toast" id="toast8" style="left: 180px; top: 934px">This pot is locked.</div>
+          <div id="s8-sparks"></div>
+        </div>
+      </div>
+
+      <!-- 9 · bring your own agent -->
+      <div id="s9" class="clip scene navy" data-scene="9" data-start="27.007" data-duration="4.835" data-track-index="0">
+        <div class="bg"><div class="grid"></div><div class="floor"></div></div>
+        <div class="cam">
+          <div class="cone" id="cone9" style="left: 520px"></div>
+          <div class="shadow" style="left: 360px; top: 880px; width: 340px; height: 50px"></div>
+          <div class="bot" id="bot9" style="left: 370px; top: 470px; transform: scale(1.45); transform-origin: 50% 100%"></div>
+          <div id="s9-title" class="abs">Bring<br /><em>your own</em><br />agent.</div>
+          <div class="chipf c" id="s9c1" style="left: 130px; top: 330px; transform: rotate(-8deg)">MCP</div>
+          <div class="chipf y" id="s9c2" style="left: 720px; top: 300px; transform: rotate(7deg)">REST</div>
+          <div class="chipf" id="s9c3" style="left: 90px; top: 660px; transform: rotate(5deg)">any model</div>
+          <div id="s9-sparks"></div>
+        </div>
+      </div>
+
+      <!-- 10 · no built-in AI; connect the one you use -->
+      <div id="s10" class="clip scene navy" data-scene="10" data-start="31.482" data-duration="5.783" data-track-index="1">
+        <div class="bg"><div class="grid"></div></div>
+        <div class="cam">
+          <div id="noai" class="ui"><div class="t">Built-in AI</div><div class="s body">someone else's bot, someone else's rules</div><div class="stamp" id="noai-stamp">none</div></div>
+          <div class="wire" id="w1" style="left: 560px; top: 395px; width: 280px; transform: rotate(22deg)"></div>
+          <div class="wire" id="w2" style="left: 1360px; top: 395px; width: 280px; transform: rotate(158deg)"></div>
+          <div class="wire" id="w3" style="left: 560px; top: 765px; width: 280px; transform: rotate(-22deg)"></div>
+          <div class="wire" id="w4" style="left: 1360px; top: 765px; width: 280px; transform: rotate(-158deg)"></div>
+          <div class="pulse" id="pu1"></div><div class="pulse" id="pu2"></div><div class="pulse" id="pu3"></div><div class="pulse" id="pu4"></div>
+          <div id="hub" class="abs"><svg viewBox="0 0 24 24"><use href="#p-mark" /></svg></div>
+          <div class="agentp" id="ag1" style="left: 170px; top: 300px"><i style="background: #d97757"></i>Claude</div>
+          <div class="agentp" id="ag2" style="left: 1350px; top: 300px"><i style="background: #10a37f"></i>ChatGPT</div>
+          <div class="agentp" id="ag3" style="left: 170px; top: 720px"><i style="background: #16181d"></i>Grok</div>
+          <div class="agentp" id="ag4" style="left: 1350px; top: 720px"><i style="background: var(--blue)"></i>Your own bot</div>
+          <div class="chipf c" id="s10mcp" style="left: 790px; top: 780px">over MCP or REST</div>
+        </div>
+      </div>
+
+      <!-- 11 · you decide: read / suggest / act, how much, who -->
+      <div id="s11" class="clip scene navy" data-scene="11" data-start="36.905" data-duration="7.802" data-track-index="0">
+        <div class="bg"><div class="grid"></div><div class="floor"></div></div>
+        <div class="cam">
+          <div class="shadow" style="left: 250px; top: 890px; width: 340px; height: 50px"></div>
+          <div class="bot" id="bot11" style="left: 260px; top: 480px; transform: scale(1.3); transform-origin: 50% 100%"></div>
+          <div id="sheet" class="ui">
+            <div class="hd">Connect an agent</div>
+            <div class="hd2 body">You set the limits. The account enforces them.</div>
+            <div class="panel" id="pA">
+              <div class="trow"><div><div class="a">Read</div><div class="b body">balances, pots, bills</div></div><div class="tog" id="tg1"><div class="on"></div><div class="k"></div></div></div>
+              <div class="trow"><div><div class="a">Suggest</div><div class="b body">you approve every move</div></div><div class="tog" id="tg2"><div class="on"></div><div class="k"></div></div></div>
+              <div class="trow"><div><div class="a">Act</div><div class="b body">on its own, inside your limits</div></div><div class="tog" id="tg3"><div class="on"></div><div class="k"></div></div></div>
+            </div>
+            <div class="panel" id="pB">
+              <div class="crow"><span class="nm">Per payment</span><div class="track"><div class="fill" id="cf1"></div></div><span class="v num"><span id="cv1">0</span> USDT</span></div>
+              <div class="crow"><span class="nm">Per day</span><div class="track"><div class="fill" id="cf2"></div></div><span class="v num"><span id="cv2">0</span> USDT</span></div>
+              <div class="crow"><span class="nm">Per week</span><div class="track"><div class="fill" id="cf3"></div></div><span class="v num"><span id="cv3">0</span> USDT</span></div>
+              <div class="allow body"><span class="y" id="al1">✓ landlord</span><span class="y" id="al2">✓ power co.</span><span class="n" id="al3">✕ anyone else</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 12 · never your keys; its own key, limits in the account -->
+      <div id="s12" class="clip scene navy" data-scene="12" data-start="44.347" data-duration="6.409" data-track-index="1">
+        <div class="bg"><div class="grid"></div><div class="floor"></div></div>
+        <div class="cam">
+          <div id="vault" class="abs">
+            <div class="door">
+              <div class="dial" id="dial"><svg viewBox="0 0 24 24"><use href="#p-mark" /></svg></div>
+              <div class="plate">
+                <div class="cap1 body">rules live in the account</div>
+                <div class="rule" id="ru1">per_payment ≤ 40</div>
+                <div class="rule" id="ru2">per_week ≤ 100</div>
+                <div class="rule" id="ru3">payees: landlord, power</div>
+              </div>
+            </div>
+          </div>
+          <svg id="yourkey" class="abs" viewBox="0 0 100 100"><use href="#p-key" /></svg>
+          <div class="chipf y" id="yours-tag">your keys stay yours</div>
+          <svg id="nokey-x" class="abs" viewBox="0 0 100 100"><path d="M16 16l68 68M84 16L16 84" stroke="#f0364a" stroke-width="16" stroke-linecap="round" /></svg>
+          <svg id="botkey" class="abs" viewBox="0 0 100 100"><use href="#p-key" /></svg>
+          <div id="keytag" class="abs"><h4>Agent key</h4><div class="body">≤ 40 USDT per payment</div><div class="body">≤ 100 USDT per week</div><div class="body">2 approved payees</div></div>
+          <div class="shadow" style="left: 1400px; top: 890px; width: 340px; height: 50px"></div>
+          <div class="bot" id="bot12" style="left: 1410px; top: 480px; transform: scale(1.3); transform-origin: 50% 100%"></div>
+        </div>
+      </div>
+
+      <!-- 13 · inside the limit: paid. over it: refused -->
+      <div id="s13" class="clip scene navy" data-scene="13" data-start="50.396" data-duration="6.137" data-track-index="0">
+        <div class="bg"><div class="grid"></div><div class="floor"></div></div>
+        <div class="cam">
+          <div id="lane" class="abs"></div>
+          <div class="shadow" style="left: 110px; top: 890px; width: 340px; height: 50px"></div>
+          <div class="bot" id="bot13" style="left: 120px; top: 500px; transform: scale(1.2); transform-origin: 50% 100%"></div>
+          <div id="gate-sign" class="abs body" data-layout-allow-occlusion>limit per payment<b class="num" style="font-family: Acorn">40 USDT</b></div>
+          <div id="gate-post" class="abs"></div>
+          <div id="gate-arm" class="abs"></div>
+          <div id="payee" class="abs"><div class="hs"><svg viewBox="0 0 24 24"><use href="#p-home" /></svg></div>landlord<small class="body">approved payee</small></div>
+          <div class="paycoin" id="pc1"><div class="coin num">25</div></div>
+          <div class="paycoin" id="pc2"><div class="coin num" style="width: 170px; height: 170px; font-size: 66px">80</div></div>
+          <div id="paid-chip" class="abs">Paid ✓</div>
+          <div id="s13-flash" class="abs"></div>
+          <div class="stamp" id="ref-stamp">Refused by the account</div>
+          <div id="fix" class="abs body"><code>how_to_fix</code>Send 40 or less, or ask the owner to raise the limit.</div>
+        </div>
+      </div>
+
+      <!-- 14 · it suggests, you approve -->
+      <div id="s14" class="clip scene navy" data-scene="14" data-start="56.173" data-duration="5.172" data-track-index="1">
+        <div class="bg"><div class="grid"></div><div class="floor"></div></div>
+        <div class="cam">
+          <div class="shadow" style="left: 70px; top: 850px; width: 300px; height: 44px"></div>
+          <div class="bot" id="bot14" style="left: 70px; top: 470px; transform: scale(1.1); transform-origin: 50% 100%"></div>
+          <div id="bubble" class="abs"><div class="k body">SUGGESTION</div><div class="q">Rent went up. Move Bills to 40%?</div><div class="r body">I can't change your plan. You can.</div></div>
+          <div id="wait" class="ui" data-layout-allow-overlap>
+            <div class="hd body">WAITING FOR YOU · 1</div>
+            <div class="ti">Bills 30% → 40%<br />Spend 30% → 20%</div>
+            <div class="re body">From your agent: "Rent is 120 USDT higher from this month."</div>
+            <div class="bts"><div class="btn blue" id="apbtn">Approve</div><div class="btn ghost">Not now</div></div>
+            <div class="okd" id="okd">Approved ✓</div>
+          </div>
+          <div id="planbar" class="abs body">
+            <div id="pb1" style="width: 30%; background: var(--blue)">Bills</div><div style="width: 20%; background: var(--mint)">Savings</div><div style="width: 10%; background: var(--violet)">Rainy</div><div style="width: 10%; background: var(--orange)">Goal</div><div id="pb5" style="width: 30%; background: #3a3f4d">Spend</div>
+          </div>
+          <div class="cursor" id="cur14"></div>
+          <div id="s14-conf"></div>
+        </div>
+      </div>
+
+      <!-- 15 · one tap, key gone -->
+      <div id="s15" class="clip scene navy" data-scene="15" data-start="60.985" data-duration="4.617" data-track-index="0">
+        <div class="bg"><div class="grid"></div><div class="floor"></div></div>
+        <div class="cam">
+          <div id="agrow" class="ui">
+            <div class="av"><svg viewBox="0 0 100 100"><use href="#p-key" /></svg></div>
+            <div><h3>Your agent</h3><div id="agst" class="body"><span id="st-a" style="color: var(--success)">● Connected · acts within limits</span><span id="st-b" style="color: var(--danger)">● Disconnected · nothing works</span></div></div>
+            <div class="btn red" id="dbtn">Disconnect</div>
+          </div>
+          <div class="shadow" style="left: 560px; top: 950px; width: 300px; height: 44px"></div>
+          <div class="bot" id="bot15" style="left: 560px; top: 560px; transform: scale(1.15); transform-origin: 50% 100%"></div>
+          <svg id="key15" class="abs" viewBox="0 0 100 100"><use href="#p-key" /></svg>
+          <div id="shards"></div>
+          <div class="stamp" id="gone-stamp">key deleted</div>
+          <div class="cursor dark" id="cur15"></div>
+        </div>
+      </div>
+
+      <!-- 16 · your money, your plan, your agent, your rules -->
+      <div id="s16" class="clip scene" data-scene="16" data-start="65.242" data-duration="3.833" data-track-index="1">
+        <div class="bg" style="background: #0b0e24"></div>
+        <div class="cam">
+          <div class="strip" id="st1" style="left: 0; background: linear-gradient(180deg, #2bd47d, #0e8a5f)"><div class="art"><div class="jar" data-jar="|#0e8a5f|#b9f5d6" id="j16" style="left: 110px; top: 40px"></div></div><div class="lab">Your<b>money.</b></div></div>
+          <div class="strip" id="st2" style="left: 480px; background: linear-gradient(180deg, #ffd95e, #f5a800)"><div class="art" id="art2"></div><div class="lab" style="color: var(--ink)">Your<b>plan.</b></div></div>
+          <div class="strip" id="st3" style="left: 960px; background: linear-gradient(180deg, #2b3486, #0b0e24)"><div class="art"><div class="bot" id="bot16" style="left: 90px; top: 10px"></div></div><div class="lab">Your<b>agent.</b></div></div>
+          <div class="strip" id="st4" style="left: 1440px; background: linear-gradient(180deg, #8a72ff, #3a24a8)"><div class="art"><svg id="lock16" viewBox="0 0 100 100" style="position: absolute; left: 110px; top: 60px; width: 260px; height: 260px; color: var(--sun); filter: drop-shadow(0 12px 0 rgba(0, 0, 0, 0.3))"><use href="#p-lock" /></svg></div><div class="lab">Your<b>rules.</b></div></div>
+        </div>
+      </div>
+
+      <!-- 17 · close -->
+      <div id="s17" class="clip scene" data-scene="17" data-start="68.715" data-duration="9.315" data-track-index="0">
+        <div class="bg"><div class="ray" id="ray17"></div></div>
+        <div class="cam">
+          <svg id="s17-logo" class="abs" viewBox="2 -73.19 172.24 74.8" fill="#fff"><use href="#p-word" /></svg>
+          <div id="tag1" class="abs"><span class="tagw">Personal </span><span class="tagw">finance</span></div>
+          <div id="tag2" class="abs"><span class="tagw">meets </span><span class="tagw">personal </span><span class="tagw">intelligence.</span></div>
+          <div id="cta" class="abs"><span>oikodotnear.vercel.app</span><span class="btn blue" id="ctabtn">Claim your name</span></div>
+          <div class="jar" data-jar="|#3d5afe|#b9c6ff" id="jc1" style="left: 70px; top: 760px"></div>
+          <div class="jar" data-jar="|#0e8a5f|#b9f5d6" id="jc2" style="left: 320px; top: 820px; transform: scale(0.8)"></div>
+          <div class="bot" id="bot17" style="left: 1570px; top: 690px"></div>
+          <div class="jar" data-jar="|#e0701a|#ffd2a8" id="jc3" style="left: 1340px; top: 830px; transform: scale(0.75)"></div>
+          <div class="cursor dark" id="cur17"></div>
+          <div id="s17-conf"></div>
+          <div id="fine" class="abs body">USDC and USDT are stablecoins, not dollars and not bank deposits.</div>
+        </div>
+      </div>
+
+      <!-- overlays -->
+      <div id="vig"></div>
+      <div id="grain" data-motion-blur="off"></div>
+      <div id="captions"></div>
+      <div id="mark"><svg viewBox="0 0 24 24"><use href="#p-mark" /></svg></div>
+
+      <!-- audio -->
+      <audio id="music" src="assets/music.mp3" data-start="0" data-duration="78.03" data-volume="0.34" data-track-index="2"></audio>
+      <audio id="sfx" src="assets/sfx.mp3" data-start="0" data-duration="78.03" data-volume="0.8" data-track-index="3"></audio>
+      <!--VO-->
+      <audio id="vo01" src="assets/vo/01.wav" data-start="0.35" data-duration="1.856" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo02" src="assets/vo/02.wav" data-start="2.656" data-duration="2.027" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo03" src="assets/vo/03.wav" data-start="5.633" data-duration="3.008" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo04" src="assets/vo/04.wav" data-start="9.141" data-duration="3.072" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo05" src="assets/vo/05.wav" data-start="12.963" data-duration="1.493" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo06" src="assets/vo/06.wav" data-start="15.706" data-duration="2.283" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo07" src="assets/vo/07.wav" data-start="18.589" data-duration="4.011" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo08" src="assets/vo/08.wav" data-start="23.149" data-duration="3.157" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo09" src="assets/vo/09.wav" data-start="27.307" data-duration="3.925" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo10" src="assets/vo/10.wav" data-start="31.782" data-duration="4.523" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo11" src="assets/vo/11.wav" data-start="37.205" data-duration="3.605" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo12" src="assets/vo/12.wav" data-start="41.21" data-duration="2.837" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo13" src="assets/vo/13.wav" data-start="44.647" data-duration="5.099" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo14" src="assets/vo/14.wav" data-start="50.696" data-duration="1.749" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo15" src="assets/vo/15.wav" data-start="52.895" data-duration="1.877" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo16" src="assets/vo/16.wav" data-start="56.473" data-duration="3.712" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo17" src="assets/vo/17.wav" data-start="61.285" data-duration="3.157" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo18" src="assets/vo/18.wav" data-start="65.542" data-duration="2.773" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo19" src="assets/vo/19.wav" data-start="69.015" data-duration="3.925" data-volume="1" data-track-index="4"></audio>
+      <audio id="vo20" src="assets/vo/20.wav" data-start="73.491" data-duration="1.941" data-volume="1" data-track-index="4"></audio>
+      <!--/VO-->
+    </div>
+
+    <script src="assets/vo/timings.js"></script>
+    <script src="film.js"></script>
+  </body>
+</html>

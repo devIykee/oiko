@@ -1,0 +1,50 @@
+[
+  {
+    "text": "Every",
+    "start": 0.09,
+    "end": 0.33,
+    "id": "w0"
+  },
+  {
+    "text": "payment",
+    "start": 0.39,
+    "end": 0.78,
+    "id": "w1"
+  },
+  {
+    "text": "splits",
+    "start": 0.87,
+    "end": 1.29,
+    "id": "w2"
+  },
+  {
+    "text": "itself.",
+    "start": 1.29,
+    "end": 1.74,
+    "id": "w3"
+  },
+  {
+    "text": "Bills,",
+    "start": 1.83,
+    "end": 2.21,
+    "id": "w4"
+  },
+  {
+    "text": "savings,",
+    "start": 2.21,
+    "end": 2.81,
+    "id": "w5"
+  },
+  {
+    "text": "goals,",
+    "start": 2.82,
+    "end": 3.18,
+    "id": "w6"
+  },
+  {
+    "text": "spend.",
+    "start": 3.63,
+    "end": 3.89,
+    "id": "w7"
+  }
+]
