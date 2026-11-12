@@ -73,7 +73,7 @@ pnpm e2e                     # in a second terminal: the Playwright suite behind
 
 Port 3000 busy? `PORT=3100 pnpm local` and `OIKO_E2E_URL=http://localhost:3100 pnpm e2e` (Docker: `OIKO_WEB_PORT=3100 docker compose up`).
 
-The suite also covers: [e2e: README-7] a bill paid by an agent shows Paid; [e2e: README-8] Earn is refused when the lending pool is over 92% borrowed; [e2e: README-9] a 3-person ROSCA savings group with 1-minute rounds pays out; [e2e: README-10] reduced motion stops animations; [e2e: README-11] no sideways scrolling at 360 px; [e2e: README-15] clicking anywhere in a text box (padding, prefix or suffix), including the landing page's name box, focuses it.
+The suite also covers: [e2e: README-7] a bill paid by an agent shows Paid; [e2e: README-8] Earn is refused when the lending pool is over 92% borrowed; [e2e: README-9] a 3-person ROSCA savings group with 1-minute rounds pays out; [e2e: README-10] reduced motion stops animations; [e2e: README-11] no sideways scrolling at 360 px; [e2e: README-15] clicking anywhere in a text box (padding, prefix or suffix), including the landing page's name box, focuses it; [e2e: README-16] optional "paying from a Gloam private balance" on the pay page is absent by default and opt-in when `FEATURE_PRIVATE_PAY` is on (see `docs/PRIVACY.md`).
 
 To run the app against NEAR testnet instead, set `OIKO_NETWORK=testnet`, the contract names from "What runs where" and your own relayer account and key in `apps/web/.env.local`, then `pnpm dev`.
 
@@ -81,7 +81,7 @@ To run the app against NEAR testnet instead, set `OIKO_NETWORK=testnet`, the con
 
 ```bash
 pnpm test:unit        # 193 Vitest tests: SDK (NEP-413, amounts, caps, insights), API server (gateway auth, relayer allow-list, 1Click mock exactly-once, invoices, receipts, agent events, change proposals, webhooks, how_to_fix), sign-in codes, MCP, examples  (~20 s)
-pnpm e2e              # 15 Playwright tests against `pnpm local` or `docker compose up`  (~3 min)
+pnpm e2e              # 16 Playwright tests against `pnpm local` or `docker compose up`  (~3 min)
 pnpm readme-check     # fails if an [e2e: …] marker in "Try it" has no matching test
 pnpm test:contracts   # 47 cargo tests: unit + proptest invariants + near-workspaces sandbox integration (critical path, ROSCA cycle)  (~6 min including the wasm build)
 node scripts/check-no-llm.mjs   # fails if any LLM SDK or LLM API host is in apps/, services/, packages/

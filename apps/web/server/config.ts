@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { configFor, isNetworkId, type NetworkId, type OikoConfig } from "@oiko/sdk";
 
-export interface Features { earn: boolean; ajo: boolean; mcp: boolean; rescue: boolean; invest: boolean; ajoDao: boolean }
+export interface Features { earn: boolean; ajo: boolean; mcp: boolean; rescue: boolean; invest: boolean; ajoDao: boolean; privatePay: boolean }
 
 export interface ServerConfig {
   network: NetworkId;
@@ -82,6 +82,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       rescue: flag(env, "FEATURE_RESCUE", network !== "mainnet"),
       invest: flag(env, "FEATURE_INVEST", false),
       ajoDao: flag(env, "FEATURE_AJO_DAO", false),
+      privatePay: flag(env, "FEATURE_PRIVATE_PAY", false),
     },
     cronSecret: env.CRON_SECRET?.trim() || null,
     databaseUrl: env.DATABASE_URL?.trim() || null,

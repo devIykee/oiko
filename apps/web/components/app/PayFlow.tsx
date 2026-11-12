@@ -1,14 +1,17 @@
 "use client";
 // The 4-step "pay this name" flow shared by /pay/[name] and invoices (/i/[id]):
 // 1 where is your money → 2 how much (skipped when the amount is fixed) → 3 refund address → 4 deposit address + live status.
-import { AmountInput, AssetLogo, Badge, Button, CopyField, Input, Note, QRCodeCard, SelectList, StatusTimeline, SuccessCheck, Skeleton, Loading } from "@oiko/ui";
+// With FEATURE_PRIVATE_PAY, origins Gloam supports get an opt-in "paying from a Gloam private balance" switch (docs/PRIVACY.md).
+import { AmountInput, AssetLogo, Badge, Button, CopyField, Input, Note, QRCodeCard, SelectList, StatusTimeline, SuccessCheck, Skeleton, Loading, Toggle } from "@oiko/ui";
 import { fromUnits, toUnits, type Token } from "@oiko/sdk";
 import { useEffect, useRef, useState } from "react";
 import { validAddress } from "@/lib/address";
 import { api } from "@/lib/api";
 import { explain } from "@/lib/explain";
 import { useConfig } from "@/lib/config";
+import { gloamOrigin } from "@/lib/privatePay";
 import { useIntentTokens, type IntentGroup } from "@/lib/publicData";
+import { useQuery } from "@/lib/query";
 import { useT } from "@/lib/i18n";
 
 type Step = 1 | 2 | 3 | 4;
@@ -36,7 +39,7 @@ export interface PayFlowProps {
 export function PayFlow({ name, display, recipient, fixed, invoiceId, onStatus, doneTitle }: PayFlowProps) {
   const t = useT();
   const groups = useIntentTokens();
-  const { isTestMode } = useConfig();
+  const { config, isTestMode } = useConfig();
   const [step, setStep] = useState<Step>(1);
   const [group, setGroup] = useState<IntentGroup | null>(null);
   const [direct, setDirect] = useState(false);
@@ -49,6 +52,7 @@ export function PayFlow({ name, display, recipient, fixed, invoiceId, onStatus, 
   const [status, setStatus] = useState<PayStatus>("PENDING_DEPOSIT");
   const [now, setNow] = useState(Date.now());
   const [simulating, setSimulating] = useState(false);
+  const [priv, setPriv] = useState(false);
 
   const symbol = fixed ? fixed.token.toUpperCase() : direct ? "USDT" : group?.symbol ?? "USDT";
 
@@ -78,6 +82,15 @@ export function PayFlow({ name, display, recipient, fixed, invoiceId, onStatus, 
   try {
     units = fixed ? toUnits(fromUnits(fixed.units), decimals) : amount && Number(amount) > 0 ? toUnits(amount, decimals) : null;
   } catch { units = null; }
+
+  // Off unless the server enables it and Gloam can pay from the chosen place; then still off until the sender turns it on.
+  const privOffered = !!config?.features.privatePay && !!group && !direct && !!gloamOrigin(group.assetId);
+  const privOn = privOffered && priv;
+  const privQuote = useQuery<{ feeBps: number | null; cashOut: string | null }>(
+    privOn && step === 4 && dep && group ? `privpay:${group.assetId}:${dep.amountIn}` : null,
+    () => api(`/api/private-pay?${new URLSearchParams({ asset: group!.assetId, amount: dep!.amountIn })}`));
+
+  const pq = privQuote.data ?? { feeBps: null, cashOut: null };
 
   const options = groups.data?.groups.filter((g) => !fixed || g.symbol === symbol) ?? [];
   const dots: Step[] = fixed ? [1, 3] : [1, 2, 3];
@@ -166,6 +179,16 @@ export function PayFlow({ name, display, recipient, fixed, invoiceId, onStatus, 
           <p className="oi-small oi-muted" style={{ margin: 0 }}>{t("pay.refundSub", { place: group.label })}</p>
           <Input label={t("pay.refundLabel", { place: group.label })} value={refund} onChange={(e) => { setRefund(e.target.value); setRefundErr(null); }}
             autoComplete="off" spellCheck={false} placeholder={group.chain === "tron" ? "T…" : "0x…"} error={refundErr} data-testid="pay-refund" />
+          {privOffered && (
+            <div className="oi-row" style={{ alignItems: "flex-start" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600 }}>{t("pay.priv.toggle")}</div>
+                <div className="oi-small oi-muted">{t("pay.priv.toggleSub")}</div>
+              </div>
+              <Toggle checked={priv} onChange={setPriv} label={t("pay.priv.toggle")} data-testid="pay-private-toggle" />
+            </div>
+          )}
+          {privOn && <Note tone="warning">{t("pay.priv.refundWarn")}</Note>}
           {err && <div role="alert"><Note tone="danger" title={err.title}>{err.next}</Note></div>}
           <Button block size="lg" loading={busy} disabled={!refund.trim()} onClick={getAddress} data-testid="pay-continue-3">{t("pay.getAddress")}</Button>
           <Button block variant="ghost" onClick={() => setStep(fixed ? 1 : 2)}>{t("common.back")}</Button>
@@ -195,6 +218,23 @@ export function PayFlow({ name, display, recipient, fixed, invoiceId, onStatus, 
               {dep.depositMemo && <Note tone="warning">{t("pay.memoWarn")}</Note>}
               <div className="oi-row oi-small"><span className="oi-muted" style={{ flex: 1 }}>{t("pay.theyGet", { name: display })}</span><span className="oi-num" style={{ fontWeight: 600 }}>{fromUnits(dep.amountOut)} {dep.destinationToken.toUpperCase()}</span></div>
               <div className="oi-row oi-small"><span className="oi-muted" style={{ flex: 1 }}>{t("common.fee")}</span><span className="oi-num">{fromUnits(dep.fee)} {dep.destinationToken.toUpperCase()}</span></div>
+              {privOn && (
+                <div className="oi-stack-sm" data-testid="pay-private">
+                  <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>{t("pay.priv.title")}</h3>
+                  {!privQuote.data && !privQuote.error ? <Skeleton height={60} radius={16} /> : (
+                    <>
+                      <CopyField label={t("pay.priv.cashOut")} value={pq.cashOut ? fromUnits(pq.cashOut, decimals) : "n/a"}
+                        display={pq.cashOut ? `${fromUnits(pq.cashOut, decimals)} ${group.symbol}` : "n/a"} mono={false}
+                        copyLabel={t("common.copy")} copiedLabel={t("common.copied")} testId="pay-private-cashout" />
+                      <p className="oi-small" style={{ margin: 0 }} data-testid="pay-private-fee">{pq.feeBps !== null
+                        ? t("pay.priv.fee", { fee: String(pq.feeBps / 100), receive: `${fromUnits(dep.amountIn, decimals)} ${group.symbol}` })
+                        : t("pay.priv.feeUnknown", { receive: `${fromUnits(dep.amountIn, decimals)} ${group.symbol}` })}</p>
+                    </>
+                  )}
+                  <p className="oi-small oi-muted" style={{ margin: 0 }}>{t("pay.priv.hidden")} {t("pay.priv.public", { name: display, receive: `${fromUnits(dep.amountIn, decimals)} ${group.symbol}` })}</p>
+                  <p className="oi-small oi-muted" style={{ margin: 0 }}>{t("pay.priv.secret")}</p>
+                </div>
+              )}
               <div className="oi-row oi-small" aria-live="off"><span className="oi-muted" style={{ flex: 1 }}>{t("pay.expires")}</span><span className="oi-num" style={{ fontWeight: 600 }} data-testid="pay-countdown">{left > 0 ? `${mm}:${ss}` : t("pay.expired")}</span></div>
             </div>
           )}

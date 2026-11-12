@@ -11,7 +11,7 @@ export interface ApiConfig {
   contracts: { registry: string; usdc: string; usdt: string; lending: string | null; ajo: string | null; mpcSigner: string | null };
   vaultCodeHash: string | null;
   explorer: string | null;
-  features: { earn: boolean; ajo: boolean; mcp: boolean; rescue: boolean; invest: boolean; ajoDao: boolean };
+  features: { earn: boolean; ajo: boolean; mcp: boolean; rescue: boolean; invest: boolean; ajoDao: boolean; privatePay: boolean };
   /** Optional extras the server may add for vault creation; see lib/signup.ts. */
   nodeUrl?: string;
   vaultFunding?: string;
