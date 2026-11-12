@@ -68,7 +68,7 @@ Not covered by these properties: concurrent `earn_off` (finding V-1), lending re
 - `/api/topup` sends NEAR to an Oiko account (identity or vault) whose free balance is below the threshold. `/api/sync` calls the permissionless `sync()`.
 
 ### Rate limits and budget, `apps/web/server/ratelimit.ts`
-Token buckets per IP and per account: register 5/h per IP and 2/h per name; relay 20/h per IP and 5/h per account; topup 10/h per IP and 3/day per account; sync 60/min per IP and 6/min per vault; gateway and MCP 120/min per IP and 60/min per key; intents 30/min; simulate 10/min. There is also a global daily relayer budget (`RELAYER_DAILY_BUDGET_NEAR`). These limits are **in memory per server instance**, so on serverless they are best effort. The client IP comes from `x-forwarded-for`, which a client can set when the app is not behind a proxy that overwrites it.
+Token buckets per IP and per account: register 5/h per IP and 2/h per name; relay 20/h per IP and 5/h per account; topup 10/h per IP and 3/day per account; sync 60/min per IP and 6/min per vault; gateway and MCP 120/min per IP and 60/min per key; intents 30/min (also used by `/api/private-pay`); simulate 10/min. There is also a global daily relayer budget (`RELAYER_DAILY_BUDGET_NEAR`). These limits are **in memory per server instance**, so on serverless they are best effort. The client IP comes from `x-forwarded-for`, which a client can set when the app is not behind a proxy that overwrites it.
 
 ### Storage
 With `DATABASE_URL`, nonces, the access log, push subscriptions and mock swaps are kept in Postgres. Without it they are kept in memory per instance: nonce replay protection and the access log reset on restart and are not shared between instances.

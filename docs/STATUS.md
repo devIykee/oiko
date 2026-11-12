@@ -1,4 +1,4 @@
-# Status (2026-11-06)
+# Status (2026-11-12)
 
 ## Works (verified)
 
@@ -9,7 +9,7 @@
 - **Proactive agents (Phase 3):** events (`/api/agent/events`, signed webhooks delivered by cron, MCP notifications) with deterministic suggested actions; proposals for non-money changes approved on Home; opt-in autopilot rules; month brief; `how_to_fix` on every refusal; each agent's approved/rejected record.
 - **Optional payer privacy (flag off):** with `FEATURE_PRIVATE_PAY`, a sender paying from a Gloam private balance on Base or Ethereum gets the exact amount to cash out to the payment address (Gloam fee read live). Hides who paid, not the amount or the balance. See `docs/PRIVACY.md`.
 - **Local mode:** `pnpm local` or `docker compose up` with no keys and no testnet; `pnpm e2e` (16 Playwright tests, ~3 min) passes against both. CI runs checks, unit tests, contracts, e2e and a fresh-clone compose run.
-- **Checks:** 179 unit tests, typecheck, production build, `check-no-llm`, `check-copy`, `readme-check`.
+- **Checks:** 202 unit tests, typecheck, production build, `check-no-llm`, `check-copy`, `readme-check`.
 
 ## Quality (Phase 4)
 
