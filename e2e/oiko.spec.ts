@@ -363,3 +363,38 @@ test("README-12 banned-words check passes", () => {
   // Exits non-zero (and execFileSync throws) when user-facing copy contains a banned word.
   execFileSync("node", ["scripts/check-copy.mjs"], { cwd: ROOT, encoding: "utf8", stdio: "pipe" });
 });
+
+test("README-15 the name box focuses from anywhere inside it: side padding and the suffix", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.goto("/start");
+  const input = page.getByTestId("start-name");
+  const wrap = input.locator("xpath=..");
+  const suffix = wrap.locator(".oi-input-affix");
+  await input.fill("steve");
+  const ring = () => wrap.evaluate((el) => el.matches(":focus-within") && getComputedStyle(el).boxShadow !== "none");
+
+  // Left padding (14 px wide): focus moves into the field and the box shows its ring.
+  await input.blur();
+  await expect(input).not.toBeFocused();
+  await wrap.click({ position: { x: 5, y: 26 } });
+  await expect(input).toBeFocused();
+  expect(await ring()).toBe(true);
+
+  // The ".oiko…" suffix: focus, caret at the end, so typing continues the name.
+  await input.blur();
+  await suffix.click();
+  await expect(input).toBeFocused();
+  expect(await ring()).toBe(true);
+  await page.keyboard.type("x");
+  await expect(input).toHaveValue("stevex");
+
+  // Right padding, past the suffix.
+  await input.blur();
+  const box = (await wrap.boundingBox())!;
+  await wrap.click({ position: { x: box.width - 5, y: 26 } });
+  await expect(input).toBeFocused();
+
+  // Text inside the field still selects normally.
+  await input.dblclick();
+  expect(await input.evaluate((el: HTMLInputElement) => el.value.slice(el.selectionStart!, el.selectionEnd!))).toBe("stevex");
+});

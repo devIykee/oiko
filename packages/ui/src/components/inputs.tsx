@@ -1,5 +1,5 @@
 "use client";
-import { forwardRef, useEffect, useId, useState, type InputHTMLAttributes, type ReactNode } from "react";
+import { forwardRef, useEffect, useId, useRef, useState, type InputHTMLAttributes, type MouseEvent, type ReactNode } from "react";
 import { Icon } from "../icons";
 import { cx } from "./primitives";
 
@@ -20,12 +20,34 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const auto = useId();
   const fid = id ?? auto;
   const hintId = `${fid}-hint`;
+  const inner = useRef<HTMLInputElement | null>(null);
+  const setRef = (el: HTMLInputElement | null) => {
+    inner.current = el;
+    if (typeof ref === "function") ref(el);
+    else if (ref) ref.current = el;
+  };
+  // The whole box is the click target: a press on its padding or on the prefix/suffix focuses the field
+  // (caret at the nearer end) instead of doing nothing. Presses on the input itself, or on a button or link
+  // inside the box (e.g. a "Save" suffix), keep their normal behaviour.
+  const focusFromWrap = (e: MouseEvent<HTMLDivElement>) => {
+    const el = inner.current;
+    if (!el || el.disabled || e.button !== 0 || e.target === el) return;
+    const hit = (e.target as Element).closest("a, button, input, select, textarea, [tabindex]");
+    if (hit && e.currentTarget.contains(hit)) return;
+    e.preventDefault(); // keep focus from landing on nothing and blurring the field
+    el.focus();
+    const r = el.getBoundingClientRect();
+    if (e.clientX >= r.right || e.clientX <= r.left) {
+      const at = e.clientX >= r.right ? el.value.length : 0;
+      try { el.setSelectionRange(at, at); } catch { /* types without a text selection (email, number) */ }
+    }
+  };
   return (
     <div className={cx("oi-field", className)}>
       <label htmlFor={fid} className={hideLabel ? "oi-sr" : "oi-label"}>{label}</label>
-      <div className="oi-input-wrap" data-invalid={error ? "true" : undefined}>
+      <div className="oi-input-wrap" data-invalid={error ? "true" : undefined} onMouseDown={focusFromWrap}>
         {prefix && <span className="oi-input-affix">{prefix}</span>}
-        <input ref={ref} id={fid} className="oi-input" aria-invalid={error ? true : undefined}
+        <input ref={setRef} id={fid} className="oi-input" aria-invalid={error ? true : undefined}
           aria-describedby={hint || error || success ? hintId : undefined} {...rest} />
         {suffix && <span className="oi-input-affix">{suffix}</span>}
       </div>

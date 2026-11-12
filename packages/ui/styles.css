@@ -123,7 +123,7 @@
 /* ---------- Inputs ---------- */
 .oi-field { display: flex; flex-direction: column; gap: 6px; }
 .oi-label { font-size: 14px; font-weight: 500; color: var(--ink-2); }
-.oi-input-wrap { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-input); padding: 0 14px; min-height: 52px; transition: border-color var(--dur-fast); }
+.oi-input-wrap { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-input); padding: 0 14px; min-height: 52px; cursor: text; transition: border-color var(--dur-fast); }
 .oi-input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .oi-input-wrap[data-invalid="true"] { border-color: var(--danger); }
 .oi-input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 16px; height: 50px; outline: none; }
