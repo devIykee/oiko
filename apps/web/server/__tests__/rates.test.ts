@@ -56,4 +56,26 @@ describe("shared limits across instances (review S-1)", () => {
     expect(await checkSharedLimits("register", "8.8.8.8", "carol", shared, t)).toBe(false); // 2 per account per hour
     expect(await checkSharedLimits("register", "8.8.8.8", "carol", shared, t + 3_600_000)).toBe(true); // next window
   });
+
+  it("skips shared limits in local mode, so the e2e suite can sign up more than 5 accounts from one IP", async () => {
+    const { checkSharedLimits, checkLimits } = await import("../ratelimit");
+    const { MemoryStore } = await import("../store");
+    const shared = new MemoryStore();
+    const prev = process.env.OIKO_NETWORK;
+    process.env.OIKO_NETWORK = "local";
+    try {
+      let sharedOk = 0;
+      let memOk = 0;
+      const t = 1_800_000_000_000;
+      for (let i = 0; i < 8; i++) {
+        if (await checkSharedLimits("register", "9.9.9.9", `name${i}`, shared, t)) sharedOk++;
+        if (checkLimits("register", "9.9.9.9", `name${i}`, t)) memOk++;
+      }
+      expect(sharedOk).toBe(8);
+      expect(memOk).toBe(8);
+    } finally {
+      if (prev === undefined) delete process.env.OIKO_NETWORK;
+      else process.env.OIKO_NETWORK = prev;
+    }
+  });
 });

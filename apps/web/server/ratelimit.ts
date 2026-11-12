@@ -70,6 +70,8 @@ export function resetLimitsForTests(): void {
  * when DATABASE_URL is set): `limit` slots per caller per window, each claimable once. Run it after checkLimits.
  */
 export async function checkSharedLimits(kind: keyof typeof LIMITS, ip: string, account: string | null, store: { useNonce(n: string, pk: string, exp: number): Promise<boolean> }, now = Date.now()): Promise<boolean> {
+  // Same skip as checkLimits: a local sandbox has no production rate limits to enforce.
+  if (process.env.OIKO_NETWORK === "local") return true;
   const l = LIMITS[kind];
   const claim = async (who: string, [limit, windowMs]: readonly [number, number]) => {
     const win = Math.floor(now / windowMs);
