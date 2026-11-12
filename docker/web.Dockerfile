@@ -1,6 +1,13 @@
 # Oiko web app (Next.js) for local mode.
 FROM node:22-bookworm-slim
-RUN corepack enable && apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
+# apt: retries + IPv4 so a DNS blip reaching the package mirrors does not fail the build (CI flake).
+RUN corepack enable \
+ && printf 'Acquire::Retries "5";\nAcquire::ForceIPv4 "true";\n' > /etc/apt/apt.conf.d/80-ci-retries \
+ && for i in 1 2 3 4 5; do \
+      (apt-get update && apt-get install -y --no-install-recommends curl ca-certificates) && break; \
+      [ "$i" = 5 ] && exit 1; echo "apt attempt $i failed, retrying"; sleep $((i * 10)); \
+    done \
+ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1 CI=1
 # Manifests first so dependency installs are cached.
