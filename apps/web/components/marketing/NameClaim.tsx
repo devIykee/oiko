@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
 import { Glyph, checkmarkCircleFill, xmarkCircleFill } from "./f7";
 import { displayAccount, displayRoot, getJson, useSiteConfig } from "./live";
 import { pillClass } from "./ui";
@@ -15,6 +15,22 @@ export function NameClaim() {
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const inputId = useId();
   const hintId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // The input only hugs the typed name, so the ".oiko…" suffix and the rest of the pill were dead space (a click
+  // there selected the suffix text). A press anywhere on the pill except the input or the button focuses the field,
+  // caret at the nearer end.
+  const focusFromPill = (e: MouseEvent<HTMLDivElement>) => {
+    const el = inputRef.current;
+    if (!el || e.button !== 0 || e.target === el || (e.target as Element).closest("button, a")) return;
+    e.preventDefault();
+    el.focus();
+    const r = el.getBoundingClientRect();
+    if (e.clientX >= r.right || e.clientX <= r.left) {
+      const at = e.clientX >= r.right ? el.value.length : 0;
+      el.setSelectionRange(at, at);
+    }
+  };
 
   useEffect(() => {
     if (!name) return setStatus({ kind: "idle" });
@@ -40,13 +56,14 @@ export function NameClaim() {
       }}
     >
       <label htmlFor={inputId} className="sr-only">Choose your name</label>
-      <div className="flex items-center gap-2 rounded-full bg-surface p-1.5 pl-5 shadow-[0_0_0_1px_var(--line)] focus-within:shadow-[0_0_0_2px_var(--focus)]">
+      <div onMouseDown={focusFromPill} className="flex cursor-text items-center gap-2 rounded-full bg-surface p-1.5 pl-5 shadow-[0_0_0_1px_var(--line)] focus-within:shadow-[0_0_0_2px_var(--focus)]">
         <div className="flex min-w-0 flex-1 items-baseline text-[17px] md:text-[19px]">
           {/* Auto-width: an invisible copy of the text sizes the grid cell, so the input hugs the name exactly. The
               ".oiko…" suffix truncates first on narrow phones; very long names scroll inside the input. */}
           <span className="inline-grid min-w-[1ch] max-w-[70%] shrink-0">
             <span aria-hidden className="invisible col-start-1 row-start-1 overflow-hidden whitespace-pre font-semibold">{name || "steve"}</span>
             <input
+              ref={inputRef}
               id={inputId}
               value={name}
               onChange={(e) => setName(e.target.value.toLowerCase().replace(/\s/g, ""))}

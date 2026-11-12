@@ -364,7 +364,7 @@ test("README-12 banned-words check passes", () => {
   execFileSync("node", ["scripts/check-copy.mjs"], { cwd: ROOT, encoding: "utf8", stdio: "pipe" });
 });
 
-test("README-15 the name box focuses from anywhere inside it: side padding and the suffix", async ({ page }) => {
+test("README-15 name boxes focus from anywhere inside them: side padding and the suffix (sign-up and landing hero)", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 780 });
   await page.goto("/start");
   const input = page.getByTestId("start-name");
@@ -397,4 +397,36 @@ test("README-15 the name box focuses from anywhere inside it: side padding and t
   // Text inside the field still selects normally.
   await input.dblclick();
   expect(await input.evaluate((el: HTMLInputElement) => el.value.slice(el.selectionStart!, el.selectionEnd!))).toBe("stevex");
+
+  // The landing hero's own name box: the input hugs the typed name, the rest of the pill must still focus it.
+  for (const width of [360, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/");
+    const hero = page.getByRole("textbox", { name: "Choose your name" });
+    const pill = hero.locator("xpath=ancestor::div[contains(@class, 'rounded-full')][1]");
+    // Wait until the page is interactive: the hint under the box only changes once React runs (a fill before
+    // hydration can be reset by it, hence the retry).
+    await expect(async () => {
+      await hero.fill("steve");
+      const hint = page.locator(`[id="${await hero.getAttribute("aria-describedby")}"]`);
+      await expect(hint).not.toHaveText("Your name becomes your pay link.", { timeout: 1_000 });
+    }).toPass({ timeout: 30_000 });
+    await hero.blur();
+    await pill.getByText(/^\.oiko/).click();
+    await expect(hero).toBeFocused();
+    expect(await pill.evaluate((el) => el.matches(":focus-within"))).toBe(true);
+    await page.keyboard.type("x");
+    await expect(hero).toHaveValue("stevex");
+    // Empty space between the suffix and the button, and the left padding.
+    const pb = (await pill.boundingBox())!;
+    const bb = (await pill.getByRole("button").boundingBox())!;
+    for (const x of [bb.x - pb.x - 6, 6]) {
+      await hero.blur();
+      await pill.click({ position: { x, y: pb.height / 2 } });
+      await expect(hero).toBeFocused();
+    }
+    // The button still submits instead of just focusing.
+    await pill.getByRole("button").click();
+    await expect(page).toHaveURL(/\/start\?name=stevex/);
+  }
 });
