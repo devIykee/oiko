@@ -148,6 +148,9 @@ export async function payFromTron(browser: Browser, name: string, amount: string
   const page = await ctx.newPage();
   try {
     await page.goto(`/pay/${name}`);
+    // The pay screen streams in: for a moment React's hidden Suspense copy (<div hidden id="S:0">) sits next to the
+    // live one, and a strict locator fails at once if it sees both. Wait for the swap to finish first.
+    await expect(page.getByTestId("pay-recipient")).toHaveCount(1);
     await expect(page.getByTestId("pay-recipient")).toBeVisible();
     await page.locator('[data-testid^="pay-origin-"]', { hasText: /USDT/ }).filter({ hasText: /TRON/i }).first().click();
     await page.getByTestId("pay-amount").fill(amount);
