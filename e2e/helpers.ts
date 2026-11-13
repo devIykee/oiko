@@ -142,13 +142,21 @@ export async function claimNameUI(page: Page, name: string): Promise<Session> {
   return readSession(page);
 }
 
+/** Waits until the pay screen has finished streaming in. It arrives first as a hidden copy inside React's Suspense
+ *  container (<div hidden id="S:0">); for 100-200 ms that copy and the live one both exist, which a strict locator
+ *  rejects. Wait for the visible one, then for the hidden container to go. */
+export async function waitForPayScreen(page: Page) {
+  await expect(page.getByTestId("pay-recipient").filter({ visible: true })).toBeVisible();
+  await expect(page.locator('div[hidden][id^="S:"]')).toHaveCount(0);
+}
+
 /** Pays `name` from "USDT on TRON" in a fresh browser context with the test-mode Simulate button. Returns amountOut (units). */
 export async function payFromTron(browser: Browser, name: string, amount: string): Promise<bigint> {
   const ctx = await browser.newContext({ baseURL: BASE });
   const page = await ctx.newPage();
   try {
     await page.goto(`/pay/${name}`);
-    await expect(page.getByTestId("pay-recipient")).toBeVisible();
+    await waitForPayScreen(page);
     await page.locator('[data-testid^="pay-origin-"]', { hasText: /USDT/ }).filter({ hasText: /TRON/i }).first().click();
     await page.getByTestId("pay-amount").fill(amount);
     await page.getByTestId("pay-continue-2").click();
