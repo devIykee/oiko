@@ -8,7 +8,7 @@ Amounts are decimal strings in base units (6 decimals) plus a `token` ticker fie
 
 | Method | Path | Body / query | Response |
 |---|---|---|---|
-| GET | `/api/config` | | `{ network, root, contracts: {registry, usdc, usdt, lending, ajo, mpcSigner}, vaultCodeHash, explorer, features: {earn, ajo, mcp, rescue, invest, ajoDao} }` |
+| GET | `/api/config` | | `{ network, root, contracts: {registry, usdc, usdt, lending, ajo, mpcSigner}, vaultCodeHash, explorer, features: {earn, ajo, mcp, rescue, invest, ajoDao, privatePay} }` (`privatePay` added 2026-11-12, `FEATURE_PRIVATE_PAY`, default false) |
 | GET | `/api/names/:name` | | `{ name, available, accountId, vaultId, exists, suggestions: [string] }` |
 | POST | `/api/register` | `{ name, ownerPublicKey, appPublicKey }` | `{ accountId, vaultId, txHash }` — relayer calls `registry.register_name` |
 | POST | `/api/relay` | `{ signedDelegate: base64 }` | `{ txHash, outcome }` — relayer wraps a NEP-366 SignedDelegate; only for receivers under the root and only allow-listed action shapes |
@@ -28,6 +28,7 @@ Wraps 1Click (`ONECLICK_BASE_URL`, default real `https://1click.chaindefuser.com
 | POST | `/api/intents/deposit-address` | `{ name, originAsset, amount, refundTo, invoiceId? }` | `{ depositAddress, depositMemo?, amountIn, amountOut, fee, deadline, quoteId, destinationToken }` — with `invoiceId` the server ignores `amount`, quotes what is left to pay on the invoice (origin must be the invoice's stablecoin), records the deposit (and its test-mode ticket) on the invoice, and adds `invoiceId` to the response |
 | POST | `/api/intents/withdraw-quote` | `{ vaultId, potId, token, amount, destinationAsset, destinationAddress }` | `{ depositAddress, amountIn, amountOut, fee, deadline, timeEstimate }` |
 | GET | `/api/intents/status/:depositAddress` | | `{ status: "PENDING_DEPOSIT" \| "KNOWN_DEPOSIT_TX" \| "PROCESSING" \| "SUCCESS" \| "INCOMPLETE_DEPOSIT" \| "REFUNDED" \| "FAILED", updatedAt }` — on SUCCESS the server calls `sync()` on the vault |
+| GET | `/api/private-pay?asset=&amount=` | `asset` = a 1Click origin asset id, `amount` = what the deposit address must receive (base units) | Added 2026-11-12, only with `FEATURE_PRIVATE_PAY` (otherwise 404 `E_DISABLED`). `{ receive, feeBps: number \| null, cashOut: string \| null, chainId, source }`: how much to cash out of a Gloam private balance so `receive` arrives; Gloam's fee is read live and both are null when it can't be read. 400 `E_BAD_REQUEST` for an origin Gloam can't pay from or a bad amount. See `docs/PRIVACY.md` |
 | POST | `/api/intents/simulate-deposit` | `{ depositAddress, memo?, ticket?, invoiceId? }` | testnet/local only: the mock marks the deposit as sent; with `invoiceId` the newer ticket is stored on the invoice |
 
 ## Agent gateway (`/api/agent/*`)

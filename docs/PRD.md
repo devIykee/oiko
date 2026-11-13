@@ -246,7 +246,7 @@ Business mode and the agent connector have no evidence from users yet; they need
 | realworld (primary) | Stablecoin savings, receive-by-name, wrong-chain rescue                | Strong                                         |
 | social              | Ajo circles                                                            | Strong; can also be presented as its own entry |
 | agents              | Agent connector with scoped keys, built-in agents, leftover-cash agent | Strong                                         |
-| privacy             | Private AI via NEAR AI TEE, hash-only health record                    | Medium                                         |
+| privacy             | Private AI via NEAR AI TEE, hash-only health record; optional payer privacy from a Gloam balance (section 20) | Medium                                         |
 | defi                | Rhea Earn, utilization guard                                           | Medium                                         |
 | business            | Promo verdict, health record                                           | Medium (no evidence collected)                 |
 
@@ -292,4 +292,10 @@ Primary: Phantom (https://phantom.com). It's the closest match: a self-custody c
 | CTA                | Repeat the hero CTA, plus a waitlist or testnet app link.                                                                                                                                                         |
 | Footer note        | 'Built at NEAR Hackathon 2026', a GitHub link, and a disclaimer: not a bank; yields are variable; tokenized assets carry issuer and regulatory risk.                                                              |
 
-Patterns to copy: - Short headline-led sections (Phantom). - Big numeric proof lines (Mercury). - Plain-English reassurance headings (Family). - A single CTA repeated top and bottom. Pitfalls to avoid: - Promising fixed APY. - Implying deposit insurance. - Showing stocks to US visitors without a geo note. - Heavy WebGL that hurts mobile load on Nigerian networks. - Crypto jargon above the fold. - Invented user counts.	
+Patterns to copy: - Short headline-led sections (Phantom). - Big numeric proof lines (Mercury). - Plain-English reassurance headings (Family). - A single CTA repeated top and bottom. Pitfalls to avoid: - Promising fixed APY. - Implying deposit insurance. - Showing stocks to US visitors without a geo note. - Heavy WebGL that hurts mobile load on Nigerian networks. - Crypto jargon above the fold. - Invented user counts.
+
+20. Optional privacy: paying from a Gloam balance (2026-11-12)
+Design and trust model: docs/PRIVACY.md. Gloam (gloam.trade) is a shielded pool on EVM chains with no NEAR support, so it cannot hide Oiko balances or the amounts an account receives. What ships is payer privacy on the pay page.
+- User story: as someone paying a pay link from a Gloam private balance, I want to know exactly how much to cash out to the payment address, so the payment arrives in full and isn't linked to my usual account.
+- Acceptance: with FEATURE_PRIVATE_PAY off (the default) the pay page is unchanged and /api/private-pay answers 404. With it on, the switch appears only for USDC on Base, USDC on Ethereum and USDT on Ethereum, starts off, and when on shows the refund warning, the cash-out amount grossed up for Gloam's live fee ("n/a" if unreadable), and what is hidden versus public. The payment itself is unchanged (e2e README-16).
+- Non-goals: private balances, private received amounts, private agent activity, holding or asking for a Gloam secret.

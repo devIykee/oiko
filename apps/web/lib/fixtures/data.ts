@@ -178,7 +178,7 @@ export async function handle(path: string, method: string, body: unknown): Promi
   await sleep(250);
   const p = path.split("?")[0]!;
   const b = (body ?? {}) as Record<string, string>;
-  if (p === "/api/config") return { network: "testnet", root, contracts: { registry: root, usdc: `usdc.${root}`, usdt: `usdt.${root}`, lending: `lending.${root}`, ajo: `ajo.${root}`, mpcSigner: null }, vaultCodeHash: "8Xq3fixture", explorer: "https://testnet.nearblocks.io", features: { earn: true, ajo: true, mcp: true, rescue: false, invest: false, ajoDao: false } };
+  if (p === "/api/config") return { network: "testnet", root, contracts: { registry: root, usdc: `usdc.${root}`, usdt: `usdt.${root}`, lending: `lending.${root}`, ajo: `ajo.${root}`, mpcSigner: null }, vaultCodeHash: "8Xq3fixture", explorer: "https://testnet.nearblocks.io", features: { earn: true, ajo: true, mcp: true, rescue: false, invest: false, ajoDao: false, privatePay: false } };
   if (p === "/api/rates/earn") return { source: "fixture", fetchedAt: new Date(NOW - 300_000).toISOString(), assets: [{ token: "usdc", supplyApr: "0.0412", utilizationBps: 7840, paused: false }, { token: "usdt", supplyApr: "0.0388", utilizationBps: 9310, paused: true }] };
   if (p.startsWith("/api/names/")) {
     const name = decodeURIComponent(p.slice(11));

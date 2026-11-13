@@ -78,6 +78,7 @@ Behind `FEATURE_INVEST`, with a risk sheet before the first buy, no agent auto-b
 - **Rescue:** the sweeper UI for wrong-chain deposits to the permanent EVM/TRON address (`rescue_sign` exists in the contract; there is no UI or sweeper yet).
 - **Push notifications:** web push (VAPID) for payments received, bills due, invoices paid and agent actions.
 - **ROSCA + Sputnik DAO:** a DAO per group to vote out a defaulter or change reminders (Social Money track stretch).
+- **Privacy (`docs/PRIVACY.md`):** payer privacy from a Gloam balance is built behind `FEATURE_PRIVATE_PAY` (off). Next: one real-money Gloam cash out into a 1Click deposit address before turning the flag on anywhere; then decide on NEAR-side confidentiality (1Click `confidentiality` / `CONFIDENTIAL_INTENTS`), which is the only route to hiding received amounts and is a separate trust model.
 - **Recovery:** add a second passkey, export a recovery code, and a "sign in on a new device" walkthrough.
 
 ## 4. Launch steps (human)

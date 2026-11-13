@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GatewayClient, decodeConnectionString, friendlyError, generateKeyPair, toUnits, type Overview } from "../packages/sdk/src/index.ts";
 import {
-  BASE, TRON_REFUND, apiUser, claimNameUI, config, fund, loginAs, payFromTron, relayerCall, rpc, until, vaultOf, waitForUsdt, type Session,
+  BASE, TRON_REFUND, apiUser, claimNameUI, config, fund, loginAs, payFromTron, relayerCall, rpc, until, vaultOf, waitForPayScreen, waitForUsdt, type Session,
 } from "./helpers";
 
 const ROOT = join(__dirname, "..");
@@ -429,4 +429,62 @@ test("README-15 name boxes focus from anywhere inside them: side padding and the
     await pill.getByRole("button").click();
     await expect(page).toHaveURL(/\/start\?name=stevex/);
   }
+});
+
+test("README-16 paying from a Gloam private balance: off by default, opt-in when the flag is on", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  const payee = await apiUser("priv");
+  const EVM_REFUND = "0x000000000000000000000000000000000000dEaD";
+  const toDeposit = async (origin: RegExp, refund: string) => {
+    await page.goto(`/pay/${payee.name}`);
+    await waitForPayScreen(page);
+    await page.locator('[data-testid^="pay-origin-"]').filter({ hasText: origin }).first().click();
+    await page.getByTestId("pay-amount").fill("100");
+    await page.getByTestId("pay-continue-2").click();
+    await page.getByTestId("pay-refund").fill(refund);
+  };
+  const noSideways = async () => {
+    const w = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+    expect(w.scroll).toBeLessThanOrEqual(w.client + 1);
+  };
+
+  // Flag off (the default): no switch, no Gloam card, and the endpoint refuses.
+  expect((await config()).features.privatePay).toBe(false);
+  const off = await page.request.get(`/api/private-pay?asset=${encodeURIComponent("nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near")}&amount=1000000`);
+  expect(off.status()).toBe(404);
+  await toDeposit(/USDC on Base/, EVM_REFUND);
+  await expect(page.getByTestId("pay-private-toggle")).toHaveCount(0);
+  await page.getByTestId("pay-continue-3").click();
+  await expect(page.getByTestId("pay-deposit")).toBeVisible();
+  await expect(page.getByTestId("pay-private")).toHaveCount(0);
+
+  // Flag on (config rewritten in the browser; the fee endpoint itself is unit-tested): still off until the sender opts in.
+  await page.route("**/api/config", async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    await route.fulfill({ response: res, json: { ...body, features: { ...body.features, privatePay: true } } });
+  });
+  await page.route("**/api/private-pay?**", (route) => route.fulfill({ json: { receive: "100000000", feeBps: 50, cashOut: "100502512", chainId: 8453, source: "test" } }));
+
+  await toDeposit(/USDT on TRON/, TRON_REFUND); // Gloam can't pay from TRON: no switch
+  await expect(page.getByTestId("pay-private-toggle")).toHaveCount(0);
+
+  await toDeposit(/USDC on Base/, EVM_REFUND);
+  const toggle = page.getByTestId("pay-private-toggle");
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText(/give one that isn't linked to you/)).toBeVisible();
+  await noSideways();
+  await page.getByTestId("pay-continue-3").click();
+  const card = page.getByTestId("pay-private");
+  await expect(card).toBeVisible();
+  await expect(page.getByTestId("pay-private-cashout")).toContainText("100.502512 USDC");
+  await expect(page.getByTestId("pay-private-fee")).toContainText("0.5%");
+  await expect(card).toContainText("Oiko never asks for your Gloam secret");
+  await noSideways();
+
+  // The payment itself is unchanged: same deposit address, same delivery.
+  await page.getByTestId("pay-simulate").click();
+  await expect(page.getByTestId("pay-done")).toBeVisible({ timeout: 120_000 });
 });

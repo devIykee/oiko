@@ -20,6 +20,7 @@ export async function api<T = any>(path: string, body?: unknown): Promise<T> {
 export interface ApiConfig {
   network: string; root: string; nodeUrl: string; relayer: string | null; vaultCodeHash: string; vaultFunding: string;
   contracts: { usdc: string; usdt: string; lending: string | null; ajo: string | null; mpcSigner: string | null };
+  features: Record<string, boolean>;
 }
 let cfgP: Promise<ApiConfig> | null = null;
 export const config = () => (cfgP ??= api<ApiConfig>("/api/config"));
