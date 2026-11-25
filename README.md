@@ -173,7 +173,7 @@ A public ledger is a strange place to keep a budget: anyone can look up an accou
 - **Backwards compatible.** No contract change, no API break. It works on accounts made with the earlier vault too (`scripts/veil-compat.sh`), plain names keep working, and agents, webhooks and push notifications from before Veil see "Private" instead of ciphertext. Clients that hold the view key opt in with `X-Oiko-Labels: sealed`. Old sign-in codes and connection strings still work.
 - **Honest about the rest.** Amounts, timing, pot kinds, plan percentages, locks and payees stay public because the contract enforces them. The app lists these under Settings → Privacy → "Still public".
 
-Design, threat model and references: `docs/PRIVACY.md`.
+Design, threat model and references: `docs/PRIVACY.md`. Full implementation guide (formats byte by byte, worked example, key lifecycle, every code path and test): `docs/PRIVACY-IMPLEMENTATION.md`.
 
 ## NEAR features used
 

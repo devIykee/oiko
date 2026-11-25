@@ -2,6 +2,8 @@
 
 Personal finance data says a lot about a person. A pot called "Divorce lawyer", a bill called "Therapy" or an invoice to "Discreet Clinic" should not be readable by anyone who looks up an account on a NEAR explorer, and not by Oiko's own server either. This document describes **Veil**, the privacy layer that keeps those labels private, and is honest about what it does not hide.
 
+The engineering guide (every format, key, code path and test, with a worked example) is [`docs/PRIVACY-IMPLEMENTATION.md`](PRIVACY-IMPLEMENTATION.md).
+
 Code: `packages/sdk/src/veil.ts` (format, keys, seal/open), `packages/sdk/src/vault.ts` (sealing on write, opening on read), `apps/web/lib/{viewKey,privacy,sealedInvoice}.ts` (app), `packages/mcp/src/gatewayBackend.ts` (agents). Tests: `packages/sdk/test/veil.test.ts`, `apps/web/server/__tests__/privateInvoices.test.ts`, `packages/mcp/test/mcp.test.ts`, `contracts/vault/src/tests.rs` (`veil_tokens_fit_and_round_trip_through_json_args`).
 
 ## The problem
