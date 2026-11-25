@@ -22,7 +22,7 @@
     "framework7-icons": "^5.0.5",
     "motion": "^14.9.0",
     "near-api-js": "7.4.0",
-    "next": "16.4.3",
+    "next": "16.4.6",
     "postgres": "^3.4.9",
     "qrcode": "^1.5.4",
     "react": "19.3.0",
@@ -38,7 +38,7 @@
     "@types/react-dom": "^19",
     "@types/web-push": "3.6.4",
     "eslint": "^9",
-    "eslint-config-next": "16.4.3",
+    "eslint-config-next": "16.4.6",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^5.0.5"
