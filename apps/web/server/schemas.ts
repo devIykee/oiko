@@ -56,6 +56,12 @@ export const InvoiceItemZ = z.object({
   quantity: z.string().trim().regex(/^\d{1,9}(\.\d{1,4})?$/, "must be a number with up to 4 decimals").refine((q) => Number(q) > 0, "must be more than 0"),
   unitPrice: U128,
 });
+/** Private invoice (Veil): the real names and descriptions, encrypted in the owner's browser. `box` opens with a key that
+ *  travels only in the link's #fragment; `keyBox` is that key sealed with the owner's view key. The server can't open either. */
+export const InvoiceSealedZ = z.object({
+  box: z.string().startsWith("oikobox1:").max(64_000),
+  keyBox: z.string().startsWith("\u{1F512}").max(200),
+});
 export const InvoiceBody = z.object({
   fromName: z.string().trim().min(1).max(80),
   client: z.object({ name: z.string().trim().min(1, "add the client's name").max(120), email: z.string().trim().email().max(200).nullable().optional() }),
@@ -65,6 +71,7 @@ export const InvoiceBody = z.object({
   note: z.string().trim().max(1000).nullable().optional(),
   /** "draft" saves without sharing; "open" makes the link payable. */
   state: z.enum(["draft", "open"]).default("open"),
+  sealed: InvoiceSealedZ.nullable().optional(),
 });
 export const InvoicePatchBody = z.object({
   fromName: z.string().trim().min(1).max(80).optional(),
@@ -74,4 +81,5 @@ export const InvoicePatchBody = z.object({
   dueDate: IsoDate.optional(),
   note: z.string().trim().max(1000).nullable().optional(),
   state: z.enum(["draft", "open", "cancelled"]).optional(),
+  sealed: InvoiceSealedZ.nullable().optional(),
 });

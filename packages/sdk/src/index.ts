@@ -12,3 +12,4 @@ export * from "./insights";
 export * from "./agent";
 export * from "./caps";
 export * from "./changes";
+export * from "./veil";

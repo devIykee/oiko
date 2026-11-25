@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { GatewayClient, decodeConnectionString, friendlyError, generateKeyPair, toUnits, type Overview } from "../packages/sdk/src/index.ts";
+import { GatewayClient, decodeConnectionString, friendlyError, generateKeyPair, isSealed, toUnits, Veil, type Overview } from "../packages/sdk/src/index.ts";
 import {
   BASE, TRON_REFUND, apiUser, claimNameUI, config, fund, loginAs, payFromTron, relayerCall, rpc, until, vaultOf, waitForUsdt, type Session,
 } from "./helpers";
@@ -33,6 +33,22 @@ test.describe.serial("money flow for one person", () => {
     const bps = Object.fromEntries(o.splits.map((r) => [o.pots.find((p) => p.id === r.pot_id)!.kind, Number(r.value)]));
     expect(bps).toMatchObject({ bills: 3000, autosave: 2000, locked: 1000, goal: 1000 });
     expect(o.pots.some((p) => p.kind === "locked")).toBe(true);
+  });
+
+  test("README-16 pot names are private: the public record holds only sealed labels, the owner's app opens them", async ({ page }) => {
+    // Read the account the way anyone can (no view key): every pot name except Spend is a sealed 38-character token.
+    const raw = await (await vaultOf(me)).overview();
+    const named = raw.pots.filter((p) => p.kind !== "flex");
+    expect(named.length).toBe(4);
+    for (const p of named) { expect(isSealed(p.name)).toBe(true); expect([...p.name].length).toBe(38); }
+    const pub = JSON.stringify(raw) + JSON.stringify(await (await vaultOf(me)).activity(undefined, 50));
+    for (const word of ["Bills", "Rainy day", "Savings"]) expect(pub).not.toContain(word);
+    // The owner's browser has the view key and shows the real names.
+    await loginAs(page, me);
+    await page.goto("/pots");
+    await expect(page.getByText("Rainy day").first()).toBeVisible({ timeout: 30_000 });
+    await page.goto("/settings");
+    await expect(page.getByTestId("toggle-private-labels")).toBeVisible();
   });
 
   test("README-2 get paid 100 USDT from USDT on TRON, split across pots", async ({ page, browser }) => {
@@ -95,7 +111,9 @@ test.describe.serial("money flow for one person", () => {
     await expect(page.getByTestId("pot-locked")).toBeVisible();
     await expect(page.getByTestId("pot-move-out")).toBeDisabled();
     await page.goto("/withdraw");
-    await expect(page.getByRole("radio", { name: new RegExp(rainy.name) })).toBeDisabled();
+    // The pot's name on the record is sealed; the owner's browser shows it opened with the view key.
+    const rainyName = Veil.fromViewKey(me.viewKey!, me.vaultId).open(rainy.name);
+    await expect(page.getByRole("radio", { name: new RegExp(rainyName) })).toBeDisabled();
     o = await v.overview();
     expect(BigInt(o.pots.find((p) => p.id === rainy.id)!.balances.usdt)).toBe(held);
   });
@@ -331,13 +349,18 @@ test("README-13 an invoice paid from USDT on TRON shows Paid and lands in the CS
   await page.getByTestId("invoice-create").click();
   await expect(page.getByTestId("invoice-sheet")).toBeVisible({ timeout: 60_000 });
   const href = await page.getByTestId("invoice-view").getAttribute("href");
-  expect(href).toMatch(/^\/i\//);
+  expect(href).toMatch(/^\/i\/[^#]+#k=[A-Za-z0-9_-]{43}$/);
+  // Private invoice: Oiko's server only has ciphertext; the link's #fragment (never sent to the server) opens it.
+  const id = href!.slice(3, href!.indexOf("#"));
+  expect(JSON.stringify(await (await fetch(`${BASE}/api/invoices/${id}`)).json())).not.toContain("Northwind");
 
   // The client pays the public invoice page in a fresh browser (fixed amount, so no amount step).
   const ctx = await browser.newContext({ baseURL: BASE });
   const payer = await ctx.newPage();
   try {
     await payer.goto(href!);
+    await expect(payer.getByTestId("invoice-doc")).toContainText("Northwind Studio");
+    await expect(payer.getByTestId("invoice-private")).toBeVisible();
     await payer.getByTestId("invoice-pay-start").click();
     await payer.locator('[data-testid^="pay-origin-"]', { hasText: /TRON/i }).first().click();
     await payer.getByTestId("pay-refund").fill(TRON_REFUND);

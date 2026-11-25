@@ -9,6 +9,8 @@ import { LoadError, PageSkeleton } from "@/components/app/States";
 import { explain } from "@/lib/actions";
 import { fmt, fmtDate, fmtToken } from "@/lib/format";
 import { useT } from "@/lib/i18n";
+import { usePrivacy } from "@/lib/privacy";
+import { fragmentFor } from "@/lib/sealedInvoice";
 import { downloadInvoicesCsv, invoiceUrl, setInvoiceState, STATUS_TONE, useInvoices, type OwnerInvoice } from "@/lib/invoices";
 import { useSession } from "@/lib/session";
 
@@ -19,6 +21,7 @@ export function InvoicesScreen() {
   const t = useT();
   const toast = useToast();
   const { session } = useSession();
+  const { veil } = usePrivacy();
   const q = useInvoices();
   const params = useSearchParams();
   const router = useRouter();
@@ -38,7 +41,7 @@ export function InvoicesScreen() {
 
   const exportCsv = async () => {
     setExporting(true);
-    try { await downloadInvoicesCsv(session); toast.show({ message: t("inv.exported"), tone: "success" }); }
+    try { await downloadInvoicesCsv(session, veil); toast.show({ message: t("inv.exported"), tone: "success" }); }
     catch (e) { const f = explain(e); toast.show({ message: `${f.title} ${f.next}`, tone: "danger" }); }
     finally { setExporting(false); }
   };
@@ -83,7 +86,7 @@ function InvoiceSheet({ inv, onClose }: { inv: OwnerInvoice; onClose: () => void
   const [busy, setBusy] = useState(false);
   const [canShare, setCanShare] = useState(false);
   useEffect(() => { setCanShare(typeof navigator.share === "function"); }, []);
-  const link = invoiceUrl(inv.id);
+  const link = invoiceUrl(inv.id, inv.shareKey);
   const T = inv.token.toUpperCase();
   const canCancel = !["paid", "cancelled"].includes(inv.status) && !inv.inFlight;
   const publish = async () => {
@@ -113,7 +116,7 @@ function InvoiceSheet({ inv, onClose }: { inv: OwnerInvoice; onClose: () => void
             <CopyField label={t("inv.link")} value={link} copyLabel={t("common.copy")} copiedLabel={t("common.copied")} testId="invoice-link" />
             <p className="oi-micro oi-muted" style={{ margin: 0 }}>{t("inv.linkHint")}</p>
             <div className="oi-row" style={{ gap: 8 }}>
-              <a className="oi-btn oi-btn--secondary" style={{ flex: 1 }} href={`/i/${inv.id}`} target="_blank" rel="noopener noreferrer" data-testid="invoice-view"><span className="oi-btn__label">{t("inv.open")}</span></a>
+              <a className="oi-btn oi-btn--secondary" style={{ flex: 1 }} href={`/i/${inv.id}${fragmentFor(inv.shareKey ?? null)}`} target="_blank" rel="noopener noreferrer" data-testid="invoice-view"><span className="oi-btn__label">{t("inv.open")}</span></a>
               {canShare && <Button variant="secondary" icon="share" style={{ flex: 1 }} onClick={() => navigator.share({ title: `${inv.number}`, text: t("inv.shareText", { number: inv.number, from: inv.fromName, amount: fmtToken(inv.remaining, inv.token) }), url: link }).catch(() => undefined)}>{t("inv.share")}</Button>}
             </div>
           </div>

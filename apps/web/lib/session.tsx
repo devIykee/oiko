@@ -3,6 +3,7 @@
 //   appKey   function-call key on <name>.<root> for every owner method except withdraw_large/rescue_sign (day-to-day money actions)
 //   ownerKey full-access key; only via passkey re-auth (derived on demand, never stored) or the "this browser" key.
 import { APP_KEY_METHODS, Signer, act, generateKeyPair, publicKeyFromSecretKey } from "@oiko/sdk";
+import { viewKeyFor } from "./viewKey";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { isFixtureMode } from "./fixtures/mode";
 import { signInWithPasskey } from "./passkey";
@@ -20,6 +21,8 @@ export interface Session {
   /** Present only for "browser" and "demo" logins. */
   ownerKey?: string;
   credentialId?: string;
+  /** Veil view key (oikoview1:…), derived from the owner key; opens private labels. Never sent to the server. */
+  viewKey?: string;
   createdAt: number;
 }
 
@@ -33,7 +36,13 @@ function read(): Session | null {
   if (isFixtureMode()) return FIXTURE_SESSION;
   try {
     const raw = window.localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Session) : null;
+    if (!raw) return null;
+    const s = JSON.parse(raw) as Session;
+    // Sessions saved before private labels existed: derive the view key when this browser holds the owner key.
+    if (!s.viewKey && s.ownerKey) {
+      try { s.viewKey = viewKeyFor(s.ownerKey, s.accountId); window.localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* keep the session as it was */ }
+    }
+    return s;
   } catch {
     return null;
   }
@@ -50,7 +59,7 @@ interface SessionCtx {
   session: Session | null;
   /** Store a session after sign-up or sign-in. */
   save: (s: Session) => void;
-  update: (p: Partial<Pick<Session, "displayName">>) => void;
+  update: (p: Partial<Pick<Session, "displayName" | "viewKey">>) => void;
   signOut: () => void;
   /** Sign in with an existing passkey (new device): derives the owner key and adds a fresh app key. */
   passkeySignIn: () => Promise<Session>;
@@ -58,6 +67,8 @@ interface SessionCtx {
   codeSignIn: (code: string, passphrase: string) => Promise<Session>;
   /** Full-access key for rare actions (large withdrawals, recovery). Prompts for the passkey when needed. */
   getOwnerKey: () => Promise<string>;
+  /** Derives the view key on this device (asks for the passkey when the owner key isn't stored). */
+  unlockPrivacy: () => Promise<string>;
 }
 const Ctx = createContext<SessionCtx | null>(null);
 
@@ -73,7 +84,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const save = useCallback((s: Session) => { write(s); setSession(s); }, []);
-  const update = useCallback((p: Partial<Pick<Session, "displayName">>) => {
+  const update = useCallback((p: Partial<Pick<Session, "displayName" | "viewKey">>) => {
     setSession((s) => { if (!s) return s; const n = { ...s, ...p }; write(n); return n; });
   }, []);
   const signOut = useCallback(() => { write(null); setSession(null); }, []);
@@ -92,7 +103,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const owner = new Signer(rpc, accountId, r.secretKey);
     const res = await owner.signAndSend(accountId, [act.addFunctionCallKey(app.publicKey, vaultId, [...APP_KEY_METHODS], "250000000000000000000000")]);
     if (!res.ok) throw new Error(res.errorCode ?? "E_TX_FAILED");
-    const s: Session = { name: r.name, displayName: r.name, accountId, vaultId, appKey: app.secretKey, method: "passkey", credentialId: r.credentialId, createdAt: Date.now() };
+    const s: Session = { name: r.name, displayName: r.name, accountId, vaultId, appKey: app.secretKey, method: "passkey", credentialId: r.credentialId, viewKey: viewKeyFor(r.secretKey, accountId), createdAt: Date.now() };
     save(s);
     return s;
   }, [save]);
@@ -112,7 +123,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const res = await owner.signAndSend(p.accountId, [act.addFunctionCallKey(app.publicKey, p.vaultId, [...APP_KEY_METHODS], "250000000000000000000000")]).catch(() => null);
       if (res?.ok) appKey = app.secretKey;
     }
-    const s: Session = { name: p.name, displayName: p.displayName || p.name, accountId: p.accountId, vaultId: p.vaultId, appKey, method: p.method, ownerKey: p.ownerKey, credentialId: p.credentialId, createdAt: Date.now() };
+    const viewKey = p.viewKey ?? (p.ownerKey ? viewKeyFor(p.ownerKey, p.accountId) : undefined);
+    const s: Session = { name: p.name, displayName: p.displayName || p.name, accountId: p.accountId, vaultId: p.vaultId, appKey, method: p.method, ownerKey: p.ownerKey, credentialId: p.credentialId, viewKey, createdAt: Date.now() };
     save(s);
     return s;
   }, [save]);
@@ -124,10 +136,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return r.secretKey;
   }, [session]);
 
+  const unlockPrivacy = useCallback(async () => {
+    if (!session) throw new Error("E_NO_KEY: signed out");
+    if (session.viewKey) return session.viewKey;
+    const vk = viewKeyFor(await getOwnerKey(), session.accountId);
+    update({ viewKey: vk });
+    return vk;
+  }, [session, getOwnerKey, update]);
+
   const value = useMemo<SessionCtx>(() => ({
     status: !ready ? "loading" : session ? "signed-in" : "signed-out",
-    session, save, update, signOut, passkeySignIn, codeSignIn, getOwnerKey,
-  }), [ready, session, save, update, signOut, passkeySignIn, codeSignIn, getOwnerKey]);
+    session, save, update, signOut, passkeySignIn, codeSignIn, getOwnerKey, unlockPrivacy,
+  }), [ready, session, save, update, signOut, passkeySignIn, codeSignIn, getOwnerKey, unlockPrivacy]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

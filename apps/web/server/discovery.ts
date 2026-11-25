@@ -226,6 +226,11 @@ const connection = encodeConnectionString({ api: "${b}", vault: account.vaultId,
   ${b}/connect?name=<agent name>&url=<https agent site>&pk=ed25519:<your public key>&scopes=read,propose,act&actions=pay,save,move_between_pots&allow=a.near,b.near&per_tx=20&daily=50&weekly=200&days=30&callback=<https url>
   per_tx/daily/weekly here are plain amounts (20 = 20 USDC + USDT), not base units. days is 1-90. After approval the callback (https only) gets ?vault=<vault id>; use it as accountId.
 
+## Private labels (Veil)
+- Pot names, bill names and reasons may be sealed by the owner: 38-character strings that start with 🔒 (longer ones for reasons). Oiko's server can't read them.
+- If the owner shared their view key (\`vk\` in the connection string, or OIKO_VIEW_KEY=oikoview1:…), open them locally: \`Veil.fromViewKey(vk, vault).openDeep(response)\` from @oiko/sdk; oiko-mcp does this for you. Seal reasons you write with \`veil.seal(text, 280)\`.
+- Without the key, call them "Private" and refer to pots by id. Never guess what they say. Details: docs/PRIVACY.md in the repo.
+
 ## Auth (every request)
 Authorization: NEP413 <base64(JSON {accountId, publicKey, signature, nonce, message})>
 - accountId: the vault, e.g. vault.ada.${cfg.oiko.root}

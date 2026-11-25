@@ -5,12 +5,14 @@ import { publicKeyFromSecretKey } from "./keys";
 import { gatewayAuthHeader } from "./nep413";
 import { signTransactionBytes } from "./tx";
 import type { AgentAction } from "./types";
+import { decodeViewKey } from "./veil";
 
-export interface AgentConnection { api: string; vault: string; sk: string }
+/** `vk`: optional Veil view key (oikoview1:…) so the agent can read the owner's private labels. */
+export interface AgentConnection { api: string; vault: string; sk: string; vk?: string }
 
-/** `oiko1:<base64url(json {api, vault, sk})>` — shown once, as text and QR, when the owner connects an agent. */
+/** `oiko1:<base64url(json {api, vault, sk, vk?})>` — shown once, as text and QR, when the owner connects an agent. */
 export function encodeConnectionString(c: AgentConnection): string {
-  return `oiko1:${b64urlEncode(utf8(JSON.stringify({ api: c.api, vault: c.vault, sk: c.sk })))}`;
+  return `oiko1:${b64urlEncode(utf8(JSON.stringify({ api: c.api, vault: c.vault, sk: c.sk, ...(c.vk ? { vk: c.vk } : {}) })))}`;
 }
 export function decodeConnectionString(s: string): AgentConnection {
   const t = s.trim();
@@ -18,7 +20,8 @@ export function decodeConnectionString(s: string): AgentConnection {
   const j = JSON.parse(fromUtf8(b64decode(t.slice(6)))) as Partial<AgentConnection>;
   if (typeof j.api !== "string" || typeof j.vault !== "string" || typeof j.sk !== "string") throw new Error("Connection string is incomplete.");
   publicKeyFromSecretKey(j.sk); // validates
-  return { api: j.api.replace(/\/+$/, ""), vault: j.vault, sk: j.sk };
+  if (j.vk !== undefined) decodeViewKey(j.vk); // validates
+  return { api: j.api.replace(/\/+$/, ""), vault: j.vault, sk: j.sk, ...(typeof j.vk === "string" ? { vk: j.vk } : {}) };
 }
 
 export class GatewayError extends Error {

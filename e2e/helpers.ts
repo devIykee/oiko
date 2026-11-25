@@ -61,6 +61,8 @@ export async function relayerCall(receiver: string, method: string, args: object
 export interface Session {
   name: string; displayName: string; accountId: string; vaultId: string; appKey: string; ownerKey?: string;
   method: "browser" | "demo" | "passkey"; createdAt: number;
+  /** Veil view key, set by the app at sign-up (claimNameUI); apiUser sessions derive it in the browser. */
+  viewKey?: string;
 }
 
 /** Creates a name + keyless savings account through the public API (what the sign-up screen does). */

@@ -14,6 +14,8 @@ import { explain } from "@/lib/actions";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { useSettings, type Theme } from "@/lib/settings";
+import { PrivacySection } from "@/components/app/PrivacySection";
+import { usePrivacy } from "@/lib/privacy";
 
 export function SettingsScreen() {
   const t = useT();
@@ -21,6 +23,7 @@ export function SettingsScreen() {
   const router = useRouter();
   const { session, update, signOut } = useSession();
   const { settings, set } = useSettings();
+  const { veil } = usePrivacy();
   const { config } = useConfig();
   const ov = useOverview();
   const act = useActivity(200);
@@ -76,6 +79,8 @@ export function SettingsScreen() {
         </section>
       )}
 
+      <PrivacySection />
+
       <section aria-labelledby="security">
         <SectionTitle id="security">{t("settings.security")}</SectionTitle>
         <GroupedList label={t("settings.security")}>
@@ -84,7 +89,7 @@ export function SettingsScreen() {
           {session.method !== "demo" && <ListRow icon="send" color="violet" title={t("settings.move")} subtitle={t("settings.moveSub")} onClick={() => setMoving(true)} chevron data-testid="settings-move" />}
           <ListRow icon="export" color="blue" title={t("settings.export")} subtitle={t("settings.exportSub")} onClick={exportCsv} chevron />
           <ListRow icon="export" color="blue" title={t("settings.exportInvoices")} subtitle={t("settings.exportInvoicesSub")} chevron data-testid="settings-export-invoices"
-            onClick={() => { downloadInvoicesCsv(session).then(() => toast.show({ message: t("inv.exported") }), (e) => { const f = explain(e); toast.show({ message: `${f.title} ${f.next}` }); }); }} />
+            onClick={() => { downloadInvoicesCsv(session, veil).then(() => toast.show({ message: t("inv.exported") }), (e) => { const f = explain(e); toast.show({ message: `${f.title} ${f.next}` }); }); }} />
         </GroupedList>
       </section>
 

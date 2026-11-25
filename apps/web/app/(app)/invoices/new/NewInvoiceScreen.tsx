@@ -10,6 +10,7 @@ import { fmt, parseUnits } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { lineTotal } from "@/lib/invoiceMath";
 import { saveInvoice, useInvoices } from "@/lib/invoices";
+import { usePrivacy } from "@/lib/privacy";
 import { useSession } from "@/lib/session";
 
 interface Line { key: number; description: string; quantity: string; price: string }
@@ -30,6 +31,7 @@ export function NewInvoiceScreen() {
   const toast = useToast();
   const router = useRouter();
   const { session } = useSession();
+  const { writes } = usePrivacy();
   const editId = useSearchParams().get("edit");
   const list = useInvoices();
   const editing = editId ? list.data?.find((i) => i.id === editId) ?? null : null;
@@ -61,6 +63,9 @@ export function NewInvoiceScreen() {
   const valid = client.trim() && fromName.trim() && lines.every((l, i) => l.description.trim() && totals[i] !== null) && total > 0n && !emailBad && /^\d{4}-\d{2}-\d{2}$/.test(due);
 
   if (editId && !editing) return <div className="oi-col"><PageSkeleton rows={5} /></div>;
+  if (editing && editing.sealed && !editing.shareKey) {
+    return <div className="oi-col oi-page"><PageHeader title={t("inv.edit")} back="/invoices" /><Note tone="info">{t("privacy.lockedSub")}</Note></div>;
+  }
   if (editing && !editing.editable) {
     return <div className="oi-col oi-page"><PageHeader title={t("inv.edit")} back="/invoices" /><Note tone="info">{t("inv.lockedEdit")}</Note></div>;
   }
@@ -79,7 +84,7 @@ export function NewInvoiceScreen() {
         token: coin, dueDate: due, note: note.trim() || null,
         ...(editing ? (editing.state === "draft" ? { state } : {}) : { state }),
       };
-      const inv = await saveInvoice(session, input, editing?.id);
+      const inv = await saveInvoice(session, input, editing?.id, writes, editing?.sealed?.keyBox);
       toast.show({ message: editing ? t("inv.form.saved") : t("inv.form.created"), tone: "success" });
       router.push(`/invoices?open=${encodeURIComponent(inv.id)}`);
     } catch (e) {

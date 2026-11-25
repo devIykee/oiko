@@ -4,6 +4,7 @@ import { ONE_NEAR, Signer, act, generateKeyPair, type OikoConfig } from "@oiko/s
 import { api } from "./api";
 import { fetchApiConfig, rpcFor, toOikoConfig, type ApiConfig } from "./config";
 import { isFixtureMode } from "./fixtures/mode";
+import { viewKeyFor } from "./viewKey";
 import { createPasskey } from "./passkey";
 import type { LoginMethod, Session } from "./session";
 
@@ -90,6 +91,7 @@ export async function signUp(opts: {
   return {
     name, displayName, accountId: reg.accountId, vaultId: reg.vaultId, appKey: app.secretKey, method, credentialId,
     ownerKey: method === "passkey" ? undefined : owner.secretKey,
+    viewKey: viewKeyFor(owner.secretKey, reg.accountId),
     createdAt: Date.now(),
   };
 }

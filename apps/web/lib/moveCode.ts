@@ -7,7 +7,7 @@ export const MOVE_PREFIX = "oikomove1:";
 const ITERATIONS = 310_000;
 export const MIN_PASSPHRASE = 8;
 
-type Payload = Pick<Session, "name" | "displayName" | "accountId" | "vaultId" | "appKey" | "method" | "ownerKey" | "credentialId">;
+type Payload = Pick<Session, "name" | "displayName" | "accountId" | "vaultId" | "appKey" | "method" | "ownerKey" | "credentialId" | "viewKey">;
 
 const b64u = (b: Uint8Array) => btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const fromB64u = (s: string) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
@@ -19,7 +19,7 @@ async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKe
 
 export async function encryptMoveCode(s: Session, passphrase: string): Promise<string> {
   if (passphrase.length < MIN_PASSPHRASE) throw new Error("E_BAD_PASSPHRASE: too short");
-  const p: Payload = { name: s.name, displayName: s.displayName, accountId: s.accountId, vaultId: s.vaultId, appKey: s.appKey, method: s.method, ownerKey: s.ownerKey, credentialId: s.credentialId };
+  const p: Payload = { name: s.name, displayName: s.displayName, accountId: s.accountId, vaultId: s.vaultId, appKey: s.appKey, method: s.method, ownerKey: s.ownerKey, credentialId: s.credentialId, viewKey: s.viewKey };
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(passphrase, salt);

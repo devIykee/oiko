@@ -80,6 +80,13 @@ Behind `FEATURE_INVEST`, with a risk sheet before the first buy, no agent auto-b
 - **ROSCA + Sputnik DAO:** a DAO per group to vote out a defaulter or change reminders (Social Money track stretch).
 - **Recovery:** add a second passkey, export a recovery code, and a "sign in on a new device" walkthrough.
 
+## 3b. Privacy beyond labels
+
+Veil (`docs/PRIVACY.md`) hides labels and invoice details. Next:
+- **View key rotation:** re-seal every label under a new key (pots via `update_pot`; bills need an `update_bill` method in the next vault version).
+- **Seal agent change-proposal names** once the server's name check accepts sealed tokens.
+- **Shielded pots** (Pedersen commitments + range proofs in a new vault version) and a **shielded pool** in front of the vault, so amounts and payers stop being public. Both need gas measurements for proof verification in Wasm.
+
 ## 4. Launch steps (human)
 
 - **Repo:** make the repo public after confirming the Acorn font licence allows it.

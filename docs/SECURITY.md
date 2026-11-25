@@ -73,6 +73,10 @@ Token buckets per IP and per account: register 5/h per IP and 2/h per name; rela
 ### Storage
 With `DATABASE_URL`, nonces, the access log, push subscriptions and mock swaps are kept in Postgres. Without it they are kept in memory per instance: nonce replay protection and the access log reset on restart and are not shared between instances.
 
+## 5b. Privacy (Veil)
+
+Pot names and icons, bill names, agent proposal reasons and invoice details are encrypted on the owner's device (ChaCha20-Poly1305) with a view key derived from the owner key (HKDF-SHA256). The vault, RPC nodes and Oiko's server store and serve only ciphertext; the server never holds a view key. Sealed labels are 38 characters (base32768), within the deployed vault's 40-character limit, so no contract change was needed. Amounts, timing, pot kinds, plan percentages, locks, payees and agent policies stay public because the contract enforces them. Design, formats and limits: `docs/PRIVACY.md`. Tests: `packages/sdk/test/veil.test.ts`, `apps/web/server/__tests__/privateInvoices.test.ts`, `packages/mcp/test/mcp.test.ts`, `contracts/vault/src/tests.rs` (`veil_tokens_fit_and_round_trip_through_json_args`).
+
 ## 6. Threats
 
 | Threat | What stops it | What remains |
@@ -88,6 +92,7 @@ With `DATABASE_URL`, nonces, the access log, push subscriptions and mock swaps a
 | Front-end compromise (hosted app or supply chain) | The vault contract still enforces locks; `withdraw_large` and `rescue_sign` need the owner key; code hash shown on `/security` can be checked on the explorer | A malicious page can use the app key (all unlocked money) and, when the user re-authenticates with a passkey or uses "this browser" sign-in, the owner key |
 | Replay | Gateway: single-use 32-byte nonce + 5-minute window + signed method, path, query and body hash. Transactions: NEAR access-key nonces. Delegates: nonce + `maxBlockHeight` | Without `DATABASE_URL`, a gateway request could be replayed on another instance within 5 minutes (reads, or a `prepare`, which only builds a transaction) |
 | Deposit counted twice | `ft_on_transfer` does not credit directly; it uses the same balance read as `sync`, credit = `real − accounted`, epoch guard | — |
+| Reading someone's finances on the public record or on Oiko's server | Veil: labels and invoice details are sealed on the owner's device; the view key never leaves the owner's devices (or an agent the owner chose) | Amounts, timing, counterparties, plan shape and locks are public on NEAR. A leaked view key reads every label sealed with it (no rotation). Labels saved before Veil stay in chain history |
 | Contract admin | No upgrade or admin method on vault, registry or ROSCA savings contract; registry and ROSCA accounts keyless since 2026-11-05 | Mock token and lending contracts (test fixtures) keep a key |
 
 ## 7. Review findings (2026-11-04, status updated 2026-11-11)

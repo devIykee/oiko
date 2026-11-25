@@ -8,6 +8,7 @@ import { useConfig } from "./config";
 import { fixtureFetch, isFixtureMode } from "./fixtures/mode";
 import { useQuery } from "./query";
 import { useSession } from "./session";
+import { usePrivacy } from "./privacy";
 
 export const vaultKey = (vaultId: string, what: string) => `vault:${vaultId}:${what}`;
 
@@ -24,11 +25,12 @@ function useSyncOnOpen(vaultId: string | undefined) {
 export function useOverview() {
   const { session } = useSession();
   const { rpc } = useConfig();
+  const { reads, veil } = usePrivacy();
   const vaultId = session?.vaultId;
   useSyncOnOpen(vaultId);
   return useQuery<Overview>(
-    vaultId && (rpc || isFixtureMode()) ? vaultKey(vaultId, "overview") : null,
-    () => (isFixtureMode() ? fixtureFetch<Overview>("vault:overview", "GET") : new VaultClient(rpc!, vaultId!).overview()),
+    vaultId && (rpc || isFixtureMode()) ? vaultKey(vaultId, `overview${veil ? ":open" : ""}`) : null,
+    () => (isFixtureMode() ? fixtureFetch<Overview>("vault:overview", "GET") : new VaultClient(rpc!, vaultId!, undefined, reads).overview()),
     { refreshMs: 15_000 },
   );
 }
@@ -37,10 +39,11 @@ export function useOverview() {
 export function useAllProposals() {
   const { session } = useSession();
   const { rpc } = useConfig();
+  const { reads, veil } = usePrivacy();
   const vaultId = session?.vaultId;
   return useQuery<Proposal[]>(
-    vaultId && (rpc || isFixtureMode()) ? vaultKey(vaultId, "proposals:all") : null,
-    () => (isFixtureMode() ? fixtureFetch<Proposal[]>("vault:proposals:all", "GET") : new VaultClient(rpc!, vaultId!).proposals(true)),
+    vaultId && (rpc || isFixtureMode()) ? vaultKey(vaultId, `proposals:all${veil ? ":open" : ""}`) : null,
+    () => (isFixtureMode() ? fixtureFetch<Proposal[]>("vault:proposals:all", "GET") : new VaultClient(rpc!, vaultId!, undefined, reads).proposals(true)),
     { refreshMs: 60_000 },
   );
 }
@@ -48,10 +51,11 @@ export function useAllProposals() {
 export function useActivity(limit = 50) {
   const { session } = useSession();
   const { rpc } = useConfig();
+  const { reads, veil } = usePrivacy();
   const vaultId = session?.vaultId;
   return useQuery<Activity[]>(
-    vaultId && (rpc || isFixtureMode()) ? vaultKey(vaultId, `activity:${limit}`) : null,
-    () => (isFixtureMode() ? fixtureFetch<Activity[]>("vault:activity", "GET") : new VaultClient(rpc!, vaultId!).activity(undefined, limit)),
+    vaultId && (rpc || isFixtureMode()) ? vaultKey(vaultId, `activity:${limit}${veil ? ":open" : ""}`) : null,
+    () => (isFixtureMode() ? fixtureFetch<Activity[]>("vault:activity", "GET") : new VaultClient(rpc!, vaultId!, undefined, reads).activity(undefined, limit)),
     { refreshMs: 15_000 },
   );
 }
@@ -59,10 +63,11 @@ export function useActivity(limit = 50) {
 export function useMonthStats(from: number, to: number) {
   const { session } = useSession();
   const { rpc } = useConfig();
+  const { reads } = usePrivacy();
   const vaultId = session?.vaultId;
   return useQuery<MonthStats[]>(
     vaultId && (rpc || isFixtureMode()) ? vaultKey(vaultId, `stats:${from}-${to}`) : null,
-    () => (isFixtureMode() ? fixtureFetch<MonthStats[]>("vault:stats", "GET") : new VaultClient(rpc!, vaultId!).monthStats(from, to)),
+    () => (isFixtureMode() ? fixtureFetch<MonthStats[]>("vault:stats", "GET") : new VaultClient(rpc!, vaultId!, undefined, reads).monthStats(from, to)),
     { refreshMs: 60_000 },
   );
 }

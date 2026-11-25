@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { encodeConnectionString, decodeConnectionString, keyPairFromSeed, parseGatewayAuthHeader, verifyNep413, parseGatewayMessage, sha256Hex } from "@oiko/sdk";
+import { encodeConnectionString, decodeConnectionString, keyPairFromSeed, parseGatewayAuthHeader, verifyNep413, parseGatewayMessage, sha256Hex, Veil, PRIVATE_LABEL } from "@oiko/sdk";
 import { createOikoMcpServer, GatewayBackend, pollOnce, TOOL_NAMES, type OikoBackend } from "../src";
 import { connectionFromEnv } from "../src/env";
 
@@ -162,5 +162,37 @@ describe("agent-side counterparty wrapper", () => {
     const { paths, backend } = fake(result("block", "refused", "refused"));
     await backend.client.run("act", { type: "save", to_pot: 1, token: "usdt", amount: "1" }).catch(() => null);
     expect(paths).not.toContain("/api/agent/counterparty");
+  });
+});
+
+describe("private labels (Veil) in the stdio backend", () => {
+  const kp = keyPairFromSeed(new Uint8Array(32).fill(41));
+  const owner = Veil.fromOwnerKey(keyPairFromSeed(new Uint8Array(32).fill(42)).secretKey, "ada.oiko.testnet");
+  const base = { api: "https://oiko.example", vault: "vault.ada.oiko.testnet", sk: kp.secretKey };
+  const sealed = owner.seal("Therapy");
+  const fake = (sent: string[]) => (async (_url: string, init: RequestInit) => {
+    if (init.body) sent.push(String(init.body));
+    return new Response(JSON.stringify({ pots: [{ id: 3, name: sealed }], title: `${sealed} is due tomorrow` }), { status: 200 });
+  }) as unknown as typeof fetch;
+
+  it("the view key travels in the connection string or OIKO_VIEW_KEY", () => {
+    const vk = owner.exportViewKey();
+    const s = encodeConnectionString({ ...base, vk });
+    expect(decodeConnectionString(s).vk).toBe(vk);
+    expect(connectionFromEnv({ OIKO_CONNECTION: encodeConnectionString(base), OIKO_VIEW_KEY: vk }).vk).toBe(vk);
+    expect(() => connectionFromEnv({ OIKO_CONNECTION: encodeConnectionString(base), OIKO_VIEW_KEY: "nope" })).toThrow(/E_VEIL_KEY/);
+  });
+  it("with the key, reads are opened in the agent's process; without it they read Private", async () => {
+    const withKey = await new GatewayBackend({ ...base, vk: owner.exportViewKey() }, fake([])).read("overview");
+    expect(withKey).toEqual({ pots: [{ id: 3, name: "Therapy" }], title: "Therapy is due tomorrow" });
+    const without = await new GatewayBackend(base, fake([])).read("overview");
+    expect(without).toEqual({ pots: [{ id: 3, name: PRIVATE_LABEL }], title: `${PRIVATE_LABEL} is due tomorrow` });
+  });
+  it("reasons the agent writes are sealed before they reach the gateway", async () => {
+    const sent: string[] = [];
+    await new GatewayBackend({ ...base, vk: owner.exportViewKey() }, fake(sent)).proposeChange({ type: "earn", pot_id: 3, on: true } as never, "Your Therapy pot could earn while it waits");
+    expect(sent[0]).not.toContain("Therapy");
+    const reason = (JSON.parse(sent[0]!) as { reason: string }).reason;
+    expect(owner.open(reason)).toBe("Your Therapy pot could earn while it waits");
   });
 });

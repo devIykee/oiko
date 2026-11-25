@@ -25,6 +25,9 @@ const M: Record<string, [string, string]> = {
   E_SAME_POT: ["Pick two different pots.", "Choose where the money comes from and where it goes."],
   E_TOO_MANY_POTS: ["You've reached the pot limit.", "Delete a pot you no longer use, then try again."],
   E_BAD_NAME: ["That name isn't valid.", "Use a shorter name with letters and numbers."],
+  // private labels (Veil, packages/sdk/src/veil.ts)
+  E_VEIL_TOO_LONG: ["That name is too long to keep private.", "Use at most 38 letters, or turn off private labels in Settings."],
+  E_VEIL_KEY: ["This view key isn't valid.", "Copy it again from Settings on a device where you're signed in."],
   E_SPLITS_TOTAL: ["Your plan adds up to more than 100%.", "Lower some percentages so they total 100% or less."],
   E_SPLITS_FLEX: ["Spend gets whatever is left.", "Remove Spend from your plan rules."],
   E_SPLIT_FLEX: ["Spend gets whatever is left.", "Remove Spend from your plan rules."],

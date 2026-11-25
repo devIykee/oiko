@@ -10,7 +10,8 @@ export const MCP_INSTRUCTIONS = `Oiko is a personal finance app. You are connect
 - Never move money out of a locked pot; it is impossible before its date.
 - Check get_events regularly (pass back its cursor). suggested_actions are computed by Oiko from the account right now; you decide. Ones marked autopilot were agreed by the owner in advance: run them with act within your caps.
 - For non-money changes (plan, pots, goals, locks, Earn, bills, schedules, draft invoices) use propose_change; the owner approves in the app.
-- Every refusal carries how_to_fix: follow it instead of retrying the same call.`;
+- Every refusal carries how_to_fix: follow it instead of retrying the same call.
+- Some names (pots, bills, reasons) may be private: the owner encrypts them on their own device. They read as "Private" (or start with 🔒) unless the owner gave you their view key. Refer to them by id; never guess what they say.`;
 
 export const MCP_VERSION = "0.2.0";
 

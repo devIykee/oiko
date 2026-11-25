@@ -247,3 +247,49 @@ fn bills_validate_due_day() {
     })
     .contains("E_INSUFFICIENT"));
 }
+
+// Veil (packages/sdk/src/veil.ts) seals pot and bill names in the browser. These are real tokens from the SDK:
+// 38 characters (one 🔒 + 37 CJK/Hangul), within the deployed vault's 40-character limit, so no contract change is needed.
+const SEALED_NAME: &str = "🔒䵁噒많猜넖骤돤뵍雁뗅澸鑷侳襐懅铁뱛㮀늍胁鄚꽷㳲居鬆醙㔘믦瞩琖귭冚眿뤪歚癰瑀";
+const SEALED_BILL: &str = "🔒㥺帼藇峂婦廠谭螣芎鞊赊劉莳誅蕰㢎飤髚鋥鉍귒搴燸綏犸㤈瀐䂫넑斛䑠꺫瘐圹犲致豀";
+
+fn with_input(body: String) -> near_sdk::VMContext {
+    let mut c = ctx("ada.oiko.test.near", T0).build();
+    c.input = std::rc::Rc::from(body.into_bytes().into_boxed_slice());
+    c
+}
+
+#[test]
+fn veil_tokens_fit_and_round_trip_through_json_args() {
+    assert_eq!(SEALED_NAME.chars().count(), 38);
+    let mut v = setup();
+    // raw UTF-8, as JSON.stringify sends it
+    let body = format!(r##"{{"name":"{}","icon":"{}","color":"#000000","kind":"goal","target":null,"target_date":null}}"##, SEALED_NAME, SEALED_BILL);
+    testing_env!(with_input(body));
+    let id = v.create_pot();
+    let p = v.get_pot_t(id).unwrap();
+    assert_eq!(p.name, SEALED_NAME);
+    assert_eq!(p.icon, SEALED_BILL);
+    // the activity note (truncated to 40 characters) keeps the whole token
+    let act = v.get_activity_t(None, 10);
+    assert!(act.iter().any(|a| a.note.as_deref() == Some(SEALED_NAME)));
+    // \u escapes with a surrogate pair, as some JSON encoders send it
+    let escaped: String = SEALED_BILL
+        .encode_utf16()
+        .map(|u| format!("\\u{:04x}", u))
+        .collect();
+    let body = format!(r#"{{"pot_id":{},"name":"{}"}}"#, id, escaped);
+    testing_env!(with_input(body));
+    v.update_pot();
+    assert_eq!(v.get_pot_t(id).unwrap().name, SEALED_BILL);
+    // bills
+    testing_env!(ctx("ada.oiko.test.near", T0).build());
+    let b = v.add_bill_t(SEALED_BILL.into(), U128(1), Token::Usdt, 3, a("landlord.near"), 0);
+    assert_eq!(v.get_overview().bills.iter().find(|x| x.id == b).unwrap().name, SEALED_BILL);
+    // one character too many is still refused: Veil never relies on a looser limit
+    let too_long = format!("{}xxx", SEALED_NAME);
+    assert!(panics(|| {
+        v.add_bill_t(too_long.clone(), U128(1), Token::Usdt, 3, a("landlord.near"), 0);
+    })
+    .contains("E_BAD_INPUT"));
+}

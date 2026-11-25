@@ -129,7 +129,7 @@ function AddBillSheet({ o, onClose }: { o: Overview; onClose: () => void }) {
   return (
     <Sheet open onOpenChange={(v) => !v && onClose()} title={t("bills.add")} closeLabel={t("common.close")} dismissible={!busy}
       footer={<Button block size="lg" loading={busy} disabled={!valid} onClick={save} data-testid="bill-save">{t("bills.save")}</Button>}>
-      <Input label={t("bills.name")} value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} placeholder={t("bills.namePlaceholder")} />
+      <Input label={t("bills.name")} value={name} onChange={(e) => setName(e.target.value.slice(0, 38))} placeholder={t("bills.namePlaceholder")} />
       <SegmentedControl label={t("common.token")} value={coin} onChange={setCoin} items={[{ value: "usdt", label: "USDT" }, { value: "usdc", label: "USDC" }]} />
       <Input label={t("common.amount")} value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" suffix={coin.toUpperCase()} />
       <Input label={t("bills.dueDay")} value={day} onChange={(e) => setDay(e.target.value.replace(/\D/g, "").slice(0, 2))} inputMode="numeric" hint={t("bills.dueDayHint")} error={day && (d < 1 || d > 28) ? t("bills.dueDayHint") : undefined} />

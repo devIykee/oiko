@@ -9,7 +9,7 @@ Oiko: **Personal finance meets personal intelligence.** Get paid from anywhere, 
 
 ## What it is
 
-You claim a name (`steve.oiko.testnet`) and share a pay link. Anyone can pay that link, and every payment is split by your plan into pots: Spend, Bills, Savings, Goals and Locked. Money sits in a separate account (`vault.steve.oiko.testnet`) that holds no owner keys at all (only the capped agent keys it adds to itself) and runs code with no upgrade or admin method. Locks, plans and agent limits are enforced by that code, not by Oiko. Oiko has no built-in AI. You connect the agent you already use (over MCP or REST), and it can read, propose, or act only within caps the account enforces.
+You claim a name (`steve.oiko.testnet`) and share a pay link. Anyone can pay that link, and every payment is split by your plan into pots: Spend, Bills, Savings, Goals and Locked. Money sits in a separate account (`vault.steve.oiko.testnet`) that holds no owner keys at all (only the capped agent keys it adds to itself) and runs code with no upgrade or admin method. Locks, plans and agent limits are enforced by that code, not by Oiko. Pot names, bill names and invoice details are encrypted on your device before they are saved (Veil), so neither the public record nor Oiko's server can read them. Oiko has no built-in AI. You connect the agent you already use (over MCP or REST), and it can read, propose, or act only within caps the account enforces.
 
 Why personal finance: payday is where people lose control of money. Oiko makes the plan run on every payment and lets an agent help without ever holding your keys.
 
@@ -27,6 +27,7 @@ Balances are USDC and USDT. USDC and USDT are stablecoins designed to track the 
 6. Agents → connect an agent with a cap → run it (see `examples/agents`) → payments within the cap pass, the next one is refused, Disconnect deletes its key. [e2e: README-6]
 7. Invoices → New invoice (client, a line or two, USDC or USDT, due date) → Create and get link → copy the link → open it in a private window → Pay this invoice → choose where the money is, give a refund address → "Simulate payment (test mode)" → back in Invoices the status goes Pending → Paid, with the amount received, the fee and a transaction link → Export CSV (one row per line item, ISO dates, plain decimals; also under Settings → Export invoices). [e2e: README-13]
 8. Let a connected agent suggest a plan change (`propose_change`, or `POST /api/agent/change`) → it shows on Home under "Waiting for you" with the agent's reason → Approve → your plan changes. The same agent reads what happened with `get_events` and gets a `how_to_fix` on every refusal. [e2e: README-14]
+9. Look your account up the way anyone can (`get_overview` on `vault.<name>.oiko.testnet`, or an explorer) → every pot name except Spend is a 38-character sealed label starting with 🔒; in the app you see "Bills", "Rainy day" and the rest. Settings → Privacy shows what is private and what is still public. An invoice link ends in `#k=…`: the payer's browser opens the details with it, and Oiko's server only stores ciphertext. [e2e: README-16]
 
 Note: the hosted demo pays for signups from a testnet relayer account. If signup says the account needs a top-up, the relayer is out of testnet NEAR (see `docs/STATUS.md`).
 
@@ -80,10 +81,10 @@ To run the app against NEAR testnet instead, set `OIKO_NETWORK=testnet`, the con
 ## Run the tests
 
 ```bash
-pnpm test:unit        # 193 Vitest tests: SDK (NEP-413, amounts, caps, insights), API server (gateway auth, relayer allow-list, 1Click mock exactly-once, invoices, receipts, agent events, change proposals, webhooks, how_to_fix), sign-in codes, MCP, examples  (~20 s)
-pnpm e2e              # 15 Playwright tests against `pnpm local` or `docker compose up`  (~3 min)
+pnpm test:unit        # 219 Vitest tests: SDK (NEP-413, amounts, caps, insights, Veil privacy), API server (gateway auth, relayer allow-list, 1Click mock exactly-once, invoices, receipts, agent events, change proposals, webhooks, how_to_fix, private invoices), sign-in codes, MCP (view keys), examples  (~20 s)
+pnpm e2e              # 16 Playwright tests against `pnpm local` or `docker compose up`  (~3 min)
 pnpm readme-check     # fails if an [e2e: …] marker in "Try it" has no matching test
-pnpm test:contracts   # 47 cargo tests: unit + proptest invariants + near-workspaces sandbox integration (critical path, ROSCA cycle)  (~6 min including the wasm build)
+pnpm test:contracts   # 49 cargo tests: unit + proptest invariants + near-workspaces sandbox integration (critical path, ROSCA cycle)  (~6 min including the wasm build)
 node scripts/check-no-llm.mjs   # fails if any LLM SDK or LLM API host is in apps/, services/, packages/
 node scripts/check-copy.mjs     # banned-words test for user-facing copy
 ```
@@ -148,6 +149,19 @@ Oiko has no built-in AI. You connect the agent you already use (Claude, ChatGPT,
 
 Developer guide: `docs/AGENTS.md`. Discovery for agents: `/llms.txt`, `/.well-known/oiko-agent.json`.
 
+## Private by default (Veil)
+
+A public ledger is a strange place to keep a budget: anyone can look up an account and read its pots. Oiko's contract needs to see amounts, locks and payees to enforce your rules, but it never needs to know that a pot is called "Divorce lawyer" or a bill "Therapy". Veil keeps those labels private without changing the contract.
+
+- **Sealed on your device.** Pot names and icons, bill names and agent reasons are encrypted (ChaCha20-Poly1305) in the browser before they are signed, and opened after they are read. The contract, RPC nodes, explorers and Oiko's server see only a token like `🔒䵁噒많…`.
+- **Fits the contract already deployed.** The vault has no upgrade method and allows 40 characters per name. Veil writes 15 bits per character (base32768 over CJK and Hangul code points), so an authenticated, padded name is exactly 38 characters. Every existing account gets privacy with no migration. All names have the same length, so a token doesn't reveal how long the name is.
+- **A view key, not a new password.** The key is derived from the owner key (HKDF), so every device you can sign in on derives the same key, and the server never sees it. It can read labels but cannot move money.
+- **Agents, if you say so.** When connecting an agent, "Let it read private names" adds the view key to its connection string (or set `OIKO_VIEW_KEY` for `oiko-mcp`). The agent opens labels in its own process and seals the reasons it writes. Without the key it sees "Private".
+- **Private invoices.** Client, email, descriptions and notes are encrypted with a per-invoice key that travels only in the link's `#fragment`, which browsers never send to the server. Amounts stay readable so payment works. Your CSV export is opened in your browser.
+- **Honest about the rest.** Amounts, timing, pot kinds, plan percentages, locks and payees stay public because the contract enforces them. The app lists these under Settings → Privacy → "Still public".
+
+Design, threat model and references: `docs/PRIVACY.md`.
+
 ## NEAR features used
 
 Named accounts and sub-accounts, Global Contracts (NEP-591, vault code by hash), NEP-366 meta transactions, function-call access keys with allowances, NEP-413 message signing, NEP-141/145 tokens, NEP-297 events, cross-contract calls with callbacks (sync, Earn, ROSCA), NEAR Intents 1Click, Rhea lending, chain signatures (`rescue_sign` via the MPC signer).
@@ -155,13 +169,13 @@ Named accounts and sub-accounts, Global Contracts (NEP-591, vault code by hash),
 | Track | Fit |
 |---|---|
 | 08 Real-World Money `RWM` (primary) | pay-by-name from any chain, plan, bills, savings, locks, no seed phrase |
-| 06 AI Security & Defense `SEC` | keyless account, immutable locks, scoped capped agent keys, NEP-413 gateway, one-tap revoke |
+| 06 AI Security & Defense `SEC` | keyless account, immutable locks, scoped capped agent keys, NEP-413 gateway, one-tap revoke, client-side encrypted labels and invoices (Veil) with a read-only view key |
 | 07 Agent Economy `AGT` | any agent manages money over MCP (stdio + HTTP) or REST, within on-chain budgets |
 | 01 Unstoppable DeFi `DFI` | Earn on Rhea with an on-chain utilization guard (refuses above 92%) |
 
 ## Security model
 
-Summary: Oiko holds no keys over user money, and the savings account holds no owner keys. The vault invariants listed in `docs/SECURITY.md` are property-tested in `contracts/vault/src/core.rs` and exercised in `contracts/tests`. Error codes: `contracts/ERRORS.md`. Full threat model and review findings: `docs/SECURITY.md`. Agent developers: `docs/AGENTS.md`. Details: `docs/DECISIONS.md`, `docs/interfaces/`.
+Summary: Oiko holds no keys over user money, and the savings account holds no owner keys. Oiko's server also holds no key that can read private labels or invoice details (`docs/PRIVACY.md`). The vault invariants listed in `docs/SECURITY.md` are property-tested in `contracts/vault/src/core.rs` and exercised in `contracts/tests`. Error codes: `contracts/ERRORS.md`. Full threat model and review findings: `docs/SECURITY.md`. Agent developers: `docs/AGENTS.md`. Details: `docs/DECISIONS.md`, `docs/interfaces/`.
 
 ## Honest limits
 
@@ -172,11 +186,12 @@ Summary: Oiko holds no keys over user money, and the savings account holds no ow
 - Autopilot rules need a connected agent: Oiko holds no key that could run them for you, by design.
 - The hosted demo stores nonces and the agent access log in Postgres (Neon). Without `DATABASE_URL` (e.g. a fresh local run) they are kept in memory per server instance.
 - The agent connector has not been validated with users.
+- Privacy covers labels, not amounts: balances, transfers, plan percentages, locks and payees are public on NEAR. Labels saved before Veil (or with it off) stay in the chain's history. A shared view key can't be revoked, and there is no key rotation yet (`docs/PRIVACY.md`).
 - Not a bank; balances are not insured; yields are variable and can go to zero; not investment, legal or tax advice. Rules for stablecoin yield products are still forming in many places.
 
 ## Built with
 
-Next.js 16, React 19, Tailwind CSS 4, motion, Radix Dialog, qrcode, zod, near-api-js 7, @noble/curves + @noble/hashes, bs58, drizzle-orm + postgres (optional), web-push, @modelcontextprotocol/sdk, framework7-icons (MIT), web3icons, Acorn (headings and UI, licensed by the author), Chillax (supporting text, Fontshare free licence); Rust near-sdk 5.29.1, near-contract-standards, near-workspaces, proptest, cargo-near; Vitest, Playwright, @resvg/resvg-js, opentype.js, svgo. Hosted on Vercel.
+Next.js 16, React 19, Tailwind CSS 4, motion, Radix Dialog, qrcode, zod, near-api-js 7, @noble/curves + @noble/hashes + @noble/ciphers, bs58, drizzle-orm + postgres (optional), web-push, @modelcontextprotocol/sdk, framework7-icons (MIT), web3icons, Acorn (headings and UI, licensed by the author), Chillax (supporting text, Fontshare free licence); Rust near-sdk 5.29.1, near-contract-standards, near-workspaces, proptest, cargo-near; Vitest, Playwright, @resvg/resvg-js, opentype.js, svgo. Hosted on Vercel.
 
 Tools: Claude Code and Grok were used during development and testing. The product itself has no built-in AI (`node scripts/check-no-llm.mjs`). Libraries above are used under their own licences.
 

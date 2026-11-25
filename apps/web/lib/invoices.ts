@@ -1,10 +1,13 @@
 "use client";
 // Invoices client: owner calls are NEP-413 signed by the app key (same as the agent access log); the public view is plain.
-import { gatewayAuthHeader, type Token } from "@oiko/sdk";
+import { gatewayAuthHeader, type Token, type Veil } from "@oiko/sdk";
+import { useEffect, useState } from "react";
 import { api, ApiError } from "./api";
 import { fixtureFetch, isFixtureMode } from "./fixtures/mode";
 import { invalidate, useQuery } from "./query";
 import { useSession, type Session } from "./session";
+import { usePrivacy } from "./privacy";
+import { keyFromFragment, openCsv, openOwnerInvoice, openPublicInvoice, sealInvoiceInput } from "./sealedInvoice";
 
 export type InvoiceStatus = "draft" | "open" | "pending" | "paid" | "refunded" | "cancelled" | "overdue";
 export interface InvoiceItemView { description: string; quantity: string; unitPrice: string; lineTotal: string }
@@ -14,6 +17,10 @@ export interface PublicInvoice {
   token: Token; items: InvoiceItemView[]; total: string; paid: string; received: string; fee: string; remaining: string;
   issueDate: string; dueDate: string; note: string | null; status: InvoiceStatus; payable: boolean; inFlight: boolean; paidAt: string | null;
   transactions: TxLink[];
+  /** Private invoice: encrypted details (lib/sealedInvoice.ts). */
+  sealed?: { box: string; keyBox?: string } | null;
+  /** Set on the client: the invoice is private, and whether this browser could open it. */
+  private?: boolean; unlocked?: boolean;
 }
 export interface InvoicePaymentView {
   originLabel: string; status: string; createdAt: string; updatedAt: string; completedAt: string | null; amountIn: string; originDecimals: number;
@@ -22,10 +29,14 @@ export interface InvoicePaymentView {
 export interface OwnerInvoice extends PublicInvoice {
   client: { name: string; email: string | null }; state: "draft" | "open" | "cancelled"; editable: boolean; createdAt: string; updatedAt: string;
   payments: InvoicePaymentView[];
+  sealed?: { box: string; keyBox: string } | null;
+  /** Set on the client for a private invoice the owner opened: the key that goes in the link's #fragment. */
+  shareKey?: string | null;
 }
 export interface InvoiceInput {
   fromName: string; client: { name: string; email: string | null }; items: Array<{ description: string; quantity: string; unitPrice: string }>;
   token: Token; dueDate: string; note: string | null; state?: "draft" | "open" | "cancelled";
+  sealed?: { box: string; keyBox: string } | null;
 }
 
 /** Signed request as the owner (NEP-413 with the app key on the name account). */
@@ -52,23 +63,38 @@ export async function ownerJson<T>(session: Session, method: string, path: strin
 
 export function useInvoices() {
   const { session } = useSession();
+  const { veil } = usePrivacy();
   return useQuery<OwnerInvoice[]>(
-    session ? `invoices:${session.accountId}` : null,
-    async () => (await ownerJson<{ invoices: OwnerInvoice[] }>(session!, "GET", "/api/invoices")).invoices,
+    session ? `invoices:${session.accountId}${veil ? ":open" : ""}` : null,
+    async () => (await ownerJson<{ invoices: OwnerInvoice[] }>(session!, "GET", "/api/invoices")).invoices.map((i) => openOwnerInvoice(veil, i)),
     { refreshMs: 15_000 },
   );
 }
 
+/** Public invoice; a private one opens with the key in the page's #fragment (read here, never sent anywhere). */
 export function usePublicInvoice(id: string | null) {
-  return useQuery<PublicInvoice>(id ? `invoice:${id}` : null, () => api(`/api/invoices/${encodeURIComponent(id!)}`), { refreshMs: 10_000 });
+  const [fragmentKey, setFragmentKey] = useState<string | null>(null);
+  useEffect(() => {
+    const read = () => setFragmentKey(keyFromFragment(window.location.hash));
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, []);
+  return useQuery<PublicInvoice>(id ? `invoice:${id}${fragmentKey ? ":k" : ""}` : null,
+    async () => openPublicInvoice(await api<PublicInvoice>(`/api/invoices/${encodeURIComponent(id!)}`), fragmentKey), { refreshMs: 10_000 });
 }
 
-export async function saveInvoice(session: Session, input: InvoiceInput, id?: string): Promise<OwnerInvoice> {
+/**
+ * Creates or edits an invoice. With a Veil (private labels on), the details are sealed in this browser first; an edit keeps
+ * the invoice's content key (`keyBox`) so links already shared keep working.
+ */
+export async function saveInvoice(session: Session, input: InvoiceInput, id?: string, veil?: Veil | null, keyBox?: string | null): Promise<OwnerInvoice> {
+  const body = veil ? sealInvoiceInput(veil, session.accountId, input, keyBox) : { ...input, sealed: null };
   const r = id
-    ? await ownerJson<OwnerInvoice>(session, "PATCH", `/api/invoices/${encodeURIComponent(id)}`, input)
-    : await ownerJson<OwnerInvoice>(session, "POST", "/api/invoices", input);
+    ? await ownerJson<OwnerInvoice>(session, "PATCH", `/api/invoices/${encodeURIComponent(id)}`, body)
+    : await ownerJson<OwnerInvoice>(session, "POST", "/api/invoices", body);
   invalidate("invoices:");
-  return r;
+  return openOwnerInvoice(veil ?? null, r);
 }
 export async function setInvoiceState(session: Session, id: string, state: "open" | "cancelled"): Promise<OwnerInvoice> {
   const r = await ownerJson<OwnerInvoice>(session, "PATCH", `/api/invoices/${encodeURIComponent(id)}`, { state });
@@ -77,12 +103,13 @@ export async function setInvoiceState(session: Session, id: string, state: "open
   return r;
 }
 
-/** Downloads the accountant CSV (owner-signed, so it can't be a plain link). */
-export async function downloadInvoicesCsv(session: Session): Promise<void> {
+/** Downloads the accountant CSV (owner-signed, so it can't be a plain link). Private details are opened here, in the browser. */
+export async function downloadInvoicesCsv(session: Session, veil?: Veil | null): Promise<void> {
   const path = "/api/invoices/export.csv";
-  const blob = isFixtureMode()
-    ? new Blob([await fixtureFetch<string>(path, "GET")], { type: "text/csv;charset=utf-8" })
-    : await (await ownerFetch(session, "GET", path)).blob();
+  const text = isFixtureMode() ? await fixtureFetch<string>(path, "GET") : await (await ownerFetch(session, "GET", path)).text();
+  // text() drops the UTF-8 BOM; put it back so spreadsheet apps still detect UTF-8.
+  const csv = openCsv(veil ?? null, text.replace(/^\uFEFF/, ""));
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -91,7 +118,9 @@ export async function downloadInvoicesCsv(session: Session): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export const invoiceUrl = (id: string) => (typeof window === "undefined" ? `/i/${id}` : `${window.location.origin}/i/${id}`);
+/** The invoice link; a private invoice's link carries its key in the #fragment, which browsers never send to the server. */
+export const invoiceUrl = (id: string, shareKey?: string | null) =>
+  `${typeof window === "undefined" ? "" : window.location.origin}/i/${id}${shareKey ? `#k=${shareKey}` : ""}`;
 
 export const STATUS_TONE: Record<InvoiceStatus, "neutral" | "accent" | "success" | "warning" | "danger"> = {
   draft: "neutral", open: "accent", pending: "warning", paid: "success", refunded: "danger", cancelled: "neutral", overdue: "danger",

@@ -69,6 +69,11 @@ export function InvoiceScreen() {
           </div>
           <Badge tone={STATUS_TONE[inv.status]} data-testid="invoice-public-status">{t(`inv.status.${inv.status}`)}</Badge>
         </div>
+        {inv.private && (
+          <div className={s.noPrint} data-testid="invoice-private">
+            <Note tone={inv.unlocked ? "info" : "warning"}>{inv.unlocked ? t("privacy.invoiceOpen") : t("privacy.invoiceLocked")}</Note>
+          </div>
+        )}
         <div className={s.parties}>
           <div>
             <p className={s.k}>{t("inv.doc.from")}</p>

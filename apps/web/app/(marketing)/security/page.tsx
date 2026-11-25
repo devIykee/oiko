@@ -50,6 +50,10 @@ export default function SecurityPage() {
         <p>Oiko has no built-in AI. When you connect your own agent, your account adds a key that can only call Oiko&rsquo;s agent methods, never transfer freely. The account checks every request against the limits you set: what it may read, whether it may only suggest or also act, per-payment, daily and weekly caps, the payees it may pay, and an expiry.</p>
         <p>Every request is written to an access log you can read. <strong>Disconnect</strong> deletes the agent&rsquo;s key from your account immediately. Oiko cannot verify who runs an agent, so only connect agents you trust.</p>
       </Block>
+      <Block id="privacy" title="Private labels">
+        <p>Everything on a public ledger can be read by anyone, so Oiko encrypts what your money is <em>for</em> on your own device before it is saved: pot names, bill names, your agent&rsquo;s reasons and the details of your invoices. The key comes from your passkey or browser key, so <strong>Oiko&rsquo;s servers never have it</strong>. Your agent gets it only if you choose to share it, and it can read names but never move money.</p>
+        <p>Amounts, dates, your plan&rsquo;s percentages, locks and who you pay stay public, because your account&rsquo;s code needs them to keep your rules. We say so in the app, under Settings &rarr; Privacy.</p>
+      </Block>
       <Block id="earn" title="Earn safeguard">
         <p>Earn is off by default. If you switch it on, that pot is lent on the Rhea lending market. Before lending, your account checks how much of the pool is already borrowed and refuses above 92% (never configurable above 95%), so you can usually take money back out. This is a safeguard, not a guarantee.</p>
       </Block>

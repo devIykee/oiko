@@ -1,10 +1,11 @@
 "use client";
-// Per-browser preferences: theme, low-data mode, hidden balance, and whether Earn / Invest show up in the app.
+// Per-browser preferences: theme, low-data mode, hidden balance, whether Earn / Invest show up in the app,
+// and private labels (new pot and bill names are encrypted on this device before they're saved).
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 export type Theme = "auto" | "light" | "dark";
-export interface Settings { theme: Theme; lowData: boolean; hideBalance: boolean; showEarn: boolean; showInvest: boolean }
-const DEFAULTS: Settings = { theme: "auto", lowData: false, hideBalance: false, showEarn: true, showInvest: true };
+export interface Settings { theme: Theme; lowData: boolean; hideBalance: boolean; showEarn: boolean; showInvest: boolean; privateLabels: boolean }
+const DEFAULTS: Settings = { theme: "auto", lowData: false, hideBalance: false, showEarn: true, showInvest: true, privateLabels: true };
 const KEY = "oiko.settings";
 /** Shared with the website's theme script (components/marketing/theme-script.ts), applied before first paint. */
 const THEME_KEY = "oiko-theme";

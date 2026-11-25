@@ -3,6 +3,7 @@ import { TGAS, type Signer } from "./tx";
 import type {
   Activity, AgentAction, AgentPolicyInput, AgentView, Bill, Circle, MonthStats, NameInfo, Overview, Pot, PotKind, Proposal, SplitRule, Token,
 } from "./types";
+import { VEIL_LIMITS, maskDeep, type Veil } from "./veil";
 
 const G = (t: number) => (BigInt(t) * TGAS).toString();
 const GAS = { small: G(30), std: G(100), xcc: G(200), max: G(300) };
@@ -18,8 +19,28 @@ export const APP_KEY_METHODS = [
 ] as const;
 export const AGENT_KEY_METHODS = ["agent_execute", "agent_propose"] as const;
 
+/**
+ * `privacy`: a Veil (labels are sealed on write and opened on read), "mask" (no key on this device: sealed labels
+ * read as "Private"), or undefined (raw contract values).
+ */
+export type VaultPrivacy = Veil | "mask" | undefined;
+
 export class VaultClient {
-  constructor(public readonly rpc: NearRpc, public readonly vaultId: string, private readonly signer?: Signer) {}
+  constructor(
+    public readonly rpc: NearRpc,
+    public readonly vaultId: string,
+    private readonly signer?: Signer,
+    private readonly privacy?: VaultPrivacy,
+  ) {}
+
+  private async v<T>(method: string, args?: object): Promise<T> {
+    const r = await this.rpc.view<T>(this.vaultId, method, args);
+    if (!this.privacy) return r;
+    return this.privacy === "mask" ? maskDeep(r) : this.privacy.openDeep(r);
+  }
+  private sealText(s: string, max: number): string {
+    return this.privacy && this.privacy !== "mask" && s ? this.privacy.seal(s, max) : s;
+  }
 
   private s(): Signer {
     if (!this.signer) throw new Error("This action needs a signed-in key.");
@@ -30,28 +51,32 @@ export class VaultClient {
   }
 
   // views
-  overview(): Promise<Overview> { return this.rpc.view(this.vaultId, "get_overview"); }
-  pot(potId: number): Promise<Pot | null> { return this.rpc.view(this.vaultId, "get_pot", { pot_id: potId }); }
+  overview(): Promise<Overview> { return this.v("get_overview"); }
+  pot(potId: number): Promise<Pot | null> { return this.v("get_pot", { pot_id: potId }); }
   splits(): Promise<SplitRule[]> { return this.rpc.view(this.vaultId, "get_splits"); }
-  agents(): Promise<AgentView[]> { return this.rpc.view(this.vaultId, "get_agents"); }
-  agent(publicKey: string): Promise<AgentView | null> { return this.rpc.view(this.vaultId, "get_agent", { public_key: publicKey }); }
-  proposals(includeClosed = false): Promise<Proposal[]> { return this.rpc.view(this.vaultId, "get_proposals", { include_closed: includeClosed }); }
+  agents(): Promise<AgentView[]> { return this.v("get_agents"); }
+  agent(publicKey: string): Promise<AgentView | null> { return this.v("get_agent", { public_key: publicKey }); }
+  proposals(includeClosed = false): Promise<Proposal[]> { return this.v("get_proposals", { include_closed: includeClosed }); }
   activity(fromSeq?: number, limit = 50): Promise<Activity[]> {
-    return this.rpc.view(this.vaultId, "get_activity", { from_seq: fromSeq ?? null, limit });
+    return this.v("get_activity", { from_seq: fromSeq ?? null, limit });
   }
   monthStats(from: number, to: number): Promise<MonthStats[]> {
     return this.rpc.view(this.vaultId, "get_month_stats", { from_month: from, to_month: to });
   }
-  bills(): Promise<Bill[]> { return this.rpc.view(this.vaultId, "get_bills"); }
+  bills(): Promise<Bill[]> { return this.v("get_bills"); }
   rescuePath(chain: "evm" | "tron"): Promise<string> { return this.rpc.view(this.vaultId, "get_rescue_path", { chain }); }
   version(): Promise<string> { return this.rpc.view(this.vaultId, "version"); }
 
   // owner
   createPot(p: { name: string; icon: string; color: string; kind: PotKind; target?: string | null; target_date?: string | null }) {
-    return this.call("create_pot", { target: null, target_date: null, ...p });
+    const sealed = { ...p, name: this.sealText(p.name, VEIL_LIMITS.potName), icon: this.sealText(p.icon, VEIL_LIMITS.potIcon) };
+    return this.call("create_pot", { target: null, target_date: null, ...sealed });
   }
   updatePot(potId: number, p: { name?: string; icon?: string; color?: string; target?: string | null; target_date?: string | null }) {
-    return this.call("update_pot", { pot_id: potId, ...p });
+    const sealed = { ...p };
+    if (p.name !== undefined) sealed.name = this.sealText(p.name, VEIL_LIMITS.potName);
+    if (p.icon !== undefined) sealed.icon = this.sealText(p.icon, VEIL_LIMITS.potIcon);
+    return this.call("update_pot", { pot_id: potId, ...sealed });
   }
   deletePot(potId: number) { return this.call("delete_pot", { pot_id: potId }); }
   setSplits(rules: SplitRule[]) { return this.call("set_splits", { rules }); }
@@ -82,7 +107,9 @@ export class VaultClient {
     return this.call("add_schedule", { to_pot: toPot, token, amount, period_ns: periodNs, first_run: firstRunNs });
   }
   removeSchedule(id: number) { return this.call("remove_schedule", { id }); }
-  addBill(b: { name: string; amount: string; token: Token; due_day: number; payee: string; pot_id: number }) { return this.call("add_bill", b); }
+  addBill(b: { name: string; amount: string; token: Token; due_day: number; payee: string; pot_id: number }) {
+    return this.call("add_bill", { ...b, name: this.sealText(b.name, VEIL_LIMITS.billName) });
+  }
   removeBill(id: number) { return this.call("remove_bill", { id }); }
   payBill(id: number) { return this.call("pay_bill", { id }, GAS.xcc); }
   ajoContribute(circleId: number, token: Token, amount: string) { return this.call("ajo_contribute", { circle_id: circleId, token, amount }, GAS.xcc); }
@@ -101,7 +128,9 @@ export class VaultClient {
 
   // agent (signed by the agent key on the vault itself)
   agentExecute(action: AgentAction) { return this.call("agent_execute", { action }, GAS.xcc); }
-  agentPropose(action: AgentAction, reason: string) { return this.call("agent_propose", { action, reason }); }
+  agentPropose(action: AgentAction, reason: string) {
+    return this.call("agent_propose", { action, reason: this.sealText(reason, VEIL_LIMITS.proposalReason) });
+  }
 
   // permissionless
   sync() { return this.call("sync", {}, GAS.xcc); }

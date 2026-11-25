@@ -7,8 +7,9 @@
 - **Product:** landing, sign-up (passkey or browser key), pay by name from other chains (test-mode 1Click), plan, bills, pots, locks, Earn with a utilization guard, ROSCA savings, invoices with CSV export, insights, activity with CSV export, move to another device, agents.
 - **Agents:** MCP (`npx -y oiko-mcp`, 0.2.0 published 2026-11-11 with all 20 tools) and MCP over HTTP with hosted 24-hour links; REST with NEP-413. Read, propose and act within caps the contract enforces; counterparty check before every payment; Disconnect deletes the key.
 - **Proactive agents (Phase 3):** events (`/api/agent/events`, signed webhooks delivered by cron, MCP notifications) with deterministic suggested actions; proposals for non-money changes approved on Home; opt-in autopilot rules; month brief; `how_to_fix` on every refusal; each agent's approved/rejected record.
-- **Local mode:** `pnpm local` or `docker compose up` with no keys and no testnet; `pnpm e2e` (14 Playwright tests, ~3 min) passes against both. CI runs checks, unit tests, contracts, e2e and a fresh-clone compose run.
-- **Checks:** 179 unit tests, typecheck, production build, `check-no-llm`, `check-copy`, `readme-check`.
+- **Local mode:** `pnpm local` or `docker compose up` with no keys and no testnet; `pnpm e2e` (16 Playwright tests, ~3 min) passes against both. CI runs checks, unit tests, contracts, e2e and a fresh-clone compose run.
+- **Checks:** 219 unit tests, typecheck, production build, `check-no-llm`, `check-copy`, `readme-check`.
+- **Privacy (Veil, 2026-11-25):** pot and bill names, agent reasons and invoice details are encrypted on the owner's device; view key derived from the owner key; agents read labels only with a shared view key; private invoice links carry their key in the `#fragment`. Works with the deployed vault (no new code hash). See `docs/PRIVACY.md`.
 
 ## Quality (Phase 4)
 

@@ -1,11 +1,12 @@
 "use client";
 // Owner-only HTTP calls (agent change proposals, autopilot), signed with NEP-413 by the app key like the access log.
-import { gatewayAuthHeader, type ConfigChange } from "@oiko/sdk";
+import { gatewayAuthHeader, maskDeep, type ConfigChange } from "@oiko/sdk";
 import { useCallback } from "react";
 import { ApiError } from "./api";
 import { fixtureFetch, isFixtureMode } from "./fixtures/mode";
 import { invalidate, useQuery } from "./query";
 import { useSession, type Session } from "./session";
+import { openWith, usePrivacy } from "./privacy";
 
 export async function ownerFetch<T>(session: Session, method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
   if (isFixtureMode()) return fixtureFetch<T>(path, method, body);
@@ -30,8 +31,10 @@ export interface ChangeView {
 
 export function useChanges() {
   const { session } = useSession();
-  return useQuery<ChangeView[]>(session ? `owner:changes:${session.accountId}` : null,
-    async () => (await ownerFetch<{ changes: ChangeView[] }>(session!, "GET", "/api/owner/changes")).changes, { refreshMs: 30_000 });
+  const { veil } = usePrivacy();
+  // An agent with the view key seals its reasons before sending them; open them here (the server can't).
+  return useQuery<ChangeView[]>(session ? `owner:changes:${session.accountId}${veil ? ":open" : ""}` : null,
+    async () => openWith(veil, (await ownerFetch<{ changes: ChangeView[] }>(session!, "GET", "/api/owner/changes")).changes, maskDeep), { refreshMs: 30_000 });
 }
 
 export function useDecideChange() {

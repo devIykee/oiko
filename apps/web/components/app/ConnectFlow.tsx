@@ -29,9 +29,11 @@ export function ConnectFlow({ open, onOpenChange, initial, overview, agentPublic
   const [err, setErr] = useState<{ title: string; next: string } | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const [secretKey, setSecretKey] = useState<string | null>(null);
+  // Private labels: share the view key with this agent so it can read pot and bill names (off by default).
+  const [shareNames, setShareNames] = useState(false);
   const toast = useToast();
   const [origin, setOrigin] = useState("");
-  useEffect(() => { if (open) { setD(initial); setStep(agentPublicKey ? "consent" : "setup"); setSecret(null); setErr(null); } }, [open, initial, agentPublicKey]);
+  useEffect(() => { if (open) { setD(initial); setStep(agentPublicKey ? "consent" : "setup"); setSecret(null); setErr(null); setShareNames(false); } }, [open, initial, agentPublicKey]);
   useEffect(() => { setOrigin(window.location.origin); }, []);
 
   const policy = draftToPolicy(d);
@@ -46,7 +48,8 @@ export function ConnectFlow({ open, onOpenChange, initial, overview, agentPublic
       const kp = agentPublicKey ? null : generateKeyPair();
       const pk = agentPublicKey ?? kp!.publicKey;
       await exec("addAgent", pk, policy);
-      if (kp && session) { setSecret(encodeConnectionString({ api: origin, vault: session.vaultId, sk: kp.secretKey })); setSecretKey(kp.secretKey); }
+      const vk = shareNames && d.scopes.includes("read") ? session?.viewKey : undefined;
+      if (kp && session) { setSecret(encodeConnectionString({ api: origin, vault: session.vaultId, sk: kp.secretKey, ...(vk ? { vk } : {}) })); setSecretKey(kp.secretKey); }
       setStep("secret");
       onDone?.(pk);
     } catch (e) { setErr(explain(e)); } finally { setBusy(false); }
@@ -71,6 +74,12 @@ export function ConnectFlow({ open, onOpenChange, initial, overview, agentPublic
             <ListRow icon="proposal" color="sun" title={t("agents.scope.propose")} subtitle={t("agents.scope.proposeSub")} trailing={<Toggle checked={d.scopes.includes("propose")} onChange={(v) => toggleScope("propose", v)} label={t("agents.scope.propose")} />} />
             <ListRow icon="agents" color="violet" title={t("agents.scope.act")} subtitle={t("agents.scope.actSub")} trailing={<Toggle checked={act} onChange={(v) => toggleScope("act", v)} label={t("agents.scope.act")} data-testid="agent-scope-act" />} />
           </GroupedList>
+          {d.scopes.includes("read") && !agentPublicKey && session?.viewKey && (
+            <GroupedList label={t("privacy.shareTitle")}>
+              <ListRow icon="security" color="mint" title={t("privacy.shareTitle")} subtitle={t("privacy.shareSub")}
+                trailing={<Toggle checked={shareNames} onChange={setShareNames} label={t("privacy.shareTitle")} data-testid="agent-share-names" />} />
+            </GroupedList>
+          )}
           {act && (
             <>
               <GroupedList label={t("agents.actions")}>

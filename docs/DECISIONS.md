@@ -472,3 +472,13 @@ Vault code hash is now **`72sdtZyfMEdLh2RSqSjBAPt73PpsHCr24irGCi9yahex`** (298,9
   - It requires a TTY and typing the root name before any transaction, and refuses to overwrite existing code.
   - `--lock` works as on testnet.
 - `scripts/near-rpc.py` is the shared read-only RPC helper for both scripts.
+
+## Privacy: Veil (2026-11-25)
+- **Goal:** pot names, bill names, agent reasons and invoice details must not be readable on the public record or by Oiko's server. Amounts, locks, plans and payees stay public: the vault must see them to enforce rules.
+- **No contract change.** The vault is immutable and checks names at ≤ 40 Unicode scalar values. Sealed labels use base32768 (15 bits per character over U+3400–U+4DBF, U+4E00–U+9FFF and U+AC00–U+C03F), so `🔒` + nonce[12] + ChaCha20-Poly1305(40-byte padded text) + tag[16] is exactly 38 characters. Verified against the vault's own JSON parser and length checks in `contracts/vault/src/tests.rs`.
+- **Cipher:** ChaCha20-Poly1305 from `@noble/ciphers` (synchronous, so views can be opened during render; WebCrypto AES-GCM is async only). 96-bit random nonces: a few hundred labels per key. Associated data `oiko-veil/v1:<vault id>`.
+- **Padding buckets** 40 / 168 / 488 bytes (2-byte length prefix): all pot and bill names have one length; reasons (≤ 280 chars on chain) fit the 488 bucket in 277 characters.
+- **View key** = HKDF-SHA256(owner seed, "oiko/veil/v1", "view:" + identity account). Derived wherever the owner key is (passkey PRF or browser key), so no new secret to back up. Kept in the browser session, carried in move-to-device codes, never sent to the server. Read-only: it can't sign.
+- **Agents:** the view key is opt-in per agent (`vk` in the connection string or `OIKO_VIEW_KEY`). `oiko-mcp` opens reads and seals reasons locally. The hosted MCP link can't use it (it runs on the server).
+- **Invoices:** per-invoice content key in the link's `#fragment`, wrapped with the view key for the owner (`keyBox`). Text fields on the server hold Veil tokens (for exports and agents) or `Private`. Amounts stay plain so payment works.
+- **Not done:** key rotation; sealing names inside agent change proposals (the server checks names at 32 chars before approval); private amounts (needs ZK, see `docs/ROADMAP.md` 3b).

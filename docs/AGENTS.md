@@ -22,7 +22,7 @@ The contract enforces scopes, kinds, allowlist, caps, expiry and revocation. The
 ## Connect
 
 ### A. Owner-issued connection string (simplest)
-In the app: Agents → Connect → pick a template or set limits → copy the one-time string `oiko1:<base64url(JSON {api, vault, sk})>`. It contains the agent's **secret key**, so treat it like a password. It is shown once, as text and a QR code.
+In the app: Agents → Connect → pick a template or set limits → copy the one-time string `oiko1:<base64url(JSON {api, vault, sk})>`. It contains the agent's **secret key**, so treat it like a password. It is shown once, as text and a QR code. If the owner turned on "Let it read private names", the JSON also has `vk`: their Veil view key (see "Private labels" below).
 
 ### B. Agent-initiated link (`/connect`)
 Generate your own ed25519 key pair, keep the secret, and send the owner a link:
@@ -70,8 +70,20 @@ Claude Desktop (`claude_desktop_config.json`, see `examples/agents/claude-deskto
 }
 ```
 
+### Private labels (Veil)
+Owners can keep pot names, bill names and reasons private: they are sealed on the owner's device and stored as 38-character tokens that start with `🔒` (`docs/PRIVACY.md`). Reads from the gateway return the tokens as they are. To read them you need the owner's view key (`oikoview1:…`, from `vk` in the connection string, `OIKO_VIEW_KEY`, or Settings → Privacy):
+
+```ts
+import { Veil } from "@oiko/sdk";
+const veil = Veil.fromViewKey(process.env.OIKO_VIEW_KEY!, "vault.ada.oiko.testnet");
+const overview = veil.openDeep(await client.get("/api/agent/overview")); // opens every token, including inside event titles
+const reason = veil.seal("Rent is due on the 1st and Bills is 20 short.", 280); // seal what you write for the owner
+```
+
+`oiko-mcp` does this for you. The view key can only read labels; it can't sign or move money. Without it, show `Private` and refer to pots by id. Never try to guess a label.
+
 ### D. MCP over HTTP
-`POST https://oikodotnear.vercel.app/api/mcp` — streamable HTTP, stateless, JSON responses. **Every** POST (initialize, tools/list, tools/call) needs its own NEP-413 header (below), signed over that request's exact body. GET returns 405. The HTTP server cannot sign: `propose` and `act` first return `{ needs_signature: true, unsigned_tx, hash, how }`; sign it and call the same tool again with `signed_tx`.
+`POST https://oikodotnear.vercel.app/api/mcp` — streamable HTTP, stateless, JSON responses. It runs on Oiko's server, which never holds a view key, so private labels stay sealed there. **Every** POST (initialize, tools/list, tools/call) needs its own NEP-413 header (below), signed over that request's exact body. GET returns 405. The HTTP server cannot sign: `propose` and `act` first return `{ needs_signature: true, unsigned_tx, hash, how }`; sign it and call the same tool again with `signed_tx`.
 
 ### E. REST
 Base `https://oikodotnear.vercel.app/api/agent`. Same header. See "Moving money over REST" below.

@@ -8,6 +8,7 @@ import { useConfig } from "./config";
 import { fixtureAction, isFixtureMode } from "./fixtures/mode";
 import { invalidate } from "./query";
 import { useSession } from "./session";
+import { usePrivacy } from "./privacy";
 
 type Methods = {
   [K in keyof VaultClient]: VaultClient[K] extends (...a: infer A) => Promise<TxResult> ? A : never;
@@ -27,6 +28,7 @@ async function topup(accountId: string) {
 export function useMoney() {
   const { session, getOwnerKey } = useSession();
   const { rpc } = useConfig();
+  const { writes } = usePrivacy();
 
   const run = useCallback(async (signerKey: string, method: VaultMethod, args: unknown[]): Promise<TxResult> => {
     if (!session) throw new ActionError("E_NO_KEY", "You're signed out.", "Sign in again.");
@@ -36,7 +38,7 @@ export function useMoney() {
     } else {
       if (!rpc) throw new ActionError("E_RPC", "Oiko is still loading.", "Try again in a moment.");
       await topup(session.accountId);
-      const client = new VaultClient(rpc, session.vaultId, new Signer(rpc, session.accountId, signerKey));
+      const client = new VaultClient(rpc, session.vaultId, new Signer(rpc, session.accountId, signerKey), writes);
       const fn = (client as unknown as Record<string, unknown>)[method] as ((...a: unknown[]) => Promise<TxResult>) | undefined;
       if (typeof fn !== "function") throw new ActionError("E_DISABLED", "This isn't available yet.", "It needs a newer version of Oiko.");
       try {
@@ -60,7 +62,7 @@ export function useMoney() {
     invalidate(`vault:${session.vaultId}`);
     invalidate("ajo:");
     return res;
-  }, [session, rpc]);
+  }, [session, rpc, writes]);
 
   /** Day-to-day action with the app key. */
   const exec = useCallback(<K extends VaultMethod>(method: K, ...args: Methods[K]) => run(session?.appKey ?? "", method, args), [run, session]);

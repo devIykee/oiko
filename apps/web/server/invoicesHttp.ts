@@ -55,7 +55,7 @@ export async function createInvoice(owner: string, body: z.infer<typeof InvoiceB
     client: { name: body.client.name, email: body.client.email || null },
     items: body.items.map((i) => ({ description: i.description, quantity: i.quantity, unitPrice: i.unitPrice })),
     token: body.token, issueDate: todayUtc(deps.now()), dueDate: body.dueDate, note: body.note || null, state: body.state,
-    payments: [], createdAt: now, updatedAt: now,
+    sealed: body.sealed ?? null, payments: [], createdAt: now, updatedAt: now,
   };
   await deps.store.putInvoice(inv);
   return inv;
@@ -71,7 +71,7 @@ async function loadOwned(owner: string, id: string, deps: InvoiceDeps): Promise<
 export async function updateInvoice(owner: string, id: string, patch: z.infer<typeof InvoicePatchBody>, deps: InvoiceDeps): Promise<Invoice> {
   const inv = await loadOwned(owner, id, deps);
   const d = deriveStatus(inv, deps.now());
-  const changesContent = patch.fromName !== undefined || patch.client !== undefined || patch.items !== undefined || patch.token !== undefined || patch.dueDate !== undefined || patch.note !== undefined;
+  const changesContent = patch.fromName !== undefined || patch.client !== undefined || patch.items !== undefined || patch.token !== undefined || patch.dueDate !== undefined || patch.note !== undefined || patch.sealed !== undefined;
   if (changesContent && !editable(inv)) throw new ApiError("E_NOT_EDITABLE", 409, "Money is already on its way for this invoice, so it can't be changed. Cancel it and create a new one if needed.");
   if (patch.state === "cancelled") {
     if (d.status === "paid") throw new ApiError("E_NOT_EDITABLE", 409, "This invoice is paid, so it can't be cancelled.");
@@ -88,6 +88,7 @@ export async function updateInvoice(owner: string, id: string, patch: z.infer<ty
     ...(patch.dueDate !== undefined ? { dueDate: patch.dueDate } : {}),
     ...(patch.note !== undefined ? { note: patch.note || null } : {}),
     ...(patch.state !== undefined ? { state: patch.state } : {}),
+    ...(patch.sealed !== undefined ? { sealed: patch.sealed } : {}),
     updatedAt: new Date(deps.now()).toISOString(),
   };
   if (patch.items) checkTotal(next.items);

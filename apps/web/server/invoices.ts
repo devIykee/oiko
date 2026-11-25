@@ -60,6 +60,8 @@ export interface Invoice {
   dueDate: string;
   note: string | null;
   state: StoredState;
+  /** Private invoice: encrypted details (see InvoiceSealedZ). Text fields then hold sealed tokens or "Private". */
+  sealed?: { box: string; keyBox: string } | null;
   payments: InvoicePayment[];
   createdAt: string;
   updatedAt: string;
@@ -166,6 +168,8 @@ export function publicView(inv: Invoice, nowMs: number, explorer: string | null)
     total: d.total.toString(), paid: d.paid.toString(), received: d.received.toString(), fee: d.fee.toString(), remaining: d.remaining.toString(),
     issueDate: inv.issueDate, dueDate: inv.dueDate, note: inv.note, status: d.status, payable: d.payable, inFlight: d.inFlight, paidAt: d.paidAt,
     transactions: d.txHashes.map((h) => ({ hash: h, url: txUrl(explorer, h) })),
+    /** Only the box: the payer opens it with the key in the link's #fragment. */
+    sealed: inv.sealed ? { box: inv.sealed.box } : null,
   };
 }
 
@@ -173,7 +177,7 @@ export function publicView(inv: Invoice, nowMs: number, explorer: string | null)
 export function ownerView(inv: Invoice, nowMs: number, explorer: string | null) {
   return {
     ...publicView(inv, nowMs, explorer),
-    client: inv.client, state: inv.state, editable: editable(inv), createdAt: inv.createdAt, updatedAt: inv.updatedAt,
+    client: inv.client, state: inv.state, editable: editable(inv), createdAt: inv.createdAt, updatedAt: inv.updatedAt, sealed: inv.sealed ?? null,
     payments: inv.payments.map((p) => ({
       originLabel: p.originLabel, status: p.status, createdAt: p.createdAt, updatedAt: p.updatedAt, completedAt: p.completedAt,
       amountIn: p.amountIn, originDecimals: p.originDecimals, amountOut: p.receivedAmount ?? p.amountOut, fee: p.fee,
@@ -191,6 +195,7 @@ export function agentView(inv: Invoice, nowMs: number, explorer: string | null) 
     total: money(d.total, inv.token), paid: money(d.paid, inv.token), received: money(d.received, inv.token), fee: money(d.fee, inv.token),
     remaining: money(d.remaining, inv.token), paid_at: d.paidAt, note: inv.note,
     transactions: d.txHashes.map((h) => txUrl(explorer, h) ?? h),
+    private: !!inv.sealed,
   };
 }
 

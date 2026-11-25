@@ -2,6 +2,25 @@
 
 Isomorphic TypeScript (browser + Node). No React inside the SDK. The web app wraps it in hooks under `apps/web/lib/`.
 
+Privacy (Veil, `veil.ts`, `docs/PRIVACY.md`):
+
+```ts
+class Veil {
+  static fromOwnerKey(ownerSecretKey: string, identityAccountId: string, vaultId?: string): Veil; // view key = HKDF(owner seed)
+  static fromViewKey(viewKey: string /* "oikoview1:…" */, vaultId: string): Veil;
+  seal(text: string, maxChars = 40): string;   // "🔒" + base32768(nonce|ChaCha20-Poly1305|tag); 38 chars for ≤ 38 bytes; E_VEIL_TOO_LONG if it can't fit
+  tryOpen(token: string): string | null;       // null: not a token, other key/vault, or tampered
+  open(s: string): string;                     // plain text passes through; unopenable tokens -> "Private"
+  openText(s: string): string;                 // opens tokens inside any sentence
+  openDeep<T>(v: T): T;                        // opens every string in a JSON value
+  exportViewKey(): string; fingerprint(): string;
+}
+isSealed(s), maskText(s), maskDeep(v), VEIL_LIMITS, PRIVATE_LABEL
+sealBox / openBox / newBoxKey / wrapBoxKey / unwrapBoxKey   // per-record encryption (private invoices)
+new VaultClient(rpc, vaultId, signer?, privacy?: Veil | "mask")  // seals createPot/updatePot/addBill/agentPropose, opens every view
+AgentConnection.vk?: string                  // optional view key inside oiko1: connection strings
+```
+
 ```ts
 // types.ts — mirrors docs/interfaces/contracts.md exactly (snake_case JSON kept as-is)
 export type Token = "usdc" | "usdt";
