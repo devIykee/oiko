@@ -5,6 +5,8 @@ All times are `U64` decimal strings in nanoseconds (`env::block_timestamp()`).
 `Token` is the string `"usdc"` or `"usdt"`. Token contract ids are fixed at init.
 Accounts below use the root `<root>` (testnet: `oiko.testnet`, local: `oiko.test.near`, mainnet: configurable `OIKO_ROOT_ACCOUNT`).
 
+Text fields (`Pot.name`, `Pot.icon`, `Bill.name`, `Proposal.reason`, and the event and activity fields copied from them) may hold **private labels**: 38-, 106- or 277-character strings that start with `🔒`, encrypted on the owner's device (`docs/PRIVACY.md`). The contracts treat them as ordinary strings under the same character limits (40 / 40 / 40 / 280, counted as Unicode scalar values); clients open them with the owner's view key.
+
 Error strings: every `require!`/panic message starts with a stable code, e.g. `E_LOCKED: pot is locked until <ns>`. The UI maps codes to plain English (see `packages/sdk/src/errors.ts`).
 
 ## Events (NEP-297)

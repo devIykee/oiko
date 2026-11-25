@@ -81,7 +81,7 @@ To run the app against NEAR testnet instead, set `OIKO_NETWORK=testnet`, the con
 ## Run the tests
 
 ```bash
-pnpm test:unit        # 232 Vitest tests: SDK (NEP-413, amounts, caps, insights, Veil privacy), API server (gateway auth, relayer allow-list, 1Click mock exactly-once, invoices, receipts, agent events, change proposals, webhooks, how_to_fix, private invoices), sign-in codes, MCP (view keys), examples  (~20 s)
+pnpm test:unit        # 233 Vitest tests: SDK (NEP-413, amounts, caps, insights, Veil privacy), API server (gateway auth, relayer allow-list, 1Click mock exactly-once, invoices, receipts, agent events, change proposals, webhooks, how_to_fix, private invoices), sign-in codes, MCP (view keys), examples  (~20 s)
 pnpm e2e              # 16 Playwright tests against `pnpm local` or `docker compose up`  (~3 min)
 pnpm readme-check     # fails if an [e2e: …] marker in "Try it" has no matching test
 pnpm test:contracts   # 49 cargo tests: unit + proptest invariants + near-workspaces sandbox integration (critical path, ROSCA cycle)  (~6 min including the wasm build)

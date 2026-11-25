@@ -14,6 +14,7 @@ const steps: Array<[string, string]> = [
   ["Your plan runs", "When money arrives it is split by your plan into pots: Spend for now, Bills, Savings, Goals, and Locked pots that only open on their date. Payments are noticed even if nobody pressed a button: anyone can ask the account to sync, and it is safe to ask twice."],
   ["Pay, save, withdraw", "Pay bills, move between pots, or withdraw from Spend to an exchange or another account. Every money action shows the amount, the source pot, where it goes and the fees in one sentence before you confirm."],
   ["Let your agent help", "Connect the AI agent you already use through MCP or the REST API. It gets its own limited key: read only, suggest only, or act within caps and payees you choose. Disconnect revokes it at once."],
+  ["Keep it private", "Pot names, bill names, your agent\u2019s reasons and the details of your invoices are encrypted on your device before they are saved, with a key that comes from your passkey or browser key. Anyone looking up your account, and Oiko\u2019s servers, see a lock instead of the name. Your agent can read them only if you share the key with it. Invoice links carry their own key in the part of the link that never reaches the server."],
 ];
 
 export default function HowItWorks() {
@@ -26,7 +27,7 @@ export default function HowItWorks() {
         </Block>
       ))}
       <Block title="What runs where" tone="grey">
-        <p><strong>On NEAR:</strong> your name, your account and its rules (pots, plan, locks, caps, bills, ROSCA savings). <strong>In your browser:</strong> your keys. <strong>On Oiko&rsquo;s servers:</strong> a relayer that pays transaction fees for you, the pay-link service and the agent gateway. None of them can move your money.</p>
+        <p><strong>On NEAR:</strong> your name, your account and its rules (pots, plan, locks, caps, bills, ROSCA savings). <strong>In your browser:</strong> your keys and the key that opens your private names. <strong>On Oiko&rsquo;s servers:</strong> a relayer that pays transaction fees for you, the pay-link service and the agent gateway. None of them can move your money or read your private names.</p>
         <p>Read the <Link className="font-semibold text-accent hover:underline" href="/security">Trust page</Link> for code fingerprints, contract accounts and risks.</p>
         <div className="flex flex-wrap gap-3 pt-2">
           <PillLink href="/start" variant="accent">Get your name</PillLink>

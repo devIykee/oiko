@@ -318,12 +318,13 @@ function Pillars() {
     { t: "An account only you control", b: "Your money sits in your own account. Oiko cannot move it, freeze it or spend it.", d: I.lockShieldFill },
     { t: "Locks only the date can open", b: "Locked pots are enforced by code with no upgrade switch. Nobody can open them early.", g: <LockedPotGlyph size={22} /> },
     { t: "Agents inside your limits", b: "Agents get their own key with caps, payees and an expiry. Disconnect revokes it at once.", g: <AgentBudgetGlyph size={22} /> },
+    { t: "Private by default", b: "Pot names, bills and invoice details are encrypted on your device before they are saved. Not even Oiko can read them.", d: I.lockFill },
     { t: "Code you can check", b: "Open source, with the account code fingerprint published on the Trust page.", d: I.checkmarkShieldFill },
   ];
   return (
     <Section tone="grey" labelledBy="pillars-title">
       <SectionHeading id="pillars-title" title="Nobody in the middle." lead="No company sits between you and your money. Here is what that means in practice." />
-      <ul className="mk-stagger mt-14 grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
+      <ul className="mk-stagger mt-14 grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {p.map((x, i) => (
           <li key={x.t} style={{ ["--i" as string]: i }}>
             <IconTile color="blue" size={48} d={x.d}>{x.g}</IconTile>
@@ -343,6 +344,7 @@ const FAQ: Array<[string, ReactNode]> = [
   ["Is this a bank?", "No. Oiko is not a bank and your balance is not insured. It is software that runs an account only you control, with rules you set."],
   ["Are these dollars?", "No. USDC and USDT are stablecoins designed to track the US dollar. They are not dollars and are not bank deposits. They can lose their peg and issuers can freeze them."],
   ["Where does yield come from?", "Only if you switch on Earn for a pot. That pot is lent on Rhea, a lending market, and borrowers pay interest. The rate is variable, shown as today’s rate, and can go to zero. Before lending, your account checks the pool is not too busy, so you can usually take money back out. That is a safeguard, not a guarantee."],
+  ["Can other people see my finances?", "Not what your money is for. Pot names, bill names, your agent\u2019s reasons and your invoice details are encrypted on your device before they are saved, with a key that comes from your passkey. The public record and Oiko\u2019s servers only see a lock symbol. Amounts, dates and who you pay stay visible, because your account\u2019s code needs them to keep your rules. Settings \u2192 Privacy shows exactly what is private."],
   ["Can Oiko freeze my money?", "No. Oiko has no admin key to your account and its code cannot be upgraded. Locked pots open on their date and not before, for anyone, including you and us."],
   ["What if an issuer freezes funds?", "Circle (USDC) and Tether (USDT) can freeze their own stablecoins at any address. Oiko cannot prevent or undo that. It is a real risk of holding stablecoins."],
   ["Do you hold local currency?", "No. Oiko only holds USDC and USDT. There is no bank account and no local-currency balance."],
