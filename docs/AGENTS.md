@@ -80,7 +80,9 @@ const overview = veil.openDeep(await client.get("/api/agent/overview")); // open
 const reason = veil.seal("Rent is due on the 1st and Bills is 20 short.", 280); // seal what you write for the owner
 ```
 
-`oiko-mcp` does this for you. The view key can only read labels; it can't sign or move money. Without it, show `Private` and refer to pots by id. Never try to guess a label.
+`oiko-mcp` (0.3.0+) does this for you. The view key can only read labels; it can't sign or move money. Without it, show `Private` and refer to pots by id. Never try to guess a label.
+
+**Backwards compatible by default.** The gateway, the hosted MCP link and webhooks replace each sealed label with `Private`, so agents written before private labels never see ciphertext. A client that holds the view key asks for the raw tokens with the header `X-Oiko-Labels: sealed` (`GatewayClient` sends it when the connection has `vk`), and a webhook gets them when registered with `{ "url": "…", "labels": "sealed" }`. The header is not part of the NEP-413 signature; it only changes how labels are shown.
 
 ### D. MCP over HTTP
 `POST https://oikodotnear.vercel.app/api/mcp` — streamable HTTP, stateless, JSON responses. It runs on Oiko's server, which never holds a view key, so private labels stay sealed there. **Every** POST (initialize, tools/list, tools/call) needs its own NEP-413 header (below), signed over that request's exact body. GET returns 405. The HTTP server cannot sign: `propose` and `act` first return `{ needs_signature: true, unsigned_tx, hash, how }`; sign it and call the same tool again with `signed_tx`.

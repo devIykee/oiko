@@ -13,7 +13,7 @@ export const MCP_INSTRUCTIONS = `Oiko is a personal finance app. You are connect
 - Every refusal carries how_to_fix: follow it instead of retrying the same call.
 - Some names (pots, bills, reasons) may be private: the owner encrypts them on their own device. They read as "Private" (or start with 🔒) unless the owner gave you their view key. Refer to them by id; never guess what they say.`;
 
-export const MCP_VERSION = "0.2.0";
+export const MCP_VERSION = "0.3.0";
 
 export function createOikoMcpServer(backend: OikoBackend, version = MCP_VERSION): McpServer {
   const server = new McpServer({ name: "oiko", version }, { instructions: MCP_INSTRUCTIONS, capabilities: { logging: {} } });

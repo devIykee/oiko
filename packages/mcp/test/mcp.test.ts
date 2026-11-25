@@ -196,3 +196,25 @@ describe("private labels (Veil) in the stdio backend", () => {
     expect(owner.open(reason)).toBe("Your Therapy pot could earn while it waits");
   });
 });
+
+describe("private labels: backwards compatibility on the wire", () => {
+  const kp = keyPairFromSeed(new Uint8Array(32).fill(43));
+  const base = { api: "https://oiko.example", vault: "vault.ada.oiko.testnet", sk: kp.secretKey };
+  const headersOf = async (conn: typeof base & { vk?: string }) => {
+    let h: Record<string, string> = {};
+    const fetchImpl = (async (_u: string, init: RequestInit) => { h = init.headers as Record<string, string>; return new Response("{}", { status: 200 }); }) as unknown as typeof fetch;
+    await new GatewayBackend(conn, fetchImpl).read("overview");
+    return h;
+  };
+  it("asks the gateway for sealed tokens only when it holds a view key; otherwise the server sends \"Private\"", async () => {
+    expect((await headersOf(base))["x-oiko-labels"]).toBeUndefined();
+    const vk = Veil.fromOwnerKey(keyPairFromSeed(new Uint8Array(32).fill(44)).secretKey, "ada.oiko.testnet").exportViewKey();
+    expect((await headersOf({ ...base, vk }))["x-oiko-labels"]).toBe("sealed");
+  });
+  it("connection strings from before view keys (and older oiko-mcp reading new ones) keep working", () => {
+    const old = `oiko1:${Buffer.from(JSON.stringify({ api: base.api, vault: base.vault, sk: base.sk })).toString("base64url")}`;
+    expect(decodeConnectionString(old)).toEqual(base);
+    const withVk = JSON.parse(Buffer.from(encodeConnectionString({ ...base, vk: Veil.fromOwnerKey(kp.secretKey, "ada.oiko.testnet").exportViewKey() }).slice(6), "base64url").toString()) as Record<string, string>;
+    expect([withVk.api, withVk.vault, withVk.sk]).toEqual([base.api, base.vault, base.sk]); // the fields 0.2.0 reads are unchanged
+  });
+});

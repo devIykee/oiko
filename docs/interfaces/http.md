@@ -68,6 +68,8 @@ Agent errors carry `error.how_to_fix` (and `submit` failures `error.how_to_fix`)
 
 Public: `GET /api/counterparty/:accountId?vault=&amount=&token=` (no auth, 30/min per IP) returns the same result shape without `decision`; `vault` adds the prior-payment signal.
 
+**Private labels (all agent responses, `/api/mcp`, webhooks).** Sealed labels (`🔒…`, `docs/PRIVACY.md`) are replaced with `"Private"` unless the request sends `X-Oiko-Labels: sealed` (for clients holding the owner's view key). `POST /api/agent/webhook` accepts an optional `labels: "masked" | "sealed"` (default: `sealed` if the registering request sent the header, else `masked`).
+
 ## Invoices (`/api/invoices/*`)
 
 Owner auth = the same NEP-413 header as `/api/agent/log`, signed by a key on the owner's **name account** (`accountId` = `ada.oiko.near`, normally the app key). Amounts are base-unit strings (6 decimals) plus `token`. Dates are `yyyy-mm-dd` (UTC). Line total = quantity (up to 4 decimals) × unit price, rounded half up to a base unit; totals are summed with bigint.
@@ -91,6 +93,10 @@ Status (derived on every read from the 1Click status of the invoice's deposits; 
 - `pending`: a deposit is received / processing / incomplete, or part of the total is paid (`received` shows how much)
 - `refunded`: the last started deposit was refunded and nothing is paid (the client can pay again)
 - `overdue`: open and past `dueDate`; otherwise `open`
+
+## Admin (`/api/admin/*`, operator only)
+
+Off unless `ADMIN_PASSWORD` is set. `POST /api/admin/login {password}` sets an HttpOnly, Secure, SameSite=Strict session cookie (8 h); `POST /api/admin/logout`. `GET|PUT /api/admin/framing`. `GET /api/admin/dashboard[?fresh=1][&sample=30]` (cached 30 s): `{ generatedAt, network, checks: [{id, label, status: ok|warn|bad, detail}], relayer, contracts: [{role, accountId, keys, keyless}], vaultCode, accounts: { total, sampled, versions, privacy, signupsByDay, balanceSampled, recent: [{name, vaultId, createdAt, version, privacy, pots, bills, agents, total}] }, counts: { invoices, invoicesPrivate, invoicesRecent, changesPending, accessRecent, accessRefusedRecent, reports, pushSubscriptions, webhooks, sinceHours }, features }`. Public chain data and aggregate counts only: no labels, invoice contents or per-user agent logs.
 
 ## Agent discovery
 

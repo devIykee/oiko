@@ -25,7 +25,7 @@ Instead of `OIKO_CONNECTION` you can set `OIKO_AGENT_KEY` (ed25519 secret key), 
 
 The key stays on your machine: every request to Oiko is signed locally (NEP-413) and every transaction is signed locally.
 
-**Private labels.** Owners can encrypt pot names, bill names and reasons (Veil, [docs/PRIVACY.md](https://github.com/devIykee/oiko/blob/main/docs/PRIVACY.md)). If they turned on "Let it read private names" when connecting you, the connection string already carries their view key. Otherwise they can give it to you as `OIKO_VIEW_KEY=oikoview1:…`. With it, this server opens every label locally and seals the reasons you write before they leave your machine; Oiko's server never sees the key. Without it, private labels read as `Private`.
+**Private labels.** Owners can encrypt pot names, bill names and reasons (Veil, [docs/PRIVACY.md](https://github.com/devIykee/oiko/blob/main/docs/PRIVACY.md)). If they turned on "Let it read private names" when connecting you, the connection string already carries their view key. Otherwise they can give it to you as `OIKO_VIEW_KEY=oikoview1:…`. With it, this server opens every label locally and seals the reasons you write before they leave your machine; Oiko's server never sees the key. Without it, private labels read as `Private` (older versions of this package, 0.2.0 and earlier, also see `Private`: the server never sends ciphertext to clients that didn't ask for it).
 
 New events are also sent as MCP `notifications/message` (logger `oiko-events`), polled every 60 seconds. Set `OIKO_EVENTS_POLL_SECONDS` to change the interval, or `0` to turn it off.
 

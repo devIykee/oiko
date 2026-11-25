@@ -88,6 +88,26 @@ Invoices live on Oiko's server, not on chain. With private labels on, the owner'
 
 Amounts, quantities, unit prices, currency, dates and status stay readable: the server needs them to quote and match payments. Editing keeps the same content key, so links already sent keep working. The CSV export is downloaded as ciphertext and opened in the browser, with RFC 4180 quoting and the spreadsheet formula guard re-applied (`openCsv`).
 
+## Backwards compatibility
+
+Veil changes no contract and no API shape, and anything that predates it keeps working:
+
+| What existed before | What happens now | Checked by |
+|---|---|---|
+| Accounts on the current vault (`72sdtZ…`) | Sealed names fit the existing 40-character limits; plain names keep working | `contracts/tests/tests/veil.rs` (sandbox, real wasm) |
+| Accounts on the **earlier** vault (`3G9G…`, created before 2026-11-05) | Same limits, same result: sealed names are stored and returned unchanged | `scripts/veil-compat.sh` builds the vault from commit `67c925f` and runs the same sandbox test against it |
+| Pots and bills saved with plain names | Shown as they are; `open` passes plain text through, `seal` never seals twice. "Make existing pot names private" is optional | `packages/sdk/test/veil.test.ts` |
+| Sessions saved before Veil | "This browser" sessions derive the view key on the next load; passkey sessions show "Unlock private labels" (one passkey prompt). Until then names read "Private" | `apps/web/lib/session.tsx` |
+| Move-to-device codes | Old codes (no view key) still sign in; new codes stay `v: 1` and only add a field older versions ignore | `apps/web/lib/__tests__/moveCodeCompat.test.ts` |
+| Agent connection strings | `oiko1:` strings without `vk` still work; strings with `vk` still work in oiko-mcp 0.2.0, which ignores the extra field | `packages/mcp/test/mcp.test.ts` |
+| Agents built before Veil (oiko-mcp 0.2.0, REST clients, the hosted MCP link) | They never see raw ciphertext: every agent response, MCP result and change-proposal summary shows **"Private"** in place of a sealed label. Clients that hold the view key ask for the tokens with the header `X-Oiko-Labels: sealed` (oiko-mcp ≥ 0.3.0 and `GatewayClient` send it automatically when they have `vk`) | `apps/web/server/__tests__/labelsCompat.test.ts` |
+| Webhooks registered before Veil | Deliveries show "Private". Register with `{ url, labels: "sealed" }` (or via a client that sends the header) to receive tokens | `labelsCompat.test.ts` |
+| Push notifications | The server can't open a sealed bill name, so a reminder says "A bill is due today" instead of showing ciphertext | `apps/web/server/labels.ts` (`plainLabel`) |
+| Invoices created before Veil, and the invoice API | `sealed` is an optional field; plain invoices are unchanged | `apps/web/server/__tests__/invoices.test.ts` |
+| People who don't want it | Settings → Privacy → Private labels off: new names are saved as plain text again | — |
+
+What can't be made compatible: a copy of the Oiko app built before Veil, opened in a browser, shows sealed names as raw tokens, because that code doesn't know the format. The hosted app always serves the current version.
+
 ## What Veil hides, and what it does not
 
 | Hidden from the public record, RPC nodes and Oiko's server | Still public |

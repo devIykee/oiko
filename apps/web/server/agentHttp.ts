@@ -1,5 +1,6 @@
 // HTTP glue for /api/agent/* (framework-free: takes a web Request, returns a Response).
 import { describeRow, factsOfAction, factsOfSignedTx, outcomeOf, reasonOf, type ActionFacts, type Outcome } from "./accessLog";
+import { forReader, labelModeOf } from "./labels";
 import { parseGatewayAuthHeader, normalizePublicKey } from "@oiko/sdk";
 import { ApiError } from "./errors";
 import { authenticateAgent, authenticateOwner, logAccess, verifiedAgentOf, payReceiverOfSignedTx, prepare, readTool, submit, type AuthedAgent, type GatewayRequest } from "./gateway";
@@ -34,7 +35,7 @@ export async function agentRead(req: Request, tool: string): Promise<Response> {
     if (!checkLimits("gateway", clientIp(req), id?.publicKey ?? null)) throw new ApiError("E_RATE_LIMIT", 429);
     ctx = await authenticateAgent(gatewayRequest(req, ""), "read");
     const params = Object.fromEntries(url.searchParams.entries());
-    return json(await readTool(ctx, tool, params));
+    return json(forReader(await readTool(ctx, tool, params), labelModeOf(req)));
   } catch (e) {
     status = e instanceof ApiError ? e.status : 500;
     code = e instanceof ApiError ? e.code : "E_INTERNAL";
@@ -126,7 +127,7 @@ export async function agentChange(req: Request): Promise<Response> {
     const b = parseBody(ProposeChangeBody, text);
     ctx = await authAgentAny(req, text, "propose");
     const { rpc } = await import("./near");
-    return json(await proposeChange(ctx, b.change, b.reason, { store: store(), now: () => Date.now(), overview: (v) => rpc().view(v, "get_overview") }));
+    return json(forReader(await proposeChange(ctx, b.change, b.reason, { store: store(), now: () => Date.now(), overview: (v) => rpc().view(v, "get_overview") }), labelModeOf(req)));
   } catch (e) {
     status = e instanceof ApiError ? e.status : 500;
     code = e instanceof ApiError ? e.code : "E_INTERNAL";
@@ -145,7 +146,7 @@ export async function agentWebhook(req: Request): Promise<Response> {
     if (!checkLimits("gateway", clientIp(req), id?.publicKey ?? null)) throw new ApiError("E_RATE_LIMIT", 429);
     const text = await readText(req, 4096);
     const { z } = await import("zod");
-    const b = parseBody(z.object({ url: z.string().max(500).nullable() }), text);
+    const b = parseBody(z.object({ url: z.string().max(500).nullable(), labels: z.enum(["masked", "sealed"]).optional() }), text);
     ctx = await authAgentAny(req, text, "read");
     const { checkWebhookUrl, registerWebhook, webhookKey } = await import("./webhooks");
     const { serverConfig } = await import("./config");
@@ -155,7 +156,7 @@ export async function agentWebhook(req: Request): Promise<Response> {
       return json({ ok: true, removed: true });
     }
     const url = checkWebhookUrl(b.url, serverConfig().network === "local");
-    return json(await registerWebhook(s, ctx.vaultId, ctx.publicKey, url, Date.now()));
+    return json(await registerWebhook(s, ctx.vaultId, ctx.publicKey, url, Date.now(), b.labels ?? labelModeOf(req)));
   } catch (e) {
     status = e instanceof ApiError ? e.status : 500;
     code = e instanceof ApiError ? e.code : "E_INTERNAL";

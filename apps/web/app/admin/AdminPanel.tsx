@@ -2,6 +2,7 @@
 import { Button, Input, MotionProvider, Note, SegmentedControl } from "@oiko/ui";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/brand/Logo";
+import { Dashboard } from "./Dashboard";
 
 type Framing = "testnet" | "mainnet";
 type State = { kind: "loading" } | { kind: "off" } | { kind: "login" } | { kind: "in"; framing: Framing };
@@ -48,7 +49,7 @@ export function AdminPanel() {
   return (
     <MotionProvider>
     <div className="oi-public oi-root">
-      <main className="oi-col oi-page" style={{ maxWidth: 480, padding: "48px 16px" }}>
+      <main className="oi-col oi-page" style={{ maxWidth: state.kind === "in" ? 1040 : 480, padding: "48px 16px" }}>
         <Logo variant="wordmark" height={24} />
         <h1 className="oi-h1">Admin</h1>
         {state.kind === "loading" && <p className="oi-muted">Checking…</p>}
@@ -61,6 +62,7 @@ export function AdminPanel() {
         )}
         {state.kind === "in" && (
           <>
+            <Dashboard />
             <section className="oi-card oi-stack" aria-labelledby="framing-title">
               <div>
                 <h2 id="framing-title" className="oi-h2">Public framing</h2>

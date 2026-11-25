@@ -58,7 +58,9 @@ export class GatewayClient {
     const auth = gatewayAuthHeader(this.conn.sk, this.conn.vault, method, path, text);
     const res = await this.fetchImpl(this.conn.api + path, {
       method,
-      headers: { authorization: auth, ...(body === undefined ? {} : { "content-type": "application/json" }) },
+      // With a view key this client can open private labels itself, so it asks for the sealed tokens; without one
+      // the server shows them as "Private" (what agents built before Veil get).
+      headers: { authorization: auth, ...(this.conn.vk ? { "x-oiko-labels": "sealed" } : {}), ...(body === undefined ? {} : { "content-type": "application/json" }) },
       body: body === undefined ? undefined : text,
     });
     const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: { code: string; message: string; detail?: string; how_to_fix?: string } };

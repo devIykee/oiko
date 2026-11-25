@@ -1,5 +1,6 @@
 // /api/cron: runs due schedules and settles due ROSCA rounds (ajo contract); sends bill reminders when push is configured.
 import { AjoClient, billStatus, formatAmount, RegistryClient, TGAS, type Circle, type Overview } from "@oiko/sdk";
+import { plainLabel } from "./labels";
 import { serverConfig } from "./config";
 import { ApiError } from "./errors";
 import { relayer, rpc } from "./near";
@@ -79,8 +80,10 @@ export async function runCron(nowMs = Date.now(), maxMs = 50_000): Promise<CronR
         const key = `${vaultId}:${b.id}:${st.nextDue.toISOString()}:${daysLeft}`;
         if (reminded.has(key)) continue;
         reminded.add(key);
+        // A private bill name can't be opened here: the notification says "A bill" instead of showing ciphertext.
+        const label = plainLabel(b.name, "A bill");
         report.reminders += await sendPush(ov.owner, {
-          title: daysLeft === 0 ? `${b.name} is due today` : `${b.name} is due in 3 days`,
+          title: daysLeft === 0 ? `${label} is due today` : `${label} is due in 3 days`,
           body: `${formatAmount(b.amount)} ${b.token.toUpperCase()} to ${b.payee}.`, url: "/bills", tag: key,
         });
       }

@@ -77,6 +77,10 @@ With `DATABASE_URL`, nonces, the access log, push subscriptions and mock swaps a
 
 Pot names and icons, bill names, agent proposal reasons and invoice details are encrypted on the owner's device (ChaCha20-Poly1305) with a view key derived from the owner key (HKDF-SHA256). The vault, RPC nodes and Oiko's server store and serve only ciphertext; the server never holds a view key. Sealed labels are 38 characters (base32768), within the deployed vault's 40-character limit, so no contract change was needed. Amounts, timing, pot kinds, plan percentages, locks, payees and agent policies stay public because the contract enforces them. Design, formats and limits: `docs/PRIVACY.md`. Tests: `packages/sdk/test/veil.test.ts`, `apps/web/server/__tests__/privateInvoices.test.ts`, `packages/mcp/test/mcp.test.ts`, `contracts/vault/src/tests.rs` (`veil_tokens_fit_and_round_trip_through_json_args`).
 
+## 5c. Operator dashboard
+
+`/admin` is off unless `ADMIN_PASSWORD` is set (`server/admin.ts`: constant-time compare, 5 tries per 15 minutes per IP, HMAC-signed HttpOnly/Secure/SameSite=Strict cookie for 8 hours). `GET /api/admin/dashboard` (`server/adminDashboard.ts`) needs that session and returns public chain data (registry names, account code hashes, access-key counts, balances) and aggregate counts from the store. It returns no private labels (only whether an account uses them), no invoice contents and no per-user access-log rows. It can't change anything except the public framing.
+
 ## 6. Threats
 
 | Threat | What stops it | What remains |

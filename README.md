@@ -81,7 +81,7 @@ To run the app against NEAR testnet instead, set `OIKO_NETWORK=testnet`, the con
 ## Run the tests
 
 ```bash
-pnpm test:unit        # 219 Vitest tests: SDK (NEP-413, amounts, caps, insights, Veil privacy), API server (gateway auth, relayer allow-list, 1Click mock exactly-once, invoices, receipts, agent events, change proposals, webhooks, how_to_fix, private invoices), sign-in codes, MCP (view keys), examples  (~20 s)
+pnpm test:unit        # 232 Vitest tests: SDK (NEP-413, amounts, caps, insights, Veil privacy), API server (gateway auth, relayer allow-list, 1Click mock exactly-once, invoices, receipts, agent events, change proposals, webhooks, how_to_fix, private invoices), sign-in codes, MCP (view keys), examples  (~20 s)
 pnpm e2e              # 16 Playwright tests against `pnpm local` or `docker compose up`  (~3 min)
 pnpm readme-check     # fails if an [e2e: …] marker in "Try it" has no matching test
 pnpm test:contracts   # 49 cargo tests: unit + proptest invariants + near-workspaces sandbox integration (critical path, ROSCA cycle)  (~6 min including the wasm build)
@@ -99,6 +99,18 @@ Lighthouse (mobile): landing 86-89 performance / 100 accessibility, pay page 88-
 | `mainnet` | NEAR mainnet | real `https://1click.chaindefuser.com` (live minimum: 100 units) | real Rhea `contract.main.burrow.near` | native USDC, USDt |
 
 Testnet contracts: registry `oiko.testnet`, `usdc.oiko.testnet`, `usdt.oiko.testnet`, `lending.oiko.testnet`, `ajo.oiko.testnet` (ROSCA savings), vault code published as a NEAR Global Contract with hash `72sdtZyfMEdLh2RSqSjBAPt73PpsHCr24irGCi9yahex` (accounts made before 2026-11-05 use the earlier `3G9Gwhrtq8gN1ugLLNBShdjbw3s1imNH8FVrUXYWTPPR`, and the app tells them), relayer `oiko-relayer.testnet`. The registry and ROSCA contracts have no keys left: nobody, including the team, can change them.
+
+## Operator dashboard
+
+Set `ADMIN_PASSWORD` and open `/admin` (unlinked, never indexed). After signing in you get:
+
+- **Health checks:** RPC reachability and latency, storage (Postgres or in memory), relayer balance, the daily relayer budget, cron, the payment provider, and whether the registry and ROSCA contracts are still keyless.
+- **Key numbers:** accounts, private-label adoption, accounts on the current account code (vs the earlier vault), relayer balance, money held by the newest accounts, invoices (and how many are private), agent requests and refusals in the last 24 h, and agent suggestions waiting for owners.
+- **Signups chart** for the last 14 days, and a table of the newest accounts (code version, private labels, pots, bills, agents, balance).
+- **Contracts and code:** access keys per contract, the published vault code and the registry's trusted list.
+- The existing **public framing** switch.
+
+It reads public chain data and aggregate counts only: no private labels, invoice contents or per-user agent logs. API: `GET /api/admin/dashboard`.
 
 ## Mainnet proof
 
@@ -158,6 +170,7 @@ A public ledger is a strange place to keep a budget: anyone can look up an accou
 - **A view key, not a new password.** The key is derived from the owner key (HKDF), so every device you can sign in on derives the same key, and the server never sees it. It can read labels but cannot move money.
 - **Agents, if you say so.** When connecting an agent, "Let it read private names" adds the view key to its connection string (or set `OIKO_VIEW_KEY` for `oiko-mcp`). The agent opens labels in its own process and seals the reasons it writes. Without the key it sees "Private".
 - **Private invoices.** Client, email, descriptions and notes are encrypted with a per-invoice key that travels only in the link's `#fragment`, which browsers never send to the server. Amounts stay readable so payment works. Your CSV export is opened in your browser.
+- **Backwards compatible.** No contract change, no API break. It works on accounts made with the earlier vault too (`scripts/veil-compat.sh`), plain names keep working, and agents, webhooks and push notifications from before Veil see "Private" instead of ciphertext. Clients that hold the view key opt in with `X-Oiko-Labels: sealed`. Old sign-in codes and connection strings still work.
 - **Honest about the rest.** Amounts, timing, pot kinds, plan percentages, locks and payees stay public because the contract enforces them. The app lists these under Settings → Privacy → "Still public".
 
 Design, threat model and references: `docs/PRIVACY.md`.

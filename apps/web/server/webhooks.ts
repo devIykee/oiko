@@ -3,6 +3,7 @@
 // returned once at registration. Undelivered events are retried on the next cron run; after 20 straight failures the
 // webhook is switched off. Before every delivery the agent's key and policy are re-checked on chain.
 import { createHmac, randomBytes } from "node:crypto";
+import { forReader } from "./labels";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { ApiError } from "./errors";
@@ -14,6 +15,8 @@ export interface Webhook {
   publicKey: string;
   url: string;
   secret: string;
+  /** "sealed": deliver private labels as tokens (the agent holds the view key). Missing or "masked": "Private". */
+  labels?: "masked" | "sealed";
   createdAt: string;
   /** Ids of events already delivered (most recent 500). */
   delivered: string[];
@@ -60,9 +63,9 @@ export function signWebhook(secret: string, timestamp: number, body: string): st
   return `sha256=${createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex")}`;
 }
 
-export async function registerWebhook(s: Store, vaultId: string, publicKey: string, url: string, now: number) {
+export async function registerWebhook(s: Store, vaultId: string, publicKey: string, url: string, now: number, labels: "masked" | "sealed" = "masked") {
   const secret = `whsec_${randomBytes(24).toString("base64url")}`;
-  const w: Webhook = { vaultId, publicKey, url, secret, createdAt: new Date(now).toISOString(), delivered: [], failures: 0, lastError: null, lastDeliveryAt: null, disabled: false };
+  const w: Webhook = { vaultId, publicKey, url, secret, labels, createdAt: new Date(now).toISOString(), delivered: [], failures: 0, lastError: null, lastDeliveryAt: null, disabled: false };
   await s.setSetting(webhookKey(vaultId, publicKey), w);
   return {
     url, secret, note: "Keep the secret: it is shown only once. Each delivery is a POST with JSON { events, delivered_at } and headers X-Oiko-Timestamp (unix ms) and X-Oiko-Signature: sha256=HMAC_SHA256(secret, \"<timestamp>.<body>\") in hex. Reply 2xx within 5 s.",
@@ -96,7 +99,7 @@ export async function deliver(s: Store, w: Webhook, events: OikoEvent[], now: nu
   const done = new Set(w.delivered);
   const fresh = events.filter((e) => !done.has(e.id) && Date.parse(e.at) > now - DELIVERY_WINDOW_MS);
   if (!fresh.length) return 0;
-  const body = JSON.stringify({ events: fresh, delivered_at: new Date(now).toISOString() });
+  const body = JSON.stringify({ events: forReader(fresh, w.labels === "sealed" ? "sealed" : "masked"), delivered_at: new Date(now).toISOString() });
   let ok = false, err: string | null = null;
   try {
     const r = await post(w.url, body, { "x-oiko-timestamp": String(now), "x-oiko-signature": signWebhook(w.secret, now, body) });

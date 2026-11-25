@@ -1,5 +1,6 @@
 // MCP over streamable HTTP (stateless) at POST /api/mcp. Each request carries the agent's NEP-413 Authorization header.
 import { createOikoMcpServer, type AgentActionInput, type ConfigChangeInput, type OikoBackend, type ReadTool } from "oiko-mcp/internal";
+import { forReader, labelModeOf, type LabelMode } from "./labels";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { normalizePublicKey, parseGatewayAuthHeader } from "@oiko/sdk";
 import { serverConfig } from "./config";
@@ -15,12 +16,12 @@ import { checkLimits } from "./ratelimit";
 
 class InProcessBackend implements OikoBackend {
   readonly canSign = false;
-  constructor(private readonly ctx: AuthedAgent) {}
+  constructor(private readonly ctx: AuthedAgent, private readonly labels: LabelMode = "masked") {}
   async read(tool: ReadTool, params: Record<string, string> = {}) {
     if (!this.ctx.policy.scopes.includes("read")) throw withHowToFix(new ApiError("E_SCOPE", 403, "This agent doesn't have the \"read\" permission."), this.ctx.policy);
     const r = await readTool(this.ctx, tool, params).catch((e) => { throw withHowToFix(e, this.ctx.policy); });
     await logAccess({ vaultId: this.ctx.vaultId, publicKey: this.ctx.publicKey, method: "MCP", path: `/api/mcp#${tool}`, status: 200, tool });
-    return r;
+    return forReader(r, this.labels);
   }
   async report(receiver: string, reason: string, evidence: string) {
     const r = await fileReport(this.ctx, { receiver, reason, evidence });
@@ -32,7 +33,7 @@ class InProcessBackend implements OikoBackend {
     const { rpc } = await import("./near");
     let status = 200, code: string | null = null;
     try {
-      return await proposeChange(this.ctx, change, reason, { store: store(), now: () => Date.now(), overview: (v) => rpc().view(v, "get_overview") });
+      return forReader(await proposeChange(this.ctx, change, reason, { store: store(), now: () => Date.now(), overview: (v) => rpc().view(v, "get_overview") }), this.labels);
     } catch (e) {
       status = e instanceof ApiError ? e.status : 500;
       code = e instanceof ApiError ? e.code : "E_INTERNAL";
@@ -99,7 +100,7 @@ export async function handleMcp(req: Request, urlToken?: string): Promise<Respon
     } catch {
       return json({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error" }, id: null }, 400);
     }
-    const server = createOikoMcpServer(new InProcessBackend(ctx));
+    const server = createOikoMcpServer(new InProcessBackend(ctx, labelModeOf(req)));
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     await server.connect(transport);
     // Rebuild the request (body already consumed) for the transport.

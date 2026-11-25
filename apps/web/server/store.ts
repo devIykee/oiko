@@ -63,6 +63,14 @@ export interface Store {
   getChange(id: string): Promise<ChangeProposal | null>;
   /** Newest first. */
   listChanges(vaultId: string, limit: number): Promise<ChangeProposal[]>;
+  /** Operator dashboard: aggregate counts only (no per-user rows). `sinceMs` bounds the "recent" counts. */
+  adminCounts(sinceMs: number): Promise<AdminCounts>;
+}
+
+export interface AdminCounts {
+  invoices: number; invoicesPrivate: number; invoicesRecent: number;
+  changesPending: number; accessRecent: number; accessRefusedRecent: number;
+  reports: number; pushSubscriptions: number; webhooks: number;
 }
 
 export class MemoryStore implements Store {
@@ -86,6 +94,16 @@ export class MemoryStore implements Store {
   async getChange(id: string) { const c = this.changes.get(id); return c ? structuredClone(c) : null; }
   async listChanges(vaultId: string, limit: number) {
     return [...this.changes.values()].filter((c) => c.vaultId === vaultId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit).map((c) => structuredClone(c));
+  }
+  async adminCounts(sinceMs: number): Promise<AdminCounts> {
+    const inv = [...this.invoices.values()];
+    const recentLog = this.log.filter((r) => Date.parse(r.at) >= sinceMs);
+    return {
+      invoices: inv.length, invoicesPrivate: inv.filter((i) => !!i.sealed).length, invoicesRecent: inv.filter((i) => Date.parse(i.createdAt) >= sinceMs).length,
+      changesPending: [...this.changes.values()].filter((c) => c.status === "pending").length,
+      accessRecent: recentLog.length, accessRefusedRecent: recentLog.filter((r) => (r.status ?? 0) >= 400).length,
+      reports: this.reports.length, pushSubscriptions: this.push.size, webhooks: [...this.settings.keys()].filter((k) => k.startsWith("webhook:")).length,
+    };
   }
   async useNonce(nonce: string, _pk: string, expiresAt: number) {
     const now = Date.now();
@@ -288,6 +306,26 @@ class PgStore implements Store {
     const db = await this.db();
     const rows = await db.select().from(agentChanges).where(eq(agentChanges.vaultId, vaultId)).orderBy(desc(agentChanges.createdAt)).limit(limit);
     return rows.map((r: typeof agentChanges.$inferSelect) => r.data as ChangeProposal);
+  }
+  async adminCounts(sinceMs: number): Promise<AdminCounts> {
+    const db = await this.db();
+    const since = new Date(sinceMs);
+    const rows = await db.execute(sql`SELECT
+      (SELECT count(*) FROM invoices) AS invoices,
+      (SELECT count(*) FROM invoices WHERE jsonb_typeof(data->'sealed') = 'object') AS invoices_private,
+      (SELECT count(*) FROM invoices WHERE created_at >= ${since}) AS invoices_recent,
+      (SELECT count(*) FROM agent_changes WHERE status = 'pending') AS changes_pending,
+      (SELECT count(*) FROM agent_access_log WHERE at >= ${since}) AS access_recent,
+      (SELECT count(*) FROM agent_access_log WHERE at >= ${since} AND status >= 400) AS access_refused_recent,
+      (SELECT count(*) FROM counterparty_reports) AS reports,
+      (SELECT count(*) FROM push_subscriptions) AS push_subscriptions,
+      (SELECT count(*) FROM app_settings WHERE key LIKE 'webhook:%') AS webhooks`);
+    const r = ((rows as unknown as Array<Record<string, string | number>>)[0] ?? {}) as Record<string, string | number>;
+    const n = (k: string) => Number(r[k] ?? 0);
+    return {
+      invoices: n("invoices"), invoicesPrivate: n("invoices_private"), invoicesRecent: n("invoices_recent"), changesPending: n("changes_pending"),
+      accessRecent: n("access_recent"), accessRefusedRecent: n("access_refused_recent"), reports: n("reports"), pushSubscriptions: n("push_subscriptions"), webhooks: n("webhooks"),
+    };
   }
   async listInvoices(owner: string) {
     const db = await this.db();
