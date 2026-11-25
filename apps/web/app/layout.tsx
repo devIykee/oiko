@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { Alive } from "@/components/Alive";
+import { Suspense } from "react";
 import localFont from "next/font/local";
 import type { ReactNode } from "react";
 import { THEME_SCRIPT } from "@/components/marketing/theme-script";
@@ -82,6 +84,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <div className="oi-night__shoot" />
         </div>
         {children}
+        <Suspense fallback={null}><Alive /></Suspense>
       </body>
     </html>
   );

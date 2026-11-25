@@ -483,3 +483,12 @@ Vault code hash is now **`72sdtZyfMEdLh2RSqSjBAPt73PpsHCr24irGCi9yahex`** (298,9
 - **Invoices:** per-invoice content key in the link's `#fragment`, wrapped with the view key for the owner (`keyBox`). Text fields on the server hold Veil tokens (for exports and agents) or `Private`. Amounts stay plain so payment works.
 - **Backwards compatibility:** agent-facing output (gateway, hosted MCP, change summaries, webhooks) masks tokens as "Private" unless the client sends `X-Oiko-Labels: sealed`; the header isn't signed (presentation only). Push reminders use "A bill" for a sealed name. oiko-mcp 0.3.0 sends the header when it holds `vk`. `scripts/veil-compat.sh` runs the sandbox test against the earlier vault (commit 67c925f).
 - **Not done:** key rotation; sealing names inside agent change proposals (the server checks names at 32 chars before approval); private amounts (needs ZK, see `docs/ROADMAP.md` 3b).
+
+## Interaction feel and Next.js 16.4.6 (2026-11-25)
+- **Next.js 16.4.3 → 16.4.6** (and `eslint-config-next`): fixes seven moderate advisories affecting ≤ 16.4.4 (`use cache` cross-request leaks, image-optimizer SVG bypass, HttpOnly cookie exposure on Edge routes, response injection when forwarding fetches). Same minor version; build, unit and e2e suites pass unchanged.
+- **Alive** (`apps/web/components/Alive.tsx`, `app/alive.css`), mounted once in the root layout, so it covers the app, the website, pay/invoice pages and admin:
+  - press: one delegated `pointerdown` listener adds `.is-pressed` and keeps it at least 110 ms, so a quick tap on a phone still shows (plain `:active` often lasts under a frame); controls sink fast (90 ms) and spring back with overshoot (380 ms, `cubic-bezier(0.34, 1.56, 0.64, 1)`);
+  - ripple from the touch point on buttons, rows and cards; it only borrows `position: relative` for a control that has no positioned children, so layout never shifts;
+  - a 3 px progress bar that starts on the click (capture phase) and finishes when the new path renders; each new screen fades up 8 px over 300 ms (`template.tsx` + `components/Enter.tsx`), never on the first load so first paint and LCP are unchanged;
+  - 6 ms haptic tick on switches and segmented controls where supported; mouse hover lifts buttons and cards 1–2 px;
+  - transform/opacity only; nothing runs with `prefers-reduced-motion` or low-data mode (e2e README-10 still passes).

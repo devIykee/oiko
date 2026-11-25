@@ -1,0 +1,67 @@
+/* Alive: how things respond when you touch them (components/Alive.tsx adds the classes and ripples).
+   - Press: things sink a little on contact (fast), then spring back past their size and settle (slow, with overshoot).
+     `.is-pressed` is held for a minimum time by Alive.tsx, so even a quick tap on a phone is visible.
+   - Ripple: a soft circle grows from where you touched.
+   - Navigation: a slim bar starts the moment you tap a link; each new screen fades up into place.
+   Everything here is transform/opacity only, and none of it runs with reduced motion or low-data mode.
+   :root raises specificity so these win over the component styles in @oiko/ui and marketing.css. */
+
+:root { --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); --alive-press: 90ms; --alive-release: 380ms; }
+
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-low-data="1"]) :is(.oi-btn, .oi-iconbtn, .oi-chip, .oi-potcard, .oi-wcard, .oi-share__btn, .mk-press, .oi-seg__btn, .oi-key, .oi-biller, .oi-ra__circle, .oi-tab svg, .oi-toggle__thumb) {
+    transition-property: transform, filter, opacity, background-color, color, box-shadow;
+    transition-duration: var(--alive-release);
+    transition-timing-function: var(--ease-spring);
+  }
+  /* Press in: quick and firm. */
+  :root:not([data-low-data="1"]) :is(.oi-btn, .oi-share__btn, .mk-press).is-pressed:not(:disabled) { transform: scale(0.955); filter: brightness(0.92); transition-duration: var(--alive-press); transition-timing-function: ease-out; }
+  :root:not([data-low-data="1"]) :is(.oi-iconbtn, .oi-chip, .oi-key, .oi-biller).is-pressed { transform: scale(0.92); transition-duration: var(--alive-press); transition-timing-function: ease-out; }
+  :root:not([data-low-data="1"]) :is(.oi-potcard, .oi-wcard).is-pressed { transform: scale(0.965); transition-duration: var(--alive-press); transition-timing-function: ease-out; }
+  :root:not([data-low-data="1"]) .oi-seg__btn.is-pressed { transform: scale(0.94); transition-duration: var(--alive-press); }
+  :root:not([data-low-data="1"]) .oi-ra.is-pressed .oi-ra__circle { transform: scale(0.88); transition-duration: var(--alive-press); transition-timing-function: ease-out; }
+  :root:not([data-low-data="1"]) .oi-tab.is-pressed svg { transform: scale(0.82); transition-duration: var(--alive-press); }
+  :root:not([data-low-data="1"]) .oi-lr--interactive.is-pressed { transform: scale(0.99); background: var(--pressed); transition: transform var(--alive-press) ease-out, background-color 0ms; }
+  :root:not([data-low-data="1"]) .oi-lr--interactive { transition: transform var(--alive-release) var(--ease-spring), background-color 240ms ease-out; }
+  /* Toggle: the thumb stretches toward where it's going while pressed. */
+  :root:not([data-low-data="1"]) .oi-toggle.is-pressed .oi-toggle__thumb { transform: scaleX(1.18); transform-origin: left center; }
+  :root:not([data-low-data="1"]) .oi-toggle[aria-checked="true"].is-pressed .oi-toggle__thumb { transform: translateX(20px) scaleX(1.18); transform-origin: right center; }
+  /* The active tab's icon gives a little hop when it becomes active. */
+  :root:not([data-low-data="1"]) .oi-tab[aria-current="page"] svg { animation: alive-hop 420ms var(--ease-spring); }
+
+  /* Hover (mouse only): lift buttons and cards a touch. */
+  @media (hover: hover) {
+    :root:not([data-low-data="1"]) :is(.oi-btn, .mk-press):hover:not(:disabled):not(.is-pressed) { transform: translateY(-1px); }
+    :root:not([data-low-data="1"]) :is(.oi-potcard, .oi-wcard):hover:not(.is-pressed) { transform: translateY(-2px); }
+  }
+
+  /* Ripple */
+  .alive-ripple-host { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; z-index: 0; }
+  .alive-ripple {
+    position: absolute; border-radius: 50%; pointer-events: none; background: currentColor; opacity: 0.14;
+    transform: translate(-50%, -50%) scale(0); animation: alive-ripple 520ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  /* Rows already darken when pressed: their ripple is a lighter wash on top. */
+  .oi-lr--interactive .alive-ripple, .oi-biller .alive-ripple, .oi-key .alive-ripple { opacity: 0.06; }
+  .alive-ripple.is-out { animation: alive-ripple 520ms cubic-bezier(0.22, 1, 0.36, 1) forwards, alive-fade 360ms ease-out 160ms forwards; }
+
+  /* New screen fades up into place (app/(app)/template.tsx, app/(marketing)/template.tsx). */
+  .alive-enter { animation: alive-enter 300ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+  /* Navigation progress bar */
+  .alive-bar { transition: transform 9s cubic-bezier(0.1, 0.7, 0.2, 1), opacity 240ms ease-out; }
+  .alive-bar.is-done { transition: transform 200ms ease-out, opacity 300ms ease-out 180ms; }
+}
+
+.alive-bar {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 1000; pointer-events: none;
+  background: var(--accent); transform-origin: left center; transform: scaleX(0); opacity: 0;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.alive-bar.is-running { opacity: 1; transform: scaleX(0.82); }
+.alive-bar.is-done { opacity: 0; transform: scaleX(1); }
+
+@keyframes alive-ripple { to { transform: translate(-50%, -50%) scale(1); } }
+@keyframes alive-fade { to { opacity: 0; } }
+@keyframes alive-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes alive-hop { 0% { transform: scale(1); } 40% { transform: scale(1.18) translateY(-2px); } 100% { transform: scale(1); } }
